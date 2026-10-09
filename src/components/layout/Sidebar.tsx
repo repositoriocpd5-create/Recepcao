@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   ChevronRight,
   BadgeCheck,
+  BookOpen,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
     { name: 'Autorizações', path: '/autorizacoes', icon: CheckCircle2 },
     { name: 'Agendamentos', path: '/agendamentos', icon: Calendar },
     { name: 'Crachás', path: '/crachas', icon: BadgeCheck },
+    { name: 'Manual de Uso', path: '/manual', icon: BookOpen },
   ];
 
   const managementNav = [
