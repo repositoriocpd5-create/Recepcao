@@ -54,7 +54,7 @@ export const DashboardPage: React.FC = () => {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
-          <h2 className="text-xl font-bold text-slate-100">Painel Geral de Controle da SME</h2>
+          <h2 className="text-xl font-bold text-slate-100">Painel Geral de Controle da SMEDU</h2>
           <p className="text-xs text-slate-400 mt-1">
             Métricas de fluxo, ocupação predial e conformidade em tempo real
           </p>

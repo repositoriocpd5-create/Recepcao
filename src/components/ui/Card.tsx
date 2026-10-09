@@ -9,8 +9,8 @@ export const Card: React.FC<CardProps> = ({ className, hoverable, children, ...p
   return (
     <div
       className={cn(
-        'bg-[#121826] border border-slate-800/90 rounded-xl p-5 shadow-xl shadow-black/20',
-        hoverable && 'transition-all duration-200 hover:border-slate-700 hover:shadow-2xl hover:-translate-y-0.5',
+        'bg-white border border-[#dce4f0] rounded-xl p-5 shadow-[0_8px_22px_-14px_rgba(18,44,82,.22)] dark:bg-[#121826] dark:border-slate-800/90 dark:shadow-xl dark:shadow-black/20',
+        hoverable && 'transition-all duration-200 hover:border-[#9fc9ed] hover:shadow-[0_14px_28px_-16px_rgba(18,44,82,.28)] hover:-translate-y-0.5 dark:hover:border-slate-700 dark:hover:shadow-2xl',
         className
       )}
       {...props}
@@ -25,7 +25,7 @@ export const CardHeader: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   children,
   ...props
 }) => (
-  <div className={cn('flex items-center justify-between pb-4 border-b border-slate-800/80 mb-4', className)} {...props}>
+  <div className={cn('flex items-center justify-between pb-4 border-b border-[#dce4f0] mb-4 dark:border-slate-800/80', className)} {...props}>
     {children}
   </div>
 );
@@ -35,7 +35,7 @@ export const CardTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>> = ({
   children,
   ...props
 }) => (
-  <h3 className={cn('text-base font-semibold text-slate-100 flex items-center gap-2', className)} {...props}>
+  <h3 className={cn('text-base font-semibold text-[#152238] flex items-center gap-2 dark:text-slate-100', className)} {...props}>
     {children}
   </h3>
 );
@@ -45,7 +45,7 @@ export const CardDescription: React.FC<React.HTMLAttributes<HTMLParagraphElement
   children,
   ...props
 }) => (
-  <p className={cn('text-xs text-slate-400 mt-1', className)} {...props}>
+  <p className={cn('text-xs text-[#627289] mt-1 dark:text-slate-400', className)} {...props}>
     {children}
   </p>
 );

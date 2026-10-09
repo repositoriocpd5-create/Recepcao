@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, Search, UserPlus, Edit2, Shield, RefreshCw } from 'lucide-react';
+import { Users, Search, UserPlus, Edit2, Shield, RefreshCw, FileDown } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { dataService, formatCpf } from '@/services/dataService';
+import { generateInstitutionalPdf } from '@/services/pdfService';
 import { Visitante } from '@/types';
 import { formatDateTime } from '@/lib/utils';
 
@@ -27,6 +28,7 @@ export const VisitantesPage: React.FC = () => {
   const [empresa, setEmpresa] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const carregarVisitantes = async () => {
     setIsLoading(true);
@@ -99,6 +101,21 @@ export const VisitantesPage: React.FC = () => {
     return v.nome.toLowerCase().includes(termo) || v.cpf.includes(termo);
   });
 
+  const handleGerarPdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      await generateInstitutionalPdf({
+        title: 'Cadastro Geral de Visitantes',
+        subtitle: `Visitantes listados: ${filtrados.length} · Emitido em ${new Date().toLocaleString('pt-BR')}`,
+        columns: ['Nome', 'CPF', 'RG / Documento', 'Telefone', 'Empresa / Vínculo', 'Observações'],
+        rows: filtrados.map((item) => [item.nome, item.cpf, item.rg || '—', item.telefone || '—', item.empresa_orgao || 'Cidadão', item.observacoes || '—']),
+        filename: 'cadastro-de-visitantes',
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -116,6 +133,10 @@ export const VisitantesPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={handleGerarPdf} isLoading={isGeneratingPdf}>
+            <FileDown className="w-3.5 h-3.5" />
+            <span>Gerar PDF</span>
+          </Button>
           <Button variant="outline" size="sm" onClick={carregarVisitantes} isLoading={isLoading}>
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Atualizar</span>

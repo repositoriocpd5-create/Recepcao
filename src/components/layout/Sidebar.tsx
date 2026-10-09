@@ -12,12 +12,14 @@ import {
   Building2,
   ShieldCheck,
   ChevronRight,
+  BadgeCheck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
-export const Sidebar: React.FC<{ isOpen?: boolean; onClose?: () => void }> = ({
+export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClose?: () => void }> = ({
   isOpen,
+  isCollapsed = false,
   onClose,
 }) => {
   const { user } = useAuth();
@@ -30,6 +32,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onClose?: () => void }> = ({
     { name: 'Servidores', path: '/servidores', icon: Briefcase },
     { name: 'Autorizações', path: '/autorizacoes', icon: CheckCircle2 },
     { name: 'Agendamentos', path: '/agendamentos', icon: Calendar },
+    { name: 'Crachás', path: '/crachas', icon: BadgeCheck },
   ];
 
   const managementNav = [
@@ -44,17 +47,18 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onClose?: () => void }> = ({
   return (
     <aside
       className={cn(
-        'w-64 bg-[#0e121d] border-r border-slate-800/80 flex flex-col shrink-0 min-h-[calc(100vh-65px)]',
-        'fixed lg:static top-[65px] bottom-0 left-0 z-30 transition-transform duration-200',
+        'w-64 bg-gradient-to-b from-[#075fa7] via-[#005a9c] to-[#043c74] border-r border-[#0a71bb] shadow-[8px_0_22px_-18px_rgba(18,44,82,.36)] flex flex-col shrink-0 min-h-[calc(100vh-65px)] text-white dark:from-[#075fa7] dark:via-[#005a9c] dark:to-[#043c74] dark:border-[#0a71bb]',
+        'fixed lg:static top-[65px] bottom-0 left-0 z-30 transition-[transform,width] duration-200',
+        isCollapsed && 'lg:w-[72px]',
         isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       )}
     >
-      <div className="p-4 flex-1 space-y-6 overflow-y-auto">
+      <div className={cn('p-4 flex-1 space-y-6 overflow-y-auto', isCollapsed && 'lg:px-2')}>
         {/* Seção Operacional */}
         <div>
-          <div className="px-3 mb-2 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+          {!isCollapsed && <div className="px-3 mb-2 text-[11px] font-bold tracking-wider text-blue-100/80 uppercase">
             Operação da Recepção
-          </div>
+          </div>}
           <nav className="space-y-1">
             {operationalNav.map((item) => {
               const Icon = item.icon;
@@ -63,21 +67,23 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onClose?: () => void }> = ({
                   key={item.path}
                   to={item.path}
                   onClick={onClose}
+                  title={isCollapsed ? item.name : undefined}
                   className={({ isActive }) =>
                     cn(
                       'flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all group',
+                      isCollapsed && 'lg:justify-center lg:px-2',
                       isActive
-                        ? 'bg-emerald-600/15 text-emerald-400 border border-emerald-500/30 font-semibold'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                        ? 'bg-white text-[#005a9c] border border-white font-bold shadow-[0_8px_18px_-10px_rgba(0,0,0,.55)]'
+                        : 'text-white/90 hover:text-white hover:bg-white/15'
                     )
                   }
                 >
                   <div className="flex items-center gap-2.5">
                     <Icon className="w-4 h-4 text-inherit" />
-                    <span>{item.name}</span>
+                    {!isCollapsed && <span>{item.name}</span>}
                   </div>
-                  {item.badge && (
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                  {item.badge && !isCollapsed && (
+                    <span className="text-[10px] bg-[#d9efff] text-[#005a9c] px-1.5 py-0.5 rounded border border-white/60">
                       {item.badge}
                     </span>
                   )}
@@ -89,9 +95,9 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onClose?: () => void }> = ({
 
         {/* Seção de Gestão & Auditoria */}
         <div>
-          <div className="px-3 mb-2 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+          {!isCollapsed && <div className="px-3 mb-2 text-[11px] font-bold tracking-wider text-blue-100/80 uppercase">
             Gestão & Controle
-          </div>
+          </div>}
           <nav className="space-y-1">
             {managementNav.map((item) => {
               const Icon = item.icon;
@@ -100,20 +106,22 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onClose?: () => void }> = ({
                   key={item.path}
                   to={item.path}
                   onClick={onClose}
+                  title={isCollapsed ? item.name : undefined}
                   className={({ isActive }) =>
                     cn(
                       'flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all group',
+                      isCollapsed && 'lg:justify-center lg:px-2',
                       isActive
-                        ? 'bg-emerald-600/15 text-emerald-400 border border-emerald-500/30 font-semibold'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                        ? 'bg-white text-[#005a9c] border border-white font-bold shadow-[0_8px_18px_-10px_rgba(0,0,0,.55)]'
+                        : 'text-white/90 hover:text-white hover:bg-white/15'
                     )
                   }
                 >
                   <div className="flex items-center gap-2.5">
                     <Icon className="w-4 h-4 text-inherit" />
-                    <span>{item.name}</span>
+                    {!isCollapsed && <span>{item.name}</span>}
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 transition-colors" />
+                  {!isCollapsed && <ChevronRight className="w-3.5 h-3.5 text-blue-100/70 group-hover:text-white transition-colors" />}
                 </NavLink>
               );
             })}
@@ -122,12 +130,12 @@ export const Sidebar: React.FC<{ isOpen?: boolean; onClose?: () => void }> = ({
       </div>
 
       {/* Rodapé da sidebar com versão e ambiente */}
-      <div className="p-3 border-t border-slate-800/80 bg-[#0a0d15] text-[11px] text-slate-400">
+      <div className={cn('p-3 border-t border-white/20 bg-[#043c74]/60 text-[11px] text-blue-50', isCollapsed && 'lg:hidden')}>
         <div className="flex items-center justify-between">
           <span className="font-mono">v1.0.0-homolog</span>
-          <span className="text-emerald-500 font-medium">Build Homologado</span>
+          <span className="text-emerald-200 font-medium">Build Homologado</span>
         </div>
-        <p className="text-[10px] text-slate-400 mt-1">
+        <p className="text-[10px] text-blue-100/70 mt-1">
           Segurança Supabase RLS ativa
         </p>
       </div>
