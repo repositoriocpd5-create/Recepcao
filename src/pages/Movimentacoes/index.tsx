@@ -9,6 +9,9 @@ import {
   Clock,
   CheckCircle,
   FileDown,
+  Eye,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -22,6 +25,7 @@ import { formatDateTime } from '@/lib/utils';
 
 export const MovimentacoesPage: React.FC = () => {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -300,6 +304,37 @@ export const MovimentacoesPage: React.FC = () => {
                         )}
                       </td>
                       <td className="py-3 px-4 text-right">
+                        {isAdmin && (
+                          <span className="inline-flex items-center gap-1 mr-2 align-middle">
+                            <button
+                              type="button"
+                              onClick={() => openVisitorHistory(m)}
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                              title="Ver registro"
+                              aria-label="Ver registro"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => alert('Edição de movimentação disponível apenas mediante confirmação administrativa.')}
+                              className="p-1.5 text-[#0877c9] hover:bg-[#edf5fc] rounded-md transition-colors dark:text-blue-400 dark:hover:bg-blue-950/40"
+                              title="Editar registro"
+                              aria-label="Editar registro"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => alert('Exclusão de movimentação disponível apenas mediante confirmação administrativa.')}
+                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-md transition-colors dark:text-rose-400 dark:hover:bg-rose-950/40"
+                              title="Excluir registro"
+                              aria-label="Excluir registro"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </span>
+                        )}
                         {m.status === 'no_predio' && (
                           <Button
                             size="sm"

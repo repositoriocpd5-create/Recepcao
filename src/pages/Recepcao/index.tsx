@@ -40,7 +40,7 @@ import {
   ConsultaServidorResultado,
   ConsultaVisitanteResultado,
 } from '@/types';
-import { formatDateTime, formatTime } from '@/lib/utils';
+import { formatDateTime, formatDuration, formatTime } from '@/lib/utils';
 import { biometricProvider, isBiometricAgentConfigured, DeviceStatus, IdentificationMethod } from '@/services/identification';
 import { generateInstitutionalPdf } from '@/services/pdfService';
 
@@ -100,6 +100,7 @@ export const RecepcaoPage: React.FC = () => {
   // Formulário de Registro de Entrada
   const [formDestinoDepId, setFormDestinoDepId] = useState('');
   const [formDestinoSetorId, setFormDestinoSetorId] = useState('');
+  const [formDestinosAdicionais, setFormDestinosAdicionais] = useState<Array<{ departamentoId: string; setorId: string }>>([]);
   const [formServidorDestinoId, setFormServidorDestinoId] = useState('');
   const [formServidorDestinoBusca, setFormServidorDestinoBusca] = useState('');
   const [isServidorDestinoBuscaOpen, setIsServidorDestinoBuscaOpen] = useState(false);
@@ -350,11 +351,29 @@ export const RecepcaoPage: React.FC = () => {
     setFormCrachaFeedback(null);
     setFormDestinoDepId('');
     setFormDestinoSetorId('');
+    setFormDestinosAdicionais([]);
     setFormServidorDestinoId('');
     setFormServidorDestinoBusca('');
     setFormMotivo('Atendimento institucional');
     setFormObservacoes('');
     setIsEntradaModalOpen(true);
+  };
+
+  const adicionarDestinoAdicional = () => {
+    if (!formDestinoDepId || !formDestinoSetorId) return;
+    const jaIncluido = formDestinosAdicionais.some(
+      (destino) => destino.departamentoId === formDestinoDepId && destino.setorId === formDestinoSetorId
+    );
+    if (!jaIncluido) {
+      setFormDestinosAdicionais((destinos) => [
+        ...destinos,
+        { departamentoId: formDestinoDepId, setorId: formDestinoSetorId },
+      ]);
+    }
+  };
+
+  const removerDestinoAdicional = (setorId: string) => {
+    setFormDestinosAdicionais((destinos) => destinos.filter((destino) => destino.setorId !== setorId));
   };
 
   const validarCrachaParaEntrada = async (): Promise<boolean> => {
@@ -463,7 +482,20 @@ export const RecepcaoPage: React.FC = () => {
     try {
       if (!(await validarCrachaParaEntrada())) return;
       const setorEscolhido = setores.find((s) => s.id === formDestinoSetorId);
-      const requerAutorizacao = setorEscolhido?.requer_autorizacao || false;
+      const requerAutorizacao = [formDestinoSetorId, ...formDestinosAdicionais.map((destino) => destino.setorId)]
+        .some((setorId) => setores.find((setor) => setor.id === setorId)?.requer_autorizacao);
+      const destinosAdicionaisDescricao = formDestinosAdicionais
+        .map((destino) => {
+          const departamento = departamentos.find((item) => item.id === destino.departamentoId);
+          const setor = setores.find((item) => item.id === destino.setorId);
+          return departamento && setor ? `${departamento.sigla} - ${setor.sigla}` : null;
+        })
+        .filter(Boolean)
+        .join(', ');
+      const observacoesComDestinos = [
+        formObservacoes.trim(),
+        destinosAdicionaisDescricao && `Destinos adicionais: ${destinosAdicionaisDescricao}`,
+      ].filter(Boolean).join(' | ');
 
       const pessoaId =
         activeTab === 'servidor'
@@ -482,7 +514,7 @@ export const RecepcaoPage: React.FC = () => {
           cracha_numero: formCracha.trim().toUpperCase(),
           motivo: formMotivo,
           requer_autorizacao: requerAutorizacao,
-          observacoes: formObservacoes,
+          observacoes: observacoesComDestinos,
         },
         user
       );
@@ -654,7 +686,7 @@ export const RecepcaoPage: React.FC = () => {
       </div>
 
       {/* 2. Seleção do Fluxo Principal (Servidor x Visitante) conforme Screenshot 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         {/* Card Servidor */}
         <div
           onClick={() => {
@@ -663,20 +695,20 @@ export const RecepcaoPage: React.FC = () => {
             setSearchFeedback({ type: null, message: '' });
             setIsIdentificationModalOpen(true);
           }}
-          className={`cursor-pointer rounded-2xl p-4 lg:p-5 border transition-all text-left flex items-center gap-4 min-w-0 min-h-[132px] ${
+          className={`cursor-pointer rounded-2xl p-5 border transition-all text-left flex flex-col min-w-0 min-h-[168px] ${
             identificationMethod === 'matricula'
               ? 'bg-[#f0f7ff] border-[#2583ff] shadow-[0_14px_28px_-18px_rgba(8,119,201,.55)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
               : 'bg-white border-[#dce4f0] hover:border-[#9fc9ed] hover:shadow-sm dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
           }`}
         >
-          <div className="w-16 h-16 shrink-0 rounded-2xl bg-[#dcecff] border border-[#c5e0fa] flex items-center justify-center text-[#1677e8] dark:bg-blue-950/60 dark:border-blue-500/30 dark:text-blue-400">
-            <Briefcase className="w-8 h-8" />
+          <div className="w-14 h-14 shrink-0 mb-3 rounded-2xl bg-[#dcecff] border border-[#c5e0fa] flex items-center justify-center text-[#1677e8] dark:bg-blue-950/60 dark:border-blue-500/30 dark:text-blue-400">
+            <Briefcase className="w-7 h-7" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-base font-bold text-slate-100 uppercase tracking-wider">Servidor</h3>
+            <h3 className="text-[15px] leading-tight font-bold text-[#152238] dark:text-slate-100 uppercase tracking-[0.08em]">Servidor</h3>
             <p className="text-xs text-slate-400 mt-0.5">Identificar por matrícula</p>
           </div>
-          <div className="shrink-0 text-xs text-emerald-400 font-semibold pt-1 text-right">
+          <div className="mt-auto pt-4 text-[11px] leading-none text-emerald-600 dark:text-emerald-400 font-semibold">
             {identificationMethod === 'matricula' ? '● Modo Ativo' : 'Selecionar'}
           </div>
         </div>
@@ -689,20 +721,20 @@ export const RecepcaoPage: React.FC = () => {
             setSearchFeedback({ type: null, message: '' });
             setIsIdentificationModalOpen(true);
           }}
-          className={`cursor-pointer rounded-2xl p-4 lg:p-5 border transition-all text-left flex items-center gap-4 min-w-0 min-h-[132px] ${
+          className={`cursor-pointer rounded-2xl p-5 border transition-all text-left flex flex-col min-w-0 min-h-[168px] ${
             identificationMethod === 'cpf'
               ? 'bg-[#f0fdf4] border-[#22c55e] shadow-[0_14px_28px_-18px_rgba(22,163,74,.38)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
               : 'bg-white border-[#dce4f0] hover:border-[#9fc9ed] hover:shadow-sm dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
           }`}
         >
-          <div className="w-16 h-16 shrink-0 rounded-2xl bg-[#e8f8ee] border border-[#ccefd8] flex items-center justify-center text-[#16a34a] dark:bg-emerald-950/60 dark:border-emerald-500/30 dark:text-emerald-400">
-            <Users className="w-8 h-8" />
+          <div className="w-14 h-14 shrink-0 mb-3 rounded-2xl bg-[#e8f8ee] border border-[#ccefd8] flex items-center justify-center text-[#16a34a] dark:bg-emerald-950/60 dark:border-emerald-500/30 dark:text-emerald-400">
+            <Users className="w-7 h-7" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-base font-bold text-slate-100 uppercase tracking-wider">Visitante</h3>
+            <h3 className="text-[15px] leading-tight font-bold text-[#152238] dark:text-slate-100 uppercase tracking-[0.08em]">Visitante</h3>
             <p className="text-xs text-slate-400 mt-0.5">Identificar por CPF</p>
           </div>
-          <div className="shrink-0 text-xs text-emerald-400 font-semibold pt-1 text-right">
+          <div className="mt-auto pt-4 text-[11px] leading-none text-emerald-600 dark:text-emerald-400 font-semibold">
             {identificationMethod === 'cpf' ? '● Modo Ativo' : 'Selecionar'}
           </div>
         </div>
@@ -710,14 +742,14 @@ export const RecepcaoPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setIdentificationMethod('biometria')}
-          className={`rounded-2xl p-4 lg:p-5 border transition-all text-left min-h-[132px] ${
+          className={`rounded-2xl p-5 border transition-all text-left min-h-[168px] flex flex-col ${
             identificationMethod === 'biometria'
               ? 'bg-[#f5f3ff] border-[#a78bfa] shadow-sm dark:bg-purple-950/60 dark:border-purple-500/40'
               : 'bg-white border-[#dce4f0] hover:border-[#c4b5fd] dark:bg-[#101625] dark:border-slate-800'
           }`}
         >
-          <Fingerprint className="w-8 h-8 text-[#7c3aed] mb-3" />
-          <div className="text-sm font-bold text-[#152238] dark:text-slate-100">Biometria digital</div>
+          <Fingerprint className="w-7 h-7 text-[#7c3aed] mb-4" />
+          <div className="text-[15px] leading-tight font-bold text-[#152238] dark:text-slate-100">Biometria digital</div>
           <p className="text-xs text-[#627289] dark:text-slate-400 mt-1">{biometricLabel[biometricStatus]}</p>
           <span className="inline-flex mt-3 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#ede9fe] text-[#7c3aed]">{isBiometricAgentConfigured ? 'Agente configurado' : 'Em implantação'}</span>
         </button>
@@ -731,10 +763,10 @@ export const RecepcaoPage: React.FC = () => {
               : 'bg-white border-[#dce4f0] hover:border-[#93c5fd] dark:bg-[#101625] dark:border-slate-800'
           }`}
         >
-          <QrCode className="w-8 h-8 text-[#0877c9] mb-3" />
-          <div className="text-sm font-bold text-[#152238] dark:text-slate-100">QR Code</div>
+          <QrCode className="w-7 h-7 text-[#0877c9] mb-4" />
+          <div className="text-[15px] leading-tight font-bold text-[#152238] dark:text-slate-100">QR Code</div>
           <p className="text-xs text-[#627289] dark:text-slate-400 mt-1">Validação de credencial segura</p>
-          <span className="inline-flex mt-3 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#dbeafe] text-[#0877c9]">Pronto para validar</span>
+          <span className="inline-flex self-start mt-auto pt-4 px-2.5 py-1 text-[10px] leading-none font-semibold rounded-full bg-[#dbeafe] text-[#0877c9]">Pronto para validar</span>
         </button>
 
         <button
@@ -746,7 +778,7 @@ export const RecepcaoPage: React.FC = () => {
               : 'bg-white border-[#dce4f0] hover:border-[#fcd34d] dark:bg-[#101625] dark:border-slate-800'
           }`}
         >
-          <Barcode className="w-8 h-8 text-[#d97706] mb-3" />
+          <Barcode className="w-7 h-7 text-[#d97706] mb-4" />
           <div className="text-sm font-bold text-[#152238] dark:text-slate-100">Código de barras</div>
           <p className="text-xs text-[#627289] dark:text-slate-400 mt-1">Crachá temporário</p>
           <span className="inline-flex mt-3 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#fef3c7] text-[#b45309]">Leitura rápida</span>
@@ -1100,6 +1132,8 @@ export const RecepcaoPage: React.FC = () => {
                   <th className="py-3 px-4">Destino / Setor</th>
                   <th className="py-3 px-4">Motivo</th>
                   <th className="py-3 px-4">Horário Entrada</th>
+                  <th className="py-3 px-4">Horário Saída</th>
+                  <th className="py-3 px-4">Total de Horas</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Ação</th>
                 </tr>
@@ -1137,6 +1171,12 @@ export const RecepcaoPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-slate-300 font-mono">
                         {formatTime(m.data_hora_entrada)}
+                      </td>
+                      <td className="py-3 px-4 text-slate-400 font-mono whitespace-nowrap">
+                        {m.data_hora_saida ? formatTime(m.data_hora_saida) : 'Em andamento'}
+                      </td>
+                      <td className="py-3 px-4 text-slate-300 font-mono whitespace-nowrap">
+                        {formatDuration(m.data_hora_entrada, m.data_hora_saida)}
                       </td>
                       <td className="py-3 px-4">
                         {m.status === 'pendente_autorizacao' ? (
@@ -1482,6 +1522,31 @@ export const RecepcaoPage: React.FC = () => {
               required
               disabled={!formDestinoDepId}
             />
+            {activeTab === 'visitante' && formDestinoDepId && formDestinoSetorId && (
+              <div className="sm:col-span-2 rounded-xl border border-[#dce4f0] bg-[#f8fbff] p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-[#152238] dark:text-slate-100">Outros destinos do visitante</p>
+                    <p className="text-[11px] text-[#627289] dark:text-slate-400">Inclua todos os setores que serão visitados nesta entrada.</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={adicionarDestinoAdicional}>Adicionar destino</Button>
+                </div>
+                {formDestinosAdicionais.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {formDestinosAdicionais.map((destino) => {
+                      const departamento = departamentos.find((item) => item.id === destino.departamentoId);
+                      const setor = setores.find((item) => item.id === destino.setorId);
+                      return (
+                        <span key={destino.setorId} className="inline-flex items-center gap-1.5 rounded-full bg-[#e8f7ee] px-2.5 py-1 text-[11px] font-semibold text-[#166534] dark:bg-emerald-950/60 dark:text-emerald-300">
+                          {departamento?.sigla} - {setor?.sigla}
+                          <button type="button" onClick={() => removerDestinoAdicional(destino.setorId)} className="rounded-full px-0.5 hover:bg-emerald-200 dark:hover:bg-emerald-900" aria-label="Remover destino">×</button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Servidor anfitrião / destino */}

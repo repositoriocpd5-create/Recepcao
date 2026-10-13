@@ -42,3 +42,18 @@ export function formatTime(dateString?: string | null): string {
     return dateString;
   }
 }
+
+export function formatDuration(startDate?: string | null, endDate?: string | null): string {
+  if (!startDate) return '-';
+
+  const start = new Date(startDate).getTime();
+  const end = endDate ? new Date(endDate).getTime() : Date.now();
+
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return '-';
+
+  const totalMinutes = Math.floor((end - start) / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${hours}h ${String(minutes).padStart(2, '0')}min`;
+}
