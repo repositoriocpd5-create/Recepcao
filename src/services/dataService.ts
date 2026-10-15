@@ -567,7 +567,8 @@ export const dataService = {
           visitante:visitantes(*),
           departamento_destino:departamentos(*),
           setor_destino:setores(*),
-          servidor_destino:servidores(*)
+          servidor_destino:servidores(*),
+          destinos:movimentacao_destinos(*)
         `)
         .order('data_hora_entrada', { ascending: false });
       return requireLiveResult(data, error, 'Não foi possível carregar movimentações') as Movimentacao[];
@@ -597,7 +598,12 @@ export const dataService = {
     operador?: UserProfile | null
   ): Promise<Movimentacao> {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase.rpc('rpc_registrar_entrada_com_cracha', {
+      const destinos = input.destinos?.length ? input.destinos : [{
+        departamento_destino_id: input.departamento_destino_id,
+        setor_destino_id: input.setor_destino_id,
+        servidor_destino_id: input.servidor_destino_id,
+      }];
+      const { data, error } = await supabase.rpc('rpc_registrar_entrada_multidestino_com_cracha', {
         p_tipo_pessoa: input.tipo_pessoa,
         p_pessoa_id: input.pessoa_id,
         p_departamento_destino_id: input.departamento_destino_id,
@@ -607,6 +613,7 @@ export const dataService = {
         p_motivo: input.motivo,
         p_requer_autorizacao: Boolean(input.requer_autorizacao),
         p_observacoes: input.observacoes || null,
+        p_destinos: destinos,
       });
 
       if (error) throw new Error(error.message);
@@ -655,6 +662,11 @@ export const dataService = {
       autorizacao_status: requerAut ? 'pendente' : 'dispensada',
       observacoes: input.observacoes,
       recepcionista_entrada_id: operador?.id,
+      destinos: input.destinos?.length ? input.destinos : [{
+        departamento_destino_id: input.departamento_destino_id,
+        setor_destino_id: input.setor_destino_id,
+        servidor_destino_id: input.servidor_destino_id,
+      }],
     };
 
     movs.unshift(novaMov);
