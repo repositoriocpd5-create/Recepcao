@@ -19,6 +19,9 @@ import {
   QrCode,
   Barcode,
   FileDown,
+  Plus,
+  Trash2,
+  CircleHelp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -37,6 +40,7 @@ import {
   Departamento,
   Setor,
   Movimentacao,
+  DestinoVisita,
   ConsultaServidorResultado,
   ConsultaVisitanteResultado,
 } from '@/types';
@@ -109,6 +113,8 @@ export const RecepcaoPage: React.FC = () => {
   const [formMotivo, setFormMotivo] = useState('Atendimento institucional');
   const [formObservacoes, setFormObservacoes] = useState('');
   const [isSubmittingEntrada, setIsSubmittingEntrada] = useState(false);
+  const [destinosVisita, setDestinosVisita] = useState<DestinoVisita[]>([{ departamento_destino_id: '', setor_destino_id: '' }]);
+  const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
 
   // Formulário de Cadastro de Visitante
   const [novoVisNome, setNovoVisNome] = useState('');
@@ -356,6 +362,7 @@ export const RecepcaoPage: React.FC = () => {
     setFormServidorDestinoBusca('');
     setFormMotivo('Atendimento institucional');
     setFormObservacoes('');
+    setDestinosVisita([{ departamento_destino_id: '', setor_destino_id: '' }]);
     setIsEntradaModalOpen(true);
   };
 
@@ -474,6 +481,24 @@ export const RecepcaoPage: React.FC = () => {
     }
   };
 
+  const atualizarDestinoVisita = (index: number, alteracoes: Partial<DestinoVisita>) => {
+    setDestinosVisita((atuais) => atuais.map((destino, atual) => {
+      if (atual !== index) return destino;
+      const proximo = { ...destino, ...alteracoes };
+      if ('departamento_destino_id' in alteracoes) {
+        proximo.setor_destino_id = '';
+        proximo.servidor_destino_id = undefined;
+      }
+      return proximo;
+    }));
+  };
+
+  const adicionarDestinoVisita = () => {
+    if (destinosVisita.length < 10) {
+      setDestinosVisita((atuais) => [...atuais, { departamento_destino_id: '', setor_destino_id: '' }]);
+    }
+  };
+
   // Confirmar Entrada Atômica
   const handleConfirmarEntrada = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -481,6 +506,7 @@ export const RecepcaoPage: React.FC = () => {
 
     try {
       if (!(await validarCrachaParaEntrada())) return;
+<<<<<<< HEAD
       const setorEscolhido = setores.find((s) => s.id === formDestinoSetorId);
       const requerAutorizacao = [formDestinoSetorId, ...formDestinosAdicionais.map((destino) => destino.setorId)]
         .some((setorId) => setores.find((setor) => setor.id === setorId)?.requer_autorizacao);
@@ -496,6 +522,16 @@ export const RecepcaoPage: React.FC = () => {
         formObservacoes.trim(),
         destinosAdicionaisDescricao && `Destinos adicionais: ${destinosAdicionaisDescricao}`,
       ].filter(Boolean).join(' | ');
+=======
+      const destinos = activeTab === 'visitante'
+        ? destinosVisita
+        : [{ departamento_destino_id: formDestinoDepId, setor_destino_id: formDestinoSetorId, servidor_destino_id: formServidorDestinoId || undefined }];
+      if (!destinos.length || destinos.some((destino) => !destino.departamento_destino_id || !destino.setor_destino_id)) {
+        throw new Error('Selecione o departamento e o setor de cada destino da visita.');
+      }
+      const setorEscolhido = setores.find((s) => s.id === destinos[0].setor_destino_id);
+      const requerAutorizacao = destinos.some((destino) => setores.find((s) => s.id === destino.setor_destino_id)?.requer_autorizacao);
+>>>>>>> d60013e (feat: aprimora recepcao e destinos de visita)
 
       const pessoaId =
         activeTab === 'servidor'
@@ -508,13 +544,18 @@ export const RecepcaoPage: React.FC = () => {
         {
           tipo_pessoa: activeTab,
           pessoa_id: pessoaId,
-          departamento_destino_id: formDestinoDepId,
-          setor_destino_id: formDestinoSetorId,
-          servidor_destino_id: formServidorDestinoId || undefined,
+          departamento_destino_id: destinos[0].departamento_destino_id,
+          setor_destino_id: destinos[0].setor_destino_id,
+          servidor_destino_id: destinos[0].servidor_destino_id,
           cracha_numero: formCracha.trim().toUpperCase(),
           motivo: formMotivo,
           requer_autorizacao: requerAutorizacao,
+<<<<<<< HEAD
           observacoes: observacoesComDestinos,
+=======
+          observacoes: formObservacoes,
+          destinos,
+>>>>>>> d60013e (feat: aprimora recepcao e destinos de visita)
         },
         user
       );
@@ -524,7 +565,7 @@ export const RecepcaoPage: React.FC = () => {
         type: 'success',
         message: requerAutorizacao
           ? 'Entrada registrada com solicitação de autorização enviada ao setor.'
-          : 'Entrada registrada com sucesso! Crachá atribuído.',
+          : `Entrada registrada com sucesso! ${destinos.length > 1 ? `${destinos.length} destinos vinculados.` : 'Crachá atribuído.'}`,
       });
 
       // Resetar resultados e atualizar lista
@@ -563,6 +604,9 @@ export const RecepcaoPage: React.FC = () => {
         visitante: novo,
         no_predio: false,
       });
+      // O cadastro é apenas a primeira etapa: encaminha diretamente para a confirmação da pessoa.
+      setIsIdentificationModalOpen(false);
+      setIsPersonDetailsModalOpen(true);
       setSearchFeedback({
         type: 'success',
         message: `Visitante "${novo.nome}" cadastrado com sucesso! Prossiga com o registro de entrada.`,
@@ -641,37 +685,69 @@ export const RecepcaoPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const handleKeyboardShortcut = (event: KeyboardEvent) => {
+      const element = event.target as HTMLElement | null;
+      const isTyping = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement || element?.isContentEditable;
+      if (isTyping || !event.altKey || event.ctrlKey || event.metaKey) return;
+
+      const key = event.code;
+      if (key === 'KeyS') {
+        event.preventDefault();
+        setActiveTab('servidor'); setIdentificationMethod('matricula'); setSearchFeedback({ type: null, message: '' }); setIsIdentificationModalOpen(true);
+      } else if (key === 'KeyV') {
+        event.preventDefault();
+        setActiveTab('visitante'); setIdentificationMethod('cpf'); setSearchFeedback({ type: null, message: '' }); setIsIdentificationModalOpen(true);
+      } else if (key === 'KeyD') {
+        event.preventDefault();
+        setReturnBarcodeInput(''); setReturnBarcodeFeedback(null); setIsBarcodeReturnModalOpen(true);
+      } else if (key === 'KeyA') {
+        event.preventDefault();
+        void carregarDadosIniciais();
+      } else if (key === 'KeyP') {
+        event.preventDefault();
+        void handleGerarPdf();
+      } else if (key === 'Slash' && event.shiftKey) {
+        event.preventDefault();
+        setIsShortcutHelpOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyboardShortcut, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyboardShortcut, { capture: true });
+  }, [isGeneratingPdf, isLoadingPredio, pessoasNoPredio]);
+
   return (
     <div className="space-y-5">
       <div className="hidden md:flex items-center gap-1.5 text-[11px] text-[#7b8ca4] dark:text-slate-500">
         <span>Início</span><ChevronRight className="w-3 h-3" /><span>Recepção</span><ChevronRight className="w-3 h-3" /><span className="text-[#005a9c] dark:text-emerald-400">Balcão da Recepção Central</span>
       </div>
       {/* 1. Cabeçalho de Recepção e Indicadores Rápidos */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-1">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-[#e8f7ee] text-[#16a34a] border border-[#ccefd8] dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-500/30">
-              <UserCheck className="w-5 h-5" />
+            <span className="p-3 rounded-2xl bg-[#dcfce7] text-[#16a34a] border border-[#ccefd8] shadow-sm dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-500/30">
+              <UserCheck className="w-6 h-6" />
             </span>
-            <h2 className="text-xl font-bold text-slate-100">Balcão da Recepção Central</h2>
+            <h2 className="text-2xl font-extrabold tracking-tight text-[#102755] dark:text-slate-100">Balcão da Recepção Central</h2>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-sm text-[#627289] dark:text-slate-400 mt-1">
             Controle de fluxo presencial da Secretaria Municipal de Educação
           </p>
         </div>
 
         {/* Indicadores de fluxo imediato */}
         <div className="flex items-center gap-3">
-          <div className="bg-white border border-[#dce4f0] rounded-xl px-4 py-2.5 flex items-center gap-4 shadow-[0_8px_20px_-16px_rgba(18,44,82,.28)] dark:bg-[#121826] dark:border-slate-800">
-            <div className="p-2 rounded-full bg-[#edf5fc] text-[#0877c9] dark:bg-blue-950/60 dark:text-blue-400"><Users className="w-5 h-5" /></div>
+          <div className="bg-white border border-[#dce4f0] rounded-2xl px-5 py-3 flex items-center gap-4 shadow-[0_12px_24px_-18px_rgba(18,44,82,.35)] dark:bg-[#121826] dark:border-slate-800">
+            <div className="p-2.5 rounded-2xl bg-[#edf5fc] text-[#0877c9] dark:bg-blue-950/60 dark:text-blue-400"><Users className="w-5 h-5" /></div>
             <div>
               <div className="text-[11px] text-slate-400">Presentes no prédio</div>
-              <div className="text-sm font-bold text-slate-100">{pessoasNoPredio.length} pessoas</div>
+              <div className="text-sm font-extrabold text-[#102755] dark:text-slate-100">{pessoasNoPredio.length} pessoas</div>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={handleGerarPdf} isLoading={isGeneratingPdf} title="Gerar relatório em PDF">
             <FileDown className="w-3.5 h-3.5" />
             <span className="hidden lg:inline">Gerar PDF</span>
+            <kbd className="hidden xl:inline rounded border border-current/20 px-1 font-mono text-[10px] opacity-70">Alt P</kbd>
           </Button>
           <Button
             variant="outline"
@@ -681,12 +757,22 @@ export const RecepcaoPage: React.FC = () => {
             title="Atualizar dados em tempo real"
           >
             <RefreshCw className="w-3.5 h-3.5" />
+            <span className="sr-only">Atualizar</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setIsShortcutHelpOpen(true)} title="Ver atalhos do teclado (Alt + ?)">
+            <CircleHelp className="w-4 h-4" />
+            <span className="sr-only">Ver atalhos do teclado</span>
           </Button>
         </div>
       </div>
 
+<<<<<<< HEAD
       {/* 2. Seleção do Fluxo Principal (Servidor x Visitante) conforme Screenshot 2 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+=======
+      {/* 2. Seleção do fluxo principal: a identificação é o único passo nesta tela. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+>>>>>>> d60013e (feat: aprimora recepcao e destinos de visita)
         {/* Card Servidor */}
         <div
           onClick={() => {
@@ -695,12 +781,18 @@ export const RecepcaoPage: React.FC = () => {
             setSearchFeedback({ type: null, message: '' });
             setIsIdentificationModalOpen(true);
           }}
+<<<<<<< HEAD
           className={`cursor-pointer rounded-2xl p-5 border transition-all text-left flex flex-col min-w-0 min-h-[168px] ${
+=======
+          title="Identificar servidor — atalho Alt + S"
+          className={`group relative overflow-hidden cursor-pointer rounded-2xl p-5 lg:p-6 border transition-all duration-200 text-left flex items-center gap-5 min-w-0 min-h-[128px] ${
+>>>>>>> d60013e (feat: aprimora recepcao e destinos de visita)
             identificationMethod === 'matricula'
-              ? 'bg-[#f0f7ff] border-[#2583ff] shadow-[0_14px_28px_-18px_rgba(8,119,201,.55)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
-              : 'bg-white border-[#dce4f0] hover:border-[#9fc9ed] hover:shadow-sm dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
+              ? 'bg-[linear-gradient(135deg,#eff8ff_0%,#fff_66%,#e2f1ff_100%)] border-[#8cc8ff] shadow-[0_18px_32px_-20px_rgba(8,119,201,.65)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
+              : 'bg-white border-[#dce4f0] hover:border-[#72afe5] hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-22px_rgba(8,119,201,.65)] dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
           }`}
         >
+<<<<<<< HEAD
           <div className="w-14 h-14 shrink-0 mb-3 rounded-2xl bg-[#dcecff] border border-[#c5e0fa] flex items-center justify-center text-[#1677e8] dark:bg-blue-950/60 dark:border-blue-500/30 dark:text-blue-400">
             <Briefcase className="w-7 h-7" />
           </div>
@@ -710,6 +802,18 @@ export const RecepcaoPage: React.FC = () => {
           </div>
           <div className="mt-auto pt-4 text-[11px] leading-none text-emerald-600 dark:text-emerald-400 font-semibold">
             {identificationMethod === 'matricula' ? '● Modo Ativo' : 'Selecionar'}
+=======
+          <div className="relative z-10 w-20 h-20 shrink-0 rounded-2xl bg-[#dcecff] border border-[#c5e0fa] flex items-center justify-center text-[#1677e8] shadow-sm dark:bg-blue-950/60 dark:border-blue-500/30 dark:text-blue-400">
+            <Briefcase className="w-8 h-8" />
+          </div>
+          <div className="relative z-10 min-w-0 flex-1">
+            <h3 className="text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Servidor</h3>
+            <p className="text-sm font-medium text-[#173b70] dark:text-slate-400 mt-0.5">Identificar por matrícula</p>
+            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de servidores <kbd className="ml-1 rounded border border-[#b9d9f3] bg-white/70 px-1 font-mono text-[10px] text-[#0877d1]">Alt S</kbd></p>
+          </div>
+          <div className={`relative z-10 shrink-0 ${identificationMethod === 'matricula' ? 'self-start text-[10px] mt-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-emerald-600' : 'w-11 h-11 rounded-full bg-[#0877d1] text-white grid place-items-center shadow-md group-hover:translate-x-1 transition-transform'}`}>
+            {identificationMethod === 'matricula' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar servidor" /><span className="sr-only">Alt S</span></>}
+>>>>>>> d60013e (feat: aprimora recepcao e destinos de visita)
           </div>
         </div>
 
@@ -721,12 +825,18 @@ export const RecepcaoPage: React.FC = () => {
             setSearchFeedback({ type: null, message: '' });
             setIsIdentificationModalOpen(true);
           }}
+<<<<<<< HEAD
           className={`cursor-pointer rounded-2xl p-5 border transition-all text-left flex flex-col min-w-0 min-h-[168px] ${
+=======
+          title="Identificar visitante — atalho Alt + V"
+          className={`group relative overflow-hidden cursor-pointer rounded-2xl p-5 lg:p-6 border transition-all duration-200 text-left flex items-center gap-5 min-w-0 min-h-[128px] ${
+>>>>>>> d60013e (feat: aprimora recepcao e destinos de visita)
             identificationMethod === 'cpf'
-              ? 'bg-[#f0fdf4] border-[#22c55e] shadow-[0_14px_28px_-18px_rgba(22,163,74,.38)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
-              : 'bg-white border-[#dce4f0] hover:border-[#9fc9ed] hover:shadow-sm dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
+              ? 'bg-[linear-gradient(135deg,#effdf5_0%,#fff_66%,#dcfce7_100%)] border-[#a7ebc3] shadow-[0_18px_32px_-20px_rgba(22,163,74,.48)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
+              : 'bg-white border-[#dce4f0] hover:border-[#7fd6a5] hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-22px_rgba(22,163,74,.6)] dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
           }`}
         >
+<<<<<<< HEAD
           <div className="w-14 h-14 shrink-0 mb-3 rounded-2xl bg-[#e8f8ee] border border-[#ccefd8] flex items-center justify-center text-[#16a34a] dark:bg-emerald-950/60 dark:border-emerald-500/30 dark:text-emerald-400">
             <Users className="w-7 h-7" />
           </div>
@@ -783,71 +893,21 @@ export const RecepcaoPage: React.FC = () => {
           <p className="text-xs text-[#627289] dark:text-slate-400 mt-1">Crachá temporário</p>
           <span className="inline-flex mt-3 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-[#fef3c7] text-[#b45309]">Leitura rápida</span>
         </button>
+=======
+          <div className="relative z-10 w-20 h-20 shrink-0 rounded-2xl bg-[#e8f8ee] border border-[#ccefd8] flex items-center justify-center text-[#16a34a] shadow-sm dark:bg-emerald-950/60 dark:border-emerald-500/30 dark:text-emerald-400">
+            <Users className="w-8 h-8" />
+          </div>
+          <div className="relative z-10 min-w-0 flex-1">
+            <h3 className="text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Visitante</h3>
+            <p className="text-sm font-medium text-[#173b70] dark:text-slate-400 mt-0.5">Identificar por CPF</p>
+            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de visitantes <kbd className="ml-1 rounded border border-[#bfe7ce] bg-white/70 px-1 font-mono text-[10px] text-[#16964a]">Alt V</kbd></p>
+          </div>
+          <div className={`relative z-10 shrink-0 ${identificationMethod === 'cpf' ? 'self-start text-[10px] mt-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-emerald-600' : 'w-11 h-11 rounded-full bg-[#0aa45a] text-white grid place-items-center shadow-md group-hover:translate-x-1 transition-transform'}`}>
+            {identificationMethod === 'cpf' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar visitante" /><span className="sr-only">Alt V</span></>}
+          </div>
+        </div>
+>>>>>>> d60013e (feat: aprimora recepcao e destinos de visita)
       </div>
-
-      {identificationMethod === 'biometria' && (
-        <Card className="border-[#ddd6fe] bg-[#faf9ff] dark:border-purple-500/30 dark:bg-purple-950/20">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-            <div className="flex items-center gap-3">
-            <Fingerprint className="w-6 h-6 text-[#7c3aed]" />
-            <div>
-              <h3 className="font-semibold text-[#152238] dark:text-slate-100">{biometricLabel[biometricStatus]}</h3>
-              <p className="text-xs text-[#627289] dark:text-slate-400 mt-1">
-                {isBiometricAgentConfigured
-                  ? 'O leitor é acessado pelo agente local desta estação; nenhuma biometria é armazenada no navegador.'
-                  : 'Configure VITE_BIOMETRIC_AGENT_URL para conectar um agente local aprovado, SDK oficial e leitor autorizado.'}
-              </p>
-            </div>
-            </div>
-            <Button variant="outline" size="sm" onClick={handleBiometricIdentification} isLoading={isBiometricLoading}>
-              <Fingerprint className="w-4 h-4" /> Iniciar leitura
-            </Button>
-          </div>
-          {biometricFeedback && <p className="mt-3 text-xs text-[#627289] dark:text-slate-300">{biometricFeedback}</p>}
-        </Card>
-      )}
-
-      {identificationMethod === 'qr_code' && (
-        <Card className="border-[#bfdbfe] bg-[#f8fbff] dark:border-blue-500/30 dark:bg-blue-950/20">
-          <div className="flex items-center gap-3">
-            <QrCode className="w-6 h-6 text-[#0877c9]" />
-            <div>
-              <h3 className="font-semibold text-[#152238] dark:text-slate-100">Validar credencial QR</h3>
-              <p className="text-xs text-[#627289] dark:text-slate-400 mt-1">Use o leitor USB (que preenche este campo como teclado) ou cole o código da credencial.</p>
-            </div>
-          </div>
-          <form onSubmit={handleValidateQr} className="mt-4 flex flex-col sm:flex-row gap-3">
-            <Input value={qrToken} onChange={(event) => setQrToken(event.target.value)} placeholder="Código lido da credencial QR" autoFocus />
-            <Button type="submit" variant="primary" isLoading={isQrLoading}><QrCode className="w-4 h-4" /> Validar QR</Button>
-          </form>
-          {qrFeedback && (
-            <p className={`mt-3 text-xs font-medium ${qrFeedback.valid ? 'text-[#16a34a] dark:text-emerald-300' : 'text-[#dc2626] dark:text-rose-300'}`}>
-              {qrFeedback.message}
-            </p>
-          )}
-        </Card>
-      )}
-
-      {identificationMethod === 'codigo_barras' && (
-        <Card className="border-[#fde68a] bg-[#fffdf6] dark:border-amber-500/30 dark:bg-amber-950/20">
-          <div className="flex items-center gap-3">
-            <Barcode className="w-6 h-6 text-[#d97706]" />
-            <div>
-              <h3 className="font-semibold text-[#152238] dark:text-slate-100">Leitura de crachá temporário</h3>
-              <p className="text-xs text-[#627289] dark:text-slate-400 mt-1">Após validar o servidor ou visitante, leia o código do crachá entregue para anexá-lo à Entrada em Andamento. A leitura do crachá devolvido registra a saída e libera o item automaticamente.</p>
-            </div>
-          </div>
-          <form onSubmit={handleBarcodeRead} className="mt-4 flex flex-col sm:flex-row gap-3">
-            <Input value={barcodeInput} onChange={(event) => setBarcodeInput(event.target.value)} placeholder="Leia o código de barras do crachá" autoFocus />
-            <Button type="submit" variant="primary" isLoading={isBarcodeLoading}><Barcode className="w-4 h-4" /> Processar crachá</Button>
-          </form>
-          {barcodeFeedback && (
-            <p className={`mt-3 text-xs font-medium ${barcodeFeedback.valid ? 'text-[#16a34a] dark:text-emerald-300' : 'text-[#dc2626] dark:text-rose-300'}`}>
-              {barcodeFeedback.message}
-            </p>
-          )}
-        </Card>
-      )}
 
       {/* 3. Pessoa identificada — a consulta ocorre no modal flutuante. */}
       <div className="space-y-4">
@@ -1084,28 +1144,22 @@ export const RecepcaoPage: React.FC = () => {
       </div>
 
       {/* 4. Rastreabilidade e Fluxo no Prédio (Quem está no prédio agora) */}
-      <Card className="border-slate-800">
-        <CardHeader>
-          <div className="flex items-center justify-between w-full">
+      <Card className="rounded-2xl border-[#dce8f5] p-4 sm:p-5 shadow-[0_18px_36px_-26px_rgba(18,44,82,.36)]">
+        <CardHeader className="mb-4 flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex items-start gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#edf5ff] text-[#0877d1]"><Users className="w-5 h-5" /></span>
             <div>
-              <CardTitle>
-                <div className="flex items-center gap-2">
-                  <span>Presentes no Prédio em Tempo Real</span>
-                  <Badge variant="success">{pessoasNoPredio.length} ativos</Badge>
-                </div>
-              </CardTitle>
-              <CardDescription>
-                Listagem ao vivo de servidores e visitantes com entrada autorizada e crachá ativo
-              </CardDescription>
+              <CardTitle className="text-[15px] font-extrabold text-[#102755]"><span>Presentes no Prédio em Tempo Real</span><Badge variant="success">{pessoasNoPredio.length} ativos</Badge></CardTitle>
+              <CardDescription>Listagem ao vivo de servidores e visitantes com entrada autorizada e crachá ativo</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={carregarDadosIniciais}>
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Atualizar</span>
-            </Button>
+          </div>
+          <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
+            <Button variant="outline" size="sm" onClick={carregarDadosIniciais} title="Atualizar lista — atalho Alt + A"><RefreshCw className="w-3.5 h-3.5" /><span>Atualizar</span><kbd className="hidden xl:inline rounded border border-current/20 px-1 font-mono text-[10px] opacity-70">Alt A</kbd></Button>
             <Button
               variant="danger"
               size="md"
               className="min-h-11 rounded-xl px-4 text-white shadow-[0_10px_20px_-10px_rgba(225,29,72,.65)] hover:shadow-[0_14px_24px_-10px_rgba(225,29,72,.75)]"
+              title="Devolução rápida de crachá — atalho Alt + D"
               onClick={() => {
                 setReturnBarcodeInput('');
                 setReturnBarcodeFeedback(null);
@@ -1113,14 +1167,16 @@ export const RecepcaoPage: React.FC = () => {
               }}
             >
               <span className="flex w-6 h-6 items-center justify-center rounded-lg bg-white/20"><Barcode className="w-4 h-4" /></span>
-              <span className="flex flex-col items-start leading-tight"><strong>Devolução rápida</strong><small className="text-[10px] font-medium opacity-80">Ler crachá e registrar saída</small></span>
+              <span className="flex flex-col items-start leading-tight"><strong>Devolução rápida</strong><small className="text-[10px] font-medium opacity-80">Ler crachá e registrar saída · Alt D</small></span>
             </Button>
           </div>
         </CardHeader>
 
         {pessoasNoPredio.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-sm">
-            Nenhuma pessoa registrada com movimentação aberta no momento.
+          <div className="min-h-[208px] rounded-xl border border-dashed border-[#d7e6f5] bg-[linear-gradient(180deg,#fff_0%,#f8fbff_100%)] px-6 py-8 text-center">
+            <span className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-[#e8f3ff] text-[#5f9df2] shadow-inner"><Briefcase className="w-8 h-8" /></span>
+            <p className="text-sm font-semibold text-[#5f7599]">Nenhuma pessoa registrada com movimentação aberta no momento.</p>
+            <p className="mt-1 text-xs text-[#8aa0bd]">Assim que houver registros de entrada, eles serão exibidos aqui em tempo real.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1442,6 +1498,24 @@ export const RecepcaoPage: React.FC = () => {
         )}
       </Modal>
 
+      <Modal
+        isOpen={isShortcutHelpOpen}
+        onClose={() => setIsShortcutHelpOpen(false)}
+        title="Atalhos de teclado"
+        description="Use estes atalhos para operar a recepção sem depender do mouse."
+        maxWidth="sm"
+      >
+        <div className="space-y-2">
+          {[['Alt + S', 'Identificar servidor'], ['Alt + V', 'Identificar visitante'], ['Alt + D', 'Abrir devolução rápida'], ['Alt + A', 'Atualizar dados'], ['Alt + P', 'Gerar PDF'], ['Esc', 'Fechar o modal atual']].map(([shortcut, action]) => (
+            <div key={shortcut} className="flex items-center justify-between rounded-xl border border-[#dce4f0] bg-[#f8fbff] px-3 py-2.5 text-sm dark:border-slate-800 dark:bg-slate-900">
+              <span className="text-[#37475e] dark:text-slate-200">{action}</span>
+              <kbd className="rounded-md border border-[#b9d9f3] bg-white px-2 py-1 font-mono text-xs font-semibold text-[#0877d1] dark:bg-slate-800 dark:border-slate-700">{shortcut}</kbd>
+            </div>
+          ))}
+          <p className="pt-2 text-xs text-[#627289] dark:text-slate-400">Os atalhos ficam suspensos enquanto você preenche um campo, para não interferir na digitação.</p>
+        </div>
+      </Modal>
+
       {/* MODAL 1: Registro Atômico de Entrada */}
       <Modal
         isOpen={isEntradaModalOpen}
@@ -1493,7 +1567,12 @@ export const RecepcaoPage: React.FC = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {activeTab === 'visitante' && <section className="space-y-3 border-t border-[#dce4f0] pt-4">
+            <div className="flex justify-between"><div><h3 className="font-bold text-[#102755]">Destinos da visita (até 10)</h3><p className="text-xs text-[#627289]">Selecione os departamentos e setores que serão visitados.</p></div><Badge variant="neutral">{destinosVisita.length}/10</Badge></div>
+            {destinosVisita.map((destino, index) => <div key={index} className="rounded-xl border border-[#d6e6f7] bg-[#f8fbff] p-3 space-y-3"><div className="flex justify-between font-bold text-sm"><span>Destino {index + 1}</span>{destinosVisita.length > 1 && <button type="button" onClick={() => setDestinosVisita((items) => items.filter((_, itemIndex) => itemIndex !== index))} className="text-rose-500"><Trash2 className="w-4 h-4" /></button>}</div><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Select label="Departamento de destino" value={destino.departamento_destino_id} onChange={(event) => atualizarDestinoVisita(index, { departamento_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar departamento' }, ...departamentos.map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))]} required /><Select label="Setor específico" value={destino.setor_destino_id} onChange={(event) => atualizarDestinoVisita(index, { setor_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar setor' }, ...setores.filter((item) => item.departamento_id === destino.departamento_destino_id).map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))]} disabled={!destino.departamento_destino_id} required /></div></div>)}
+            {destinosVisita.length < 10 && <button type="button" onClick={adicionarDestinoVisita} className="flex w-full justify-center gap-2 rounded-xl border border-dashed border-[#52a6fb] py-2 text-sm font-semibold text-[#0877d1]"><Plus className="w-4 h-4" />Adicionar outro destino</button>}
+          </section>}
+          <div className={activeTab === 'visitante' ? 'hidden' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'}>
             <Select
               label="Departamento de Destino"
               value={formDestinoDepId}
@@ -1550,7 +1629,7 @@ export const RecepcaoPage: React.FC = () => {
           </div>
 
           {/* Servidor anfitrião / destino */}
-          <div className="relative">
+          <div className={activeTab === 'visitante' ? 'hidden' : 'relative'}>
             <Input
               label="Servidor / Responsável a ser procurado (Opcional)"
               value={formServidorDestinoBusca}

@@ -105,6 +105,17 @@ export interface Movimentacao {
   departamento_destino?: Departamento;
   setor_destino?: Setor;
   servidor_destino?: Servidor;
+  destinos?: DestinoVisita[];
+}
+
+export interface DestinoVisita {
+  id?: string;
+  departamento_destino_id: string;
+  setor_destino_id: string;
+  servidor_destino_id?: string;
+  departamento_destino?: Departamento;
+  setor_destino?: Setor;
+  servidor_destino?: Servidor;
 }
 
 export interface Autorizacao {
@@ -204,4 +215,5 @@ export interface RegistroEntradaInput {
   motivo: string;
   requer_autorizacao?: boolean;
   observacoes?: string;
+  destinos?: DestinoVisita[];
 }

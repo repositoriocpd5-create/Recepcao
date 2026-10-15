@@ -18,7 +18,7 @@ export const AppLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f4f7fc] text-[#152238] dark:bg-[#0b0f19] dark:text-slate-100">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_88%_74%,#e9f5ff_0,transparent_26%),linear-gradient(135deg,#f7fbff_0%,#eef6ff_100%)] text-[#152238] dark:bg-[#0b0f19] dark:text-slate-100">
       <Navbar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} />
 
       {/* Barra de controle móvel para abrir menu */}
@@ -49,8 +49,8 @@ export const AppLayout: React.FC = () => {
         )}
 
         {/* Conteúdo principal */}
-        <main className="flex-1 p-4 lg:p-8 overflow-x-hidden">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 p-4 lg:px-7 lg:py-6 overflow-x-hidden">
+          <div className="max-w-[1240px] mx-auto">
             <Outlet />
           </div>
         </main>
