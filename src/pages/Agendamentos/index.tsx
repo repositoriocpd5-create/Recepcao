@@ -89,7 +89,7 @@ export const AgendamentosPage: React.FC = () => {
             <span className="p-1.5 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-500/30">
               <Calendar className="w-5 h-5" />
             </span>
-            <h2 className="text-xl font-bold text-slate-100">Agendamentos e Audiências da SME</h2>
+            <h2 className="text-xl font-bold text-slate-100">Agendamentos e Audiências da SMEDU</h2>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Programação prévia de reuniões, perícias, comissões e atendimentos

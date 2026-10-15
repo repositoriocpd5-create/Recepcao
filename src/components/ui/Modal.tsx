@@ -54,18 +54,18 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal Dialog */}
       <div
         className={cn(
-          'relative w-full bg-[#121826] border border-slate-700/80 rounded-2xl p-6 shadow-2xl z-10 overflow-hidden max-h-[90vh] flex flex-col',
+          'relative w-full bg-white border border-[#dce4f0] rounded-2xl p-6 shadow-[0_24px_52px_-16px_rgba(18,44,82,.28)] z-10 overflow-hidden max-h-[90vh] flex flex-col dark:bg-[#121826] dark:border-slate-700/80 dark:shadow-2xl',
           maxWidths[maxWidth]
         )}
       >
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="flex items-center justify-between pb-3 border-b border-[#dce4f0] dark:border-slate-800">
           <div>
-            <h2 className="text-lg font-bold text-slate-100">{title}</h2>
-            {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
+            <h2 className="text-lg font-bold text-[#152238] dark:text-slate-100">{title}</h2>
+            {description && <p className="text-xs text-[#627289] dark:text-slate-400 mt-0.5">{description}</p>}
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1 rounded-lg text-[#627289] hover:text-[#005a9c] hover:bg-[#edf5fc] transition-colors dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
           </button>

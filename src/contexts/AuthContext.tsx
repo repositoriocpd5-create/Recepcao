@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const u: UserProfile = {
             id: data.user.id,
             email: data.user.email || email,
-            nome_completo: profile?.nome_completo || 'Operador SME',
+            nome_completo: profile?.nome_completo || 'Operador SMEDU',
             cargo: profile?.cargo || 'Recepcionista',
             role: profile?.role || 'recepcionista',
             ativo: true,

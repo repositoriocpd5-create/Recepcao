@@ -10,6 +10,8 @@ export type AutorizacaoStatus = 'dispensada' | 'pendente' | 'autorizado' | 'recu
 
 export type AgendamentoStatus = 'agendado' | 'confirmado' | 'cancelado' | 'concluido';
 
+export type CrachaStatus = 'disponivel' | 'em_uso' | 'extraviado' | 'danificado' | 'inativo';
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -50,12 +52,14 @@ export interface Servidor {
   id: string;
   matricula: string;
   nome: string;
-  cpf: string;
+  cpf?: string;
   cargo: string;
+  lotacao?: string;
   departamento_id: string;
   setor_id?: string;
   email?: string;
   telefone?: string;
+  ramal?: string;
   foto_url?: string;
   status: ServidorStatus;
   departamento?: Departamento;
@@ -101,6 +105,17 @@ export interface Movimentacao {
   departamento_destino?: Departamento;
   setor_destino?: Setor;
   servidor_destino?: Servidor;
+  destinos?: DestinoVisita[];
+}
+
+export interface DestinoVisita {
+  id?: string;
+  departamento_destino_id: string;
+  setor_destino_id: string;
+  servidor_destino_id?: string;
+  departamento_destino?: Departamento;
+  setor_destino?: Setor;
+  servidor_destino?: Servidor;
 }
 
 export interface Autorizacao {
@@ -133,6 +148,27 @@ export interface Agendamento {
   departamento?: Departamento;
   setor?: Setor;
   servidor_destino?: Servidor;
+}
+
+export interface Cracha {
+  id: string;
+  numero: string;
+  situacao: CrachaStatus;
+  descricao?: string;
+  ativo: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AtribuicaoCracha {
+  id: string;
+  cracha_id: string;
+  movimentacao_id?: string;
+  entregue_em: string;
+  devolvido_em?: string;
+  observacoes?: string;
+  cracha?: Cracha;
+  movimentacao?: Movimentacao;
 }
 
 export interface AuditoriaLog {
@@ -179,4 +215,5 @@ export interface RegistroEntradaInput {
   motivo: string;
   requer_autorizacao?: boolean;
   observacoes?: string;
+  destinos?: DestinoVisita[];
 }

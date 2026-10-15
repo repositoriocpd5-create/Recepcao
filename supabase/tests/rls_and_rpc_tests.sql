@@ -8,9 +8,9 @@ BEGIN;
 DO $$
 DECLARE
   v_res JSONB;
-  v_vis_id UUID := 'v1000000-0000-0000-0000-000000000001';
+  v_vis_id UUID := '30000000-0000-0000-0000-000000000001';
   v_dep_id UUID := 'd1000000-0000-0000-0000-000000000003';
-  v_set_id UUID := 's1000000-0000-0000-0000-000000000005';
+  v_set_id UUID := '20000000-0000-0000-0000-000000000005';
   v_error_caught BOOLEAN := false;
 BEGIN
   -- Como v1000000-0000-0000-0000-000000000001 já está com status 'no_predio', deve lançar exceção
@@ -57,7 +57,7 @@ END $$;
 -- Teste 3: Registro de saída atômico
 DO $$
 DECLARE
-  v_mov_id UUID := 'm1000000-0000-0000-0000-000000000001';
+  v_mov_id UUID := '40000000-0000-0000-0000-000000000001';
   v_res JSONB;
 BEGIN
   v_res := public.rpc_registrar_saida(v_mov_id, NULL, 'Saída para teste');

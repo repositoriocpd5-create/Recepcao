@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { dataService, formatCpf } from '@/services/dataService';
+import { dataService } from '@/services/dataService';
 import { Servidor, Departamento, Setor } from '@/types';
 
 export const ServidoresPage: React.FC = () => {
@@ -22,12 +22,11 @@ export const ServidoresPage: React.FC = () => {
   const [editId, setEditId] = useState<string | null>(null);
   const [nome, setNome] = useState('');
   const [matricula, setMatricula] = useState('');
-  const [cpf, setCpf] = useState('');
   const [cargo, setCargo] = useState('');
+  const [lotacao, setLotacao] = useState('');
   const [depId, setDepId] = useState('');
   const [setorId, setSetorId] = useState('');
-  const [email, setEmail] = useState('');
-  const [telefone, setTelefone] = useState('');
+  const [ramal, setRamal] = useState('');
   const [status, setStatus] = useState<'ativo' | 'afastado' | 'ferias' | 'inativo'>('ativo');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -58,12 +57,11 @@ export const ServidoresPage: React.FC = () => {
     setEditId(null);
     setNome('');
     setMatricula(`SME-${Math.floor(100000 + Math.random() * 900000)}`);
-    setCpf('');
     setCargo('');
+    setLotacao('');
     setDepId(departamentos[0]?.id || '');
     setSetorId('');
-    setEmail('');
-    setTelefone('');
+    setRamal('');
     setStatus('ativo');
     setIsModalOpen(true);
   };
@@ -72,12 +70,11 @@ export const ServidoresPage: React.FC = () => {
     setEditId(s.id);
     setNome(s.nome);
     setMatricula(s.matricula);
-    setCpf(s.cpf);
     setCargo(s.cargo);
+    setLotacao(s.lotacao || '');
     setDepId(s.departamento_id);
     setSetorId(s.setor_id || '');
-    setEmail(s.email || '');
-    setTelefone(s.telefone || '');
+    setRamal(s.ramal || '');
     setStatus(s.status);
     setIsModalOpen(true);
   };
@@ -90,12 +87,11 @@ export const ServidoresPage: React.FC = () => {
         id: editId || undefined,
         nome,
         matricula,
-        cpf,
         cargo,
+        lotacao,
         departamento_id: depId,
         setor_id: setorId || undefined,
-        email,
-        telefone,
+        ramal,
         status,
       });
       setIsModalOpen(false);
@@ -112,7 +108,7 @@ export const ServidoresPage: React.FC = () => {
     const matchesSearch =
       s.nome.toLowerCase().includes(termo) ||
       s.matricula.toLowerCase().includes(termo) ||
-      s.cpf.includes(termo);
+      (s.lotacao || '').toLowerCase().includes(termo);
     const matchesDep = selectedDep === 'todos' || s.departamento_id === selectedDep;
     return matchesSearch && matchesDep;
   });
@@ -125,7 +121,7 @@ export const ServidoresPage: React.FC = () => {
             <span className="p-1.5 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-500/30">
               <Briefcase className="w-5 h-5" />
             </span>
-            <h2 className="text-xl font-bold text-slate-100">Quadro de Servidores da SME</h2>
+            <h2 className="text-xl font-bold text-slate-100">Quadro de Servidores da SMEDU</h2>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Gestão do corpo funcional, lotações e consulta de matrícula
@@ -178,7 +174,6 @@ export const ServidoresPage: React.FC = () => {
               <tr>
                 <th className="py-3 px-4">Nome do Servidor</th>
                 <th className="py-3 px-4">Matrícula</th>
-                <th className="py-3 px-4">CPF</th>
                 <th className="py-3 px-4">Cargo / Função</th>
                 <th className="py-3 px-4">Lotação (Dep/Setor)</th>
                 <th className="py-3 px-4">Status</th>
@@ -190,10 +185,9 @@ export const ServidoresPage: React.FC = () => {
                 <tr key={s.id} className="hover:bg-slate-800/20 transition-colors">
                   <td className="py-3 px-4 font-semibold text-slate-100">{s.nome}</td>
                   <td className="py-3 px-4 font-mono text-emerald-400 font-bold">{s.matricula}</td>
-                  <td className="py-3 px-4 font-mono text-slate-400">{s.cpf}</td>
                   <td className="py-3 px-4 text-slate-300">{s.cargo}</td>
                   <td className="py-3 px-4 text-slate-200">
-                    {s.departamento?.sigla || 'SME'} {s.setor ? `(${s.setor.sigla})` : ''}
+                    {s.lotacao || `${s.departamento?.sigla || 'SMEDU'}${s.setor ? ` (${s.setor.sigla})` : ''}`}
                   </td>
                   <td className="py-3 px-4">
                     <Badge variant={s.status === 'ativo' ? 'success' : 'warning'}>
@@ -226,14 +220,13 @@ export const ServidoresPage: React.FC = () => {
         description="Dados funcionais e lotação oficial do servidor"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="Nome Completo *" value={nome} onChange={(e) => setNome(e.target.value)} required />
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Matrícula Institucional *" value={matricula} onChange={(e) => setMatricula(e.target.value)} required />
-            <Input label="CPF *" value={cpf} onChange={(e) => setCpf(formatCpf(e.target.value))} placeholder="000.000.000-00" maxLength={14} required />
+            <Input label="Nome *" value={nome} onChange={(e) => setNome(e.target.value)} required />
           </div>
 
           <Input label="Cargo Oficial *" value={cargo} onChange={(e) => setCargo(e.target.value)} required />
+          <Input label="Lotação *" value={lotacao} onChange={(e) => setLotacao(e.target.value)} required />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select
@@ -256,10 +249,7 @@ export const ServidoresPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="Telefone / Ramal" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
-            <Input label="E-mail Institucional" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
+          <Input label="Ramal" value={ramal} onChange={(e) => setRamal(e.target.value)} placeholder="Ex.: 1001" />
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>

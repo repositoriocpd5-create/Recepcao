@@ -11,6 +11,8 @@ import {
   ConsultaVisitanteResultado,
   RegistroEntradaInput,
   UserProfile,
+  Cracha,
+  CrachaStatus,
 } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
@@ -23,6 +25,7 @@ import {
   INITIAL_AGENDAMENTOS,
   INITIAL_AUDITORIA_LOGS,
 } from './mockData';
+import { SERVIDORES_OFICIAIS } from './servidoresOficiais';
 
 // Local storage keys para persistência no ambiente de teste/demonstração
 const STORAGE_KEYS = {
@@ -34,7 +37,13 @@ const STORAGE_KEYS = {
   AUTORIZACOES: 'sme_autorizacoes',
   AGENDAMENTOS: 'sme_agendamentos',
   AUDITORIA: 'sme_auditoria',
+  CRACHAS: 'smedu_crachas',
 };
+
+const MATRICULAS_FICTICIAS_LEGADAS = new Set([
+  'SME-100201', 'SME-100452', 'SME-200781', 'SME-200994',
+  'SME-300112', 'SME-400553', 'SME-500881',
+]);
 
 function getStorage<T>(key: string, initial: T): T {
   try {
@@ -57,10 +66,16 @@ function setStorage<T>(key: string, value: T): void {
   }
 }
 
+function requireLiveResult<T>(data: T | null, error: { message: string } | null, operation: string): T {
+  if (error) throw new Error(`${operation}: ${error.message}`);
+  if (data === null) throw new Error(`${operation}: o Supabase não retornou dados.`);
+  return data;
+}
+
 export function resetTestData(): void {
   localStorage.setItem(STORAGE_KEYS.DEPARTAMENTOS, JSON.stringify(INITIAL_DEPARTAMENTOS));
   localStorage.setItem(STORAGE_KEYS.SETORES, JSON.stringify(INITIAL_SETORES));
-  localStorage.setItem(STORAGE_KEYS.SERVIDORES, JSON.stringify(INITIAL_SERVIDORES));
+  localStorage.setItem(STORAGE_KEYS.SERVIDORES, JSON.stringify(SERVIDORES_OFICIAIS));
   localStorage.setItem(STORAGE_KEYS.VISITANTES, JSON.stringify(INITIAL_VISITANTES));
   localStorage.setItem(STORAGE_KEYS.MOVIMENTACOES, JSON.stringify(INITIAL_MOVIMENTACOES));
   localStorage.setItem(STORAGE_KEYS.AUTORIZACOES, JSON.stringify(INITIAL_AUTORIZACOES));
@@ -79,12 +94,41 @@ export const formatCpf = (val: string) => {
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
 };
 
+export const isValidCpf = (value: string): boolean => {
+  const cpf = sanitizeNumbers(value);
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  const digit = (length: number) => {
+    const sum = cpf.slice(0, length).split('').reduce((total, current, index) => total + Number(current) * (length + 1 - index), 0);
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+  return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]);
+};
+
 export const dataService = {
+  async validarCredencialQr(token: string): Promise<{
+    valida: boolean;
+    motivo?: string;
+    visitante_id?: string;
+    agendamento_id?: string;
+    expira_em?: string;
+  }> {
+    const credential = token.trim();
+    if (!credential) throw new Error('Apresente ou informe o código da credencial QR.');
+    if (!isSupabaseConfigured) {
+      return { valida: false, motivo: 'A validação de QR Code exige conexão com o Supabase configurada.' };
+    }
+    const { data, error } = await supabase.rpc('rpc_validar_credencial_qr', { p_token: credential });
+    return requireLiveResult(data, error, 'Não foi possível validar a credencial QR') as {
+      valida: boolean; motivo?: string; visitante_id?: string; agendamento_id?: string; expira_em?: string;
+    };
+  },
+
   // 1. Departamentos e Setores
   async getDepartamentos(): Promise<Departamento[]> {
     if (isSupabaseConfigured) {
       const { data, error } = await supabase.from('departamentos').select('*').order('nome');
-      if (!error && data) return data as Departamento[];
+      return requireLiveResult(data, error, 'Não foi possível carregar departamentos') as Departamento[];
     }
     return getStorage<Departamento[]>(STORAGE_KEYS.DEPARTAMENTOS, INITIAL_DEPARTAMENTOS);
   },
@@ -94,7 +138,7 @@ export const dataService = {
       let query = supabase.from('setores').select('*, departamento:departamentos(*)').order('nome');
       if (departamentoId) query = query.eq('departamento_id', departamentoId);
       const { data, error } = await query;
-      if (!error && data) return data as Setor[];
+      return requireLiveResult(data, error, 'Não foi possível carregar setores') as Setor[];
     }
     const all = getStorage<Setor[]>(STORAGE_KEYS.SETORES, INITIAL_SETORES);
     const deps = await this.getDepartamentos();
@@ -105,6 +149,150 @@ export const dataService = {
     return departamentoId ? enriched.filter((s) => s.departamento_id === departamentoId) : enriched;
   },
 
+  async salvarDepartamento(departamento: Partial<Departamento>): Promise<Departamento> {
+    if (isSupabaseConfigured) {
+      const query = departamento.id
+        ? supabase.from('departamentos').update(departamento).eq('id', departamento.id)
+        : supabase.from('departamentos').insert(departamento);
+      const { data, error } = await query.select().single();
+      if (error) throw error;
+      return data as Departamento;
+    }
+
+    const lista = getStorage<Departamento[]>(STORAGE_KEYS.DEPARTAMENTOS, INITIAL_DEPARTAMENTOS);
+    if (departamento.id) {
+      const indice = lista.findIndex((item) => item.id === departamento.id);
+      if (indice < 0) throw new Error('Departamento não encontrado.');
+      lista[indice] = { ...lista[indice], ...departamento } as Departamento;
+      setStorage(STORAGE_KEYS.DEPARTAMENTOS, lista);
+      return lista[indice];
+    }
+
+    const novo: Departamento = {
+      id: `d-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      nome: departamento.nome || '',
+      sigla: departamento.sigla || '',
+      descricao: departamento.descricao,
+      responsavel: departamento.responsavel,
+      ramal: departamento.ramal,
+      localizacao: departamento.localizacao,
+      ativo: departamento.ativo ?? true,
+    };
+    lista.push(novo);
+    setStorage(STORAGE_KEYS.DEPARTAMENTOS, lista);
+    return novo;
+  },
+
+  async excluirDepartamento(id: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('departamentos').delete().eq('id', id);
+      if (error) throw error;
+      return;
+    }
+
+    const setores = getStorage<Setor[]>(STORAGE_KEYS.SETORES, INITIAL_SETORES);
+    if (setores.some((setor) => setor.departamento_id === id)) {
+      throw new Error('Exclua ou realoque os setores vinculados antes de remover o departamento.');
+    }
+    const lista = getStorage<Departamento[]>(STORAGE_KEYS.DEPARTAMENTOS, INITIAL_DEPARTAMENTOS);
+    setStorage(STORAGE_KEYS.DEPARTAMENTOS, lista.filter((item) => item.id !== id));
+  },
+
+  async salvarSetor(setor: Partial<Setor>): Promise<Setor> {
+    if (isSupabaseConfigured) {
+      const query = setor.id
+        ? supabase.from('setores').update(setor).eq('id', setor.id)
+        : supabase.from('setores').insert(setor);
+      const { data, error } = await query.select().single();
+      if (error) throw error;
+      return data as Setor;
+    }
+
+    const lista = getStorage<Setor[]>(STORAGE_KEYS.SETORES, INITIAL_SETORES);
+    if (setor.id) {
+      const indice = lista.findIndex((item) => item.id === setor.id);
+      if (indice < 0) throw new Error('Setor não encontrado.');
+      lista[indice] = { ...lista[indice], ...setor } as Setor;
+      setStorage(STORAGE_KEYS.SETORES, lista);
+      return lista[indice];
+    }
+
+    const novo: Setor = {
+      id: `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      departamento_id: setor.departamento_id || '',
+      nome: setor.nome || '',
+      sigla: setor.sigla || '',
+      responsavel: setor.responsavel,
+      ramal: setor.ramal,
+      sala: setor.sala,
+      requer_autorizacao: setor.requer_autorizacao ?? false,
+      ativo: setor.ativo ?? true,
+    };
+    lista.push(novo);
+    setStorage(STORAGE_KEYS.SETORES, lista);
+    return novo;
+  },
+
+  async excluirSetor(id: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('setores').delete().eq('id', id);
+      if (error) throw error;
+      return;
+    }
+    const lista = getStorage<Setor[]>(STORAGE_KEYS.SETORES, INITIAL_SETORES);
+    setStorage(STORAGE_KEYS.SETORES, lista.filter((item) => item.id !== id));
+  },
+
+  // 1.1 Crachás físicos
+  async getCrachas(): Promise<Cracha[]> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('crachas').select('*').order('numero');
+      return requireLiveResult(data, error, 'Não foi possível carregar crachás') as Cracha[];
+    }
+    return getStorage<Cracha[]>(STORAGE_KEYS.CRACHAS, []);
+  },
+
+  async salvarCracha(cracha: Partial<Cracha>): Promise<Cracha> {
+    const payload = {
+      numero: (cracha.numero || '').trim().toUpperCase(),
+      situacao: cracha.situacao || 'disponivel',
+      descricao: cracha.descricao || null,
+      ativo: cracha.ativo ?? true,
+    };
+    if (!payload.numero) throw new Error('Informe o identificador do crachá.');
+
+    if (isSupabaseConfigured) {
+      const query = cracha.id
+        ? supabase.from('crachas').update(payload).eq('id', cracha.id)
+        : supabase.from('crachas').insert(payload);
+      const { data, error } = await query.select().single();
+      if (error) throw new Error(`Não foi possível salvar crachá: ${error.message}`);
+      return data as Cracha;
+    }
+
+    const lista = getStorage<Cracha[]>(STORAGE_KEYS.CRACHAS, []);
+    const duplicado = lista.find((item) => item.numero === payload.numero && item.id !== cracha.id);
+    if (duplicado) throw new Error('Já existe um crachá com este identificador.');
+    if (cracha.id) {
+      const indice = lista.findIndex((item) => item.id === cracha.id);
+      if (indice < 0) throw new Error('Crachá não encontrado.');
+      lista[indice] = { ...lista[indice], ...payload, updated_at: new Date().toISOString() } as Cracha;
+      setStorage(STORAGE_KEYS.CRACHAS, lista);
+      return lista[indice];
+    }
+    const novo: Cracha = { id: `cr-${crypto.randomUUID()}`, ...payload, created_at: new Date().toISOString() } as Cracha;
+    lista.push(novo);
+    setStorage(STORAGE_KEYS.CRACHAS, lista);
+    return novo;
+  },
+
+  async alterarSituacaoCracha(id: string, situacao: CrachaStatus): Promise<Cracha> {
+    const lista = await this.getCrachas();
+    const cracha = lista.find((item) => item.id === id);
+    if (!cracha) throw new Error('Crachá não encontrado.');
+    return this.salvarCracha({ ...cracha, situacao, ativo: situacao !== 'inativo' });
+  },
+
   // 2. Servidores
   async getServidores(): Promise<Servidor[]> {
     if (isSupabaseConfigured) {
@@ -112,11 +300,20 @@ export const dataService = {
         .from('servidores')
         .select('*, departamento:departamentos(*), setor:setores(*)')
         .order('nome');
-      if (!error && data) return data as Servidor[];
+      return requireLiveResult(data, error, 'Não foi possível carregar servidores') as Servidor[];
     }
-    const list = getStorage<Servidor[]>(STORAGE_KEYS.SERVIDORES, INITIAL_SERVIDORES);
     const deps = await this.getDepartamentos();
     const sets = await this.getSetores();
+    const list = getStorage<Servidor[]>(STORAGE_KEYS.SERVIDORES, SERVIDORES_OFICIAIS);
+    // Substitui automaticamente os sete registros fictícios preservados em instalações antigas.
+    if (list.some((servidor) => MATRICULAS_FICTICIAS_LEGADAS.has(servidor.matricula))) {
+      setStorage(STORAGE_KEYS.SERVIDORES, SERVIDORES_OFICIAIS);
+      return SERVIDORES_OFICIAIS.map((s) => ({
+        ...s,
+        departamento: deps.find((d) => d.id === s.departamento_id),
+        setor: sets.find((st) => st.id === s.setor_id),
+      }));
+    }
     return list.map((s) => ({
       ...s,
       departamento: deps.find((d) => d.id === s.departamento_id),
@@ -146,7 +343,7 @@ export const dataService = {
       }
     }
 
-    const list = getStorage<Servidor[]>(STORAGE_KEYS.SERVIDORES, INITIAL_SERVIDORES);
+    const list = getStorage<Servidor[]>(STORAGE_KEYS.SERVIDORES, SERVIDORES_OFICIAIS);
     if (servidor.id) {
       const idx = list.findIndex((s) => s.id === servidor.id);
       if (idx >= 0) {
@@ -183,7 +380,7 @@ export const dataService = {
       const { data, error } = await supabase.rpc('rpc_consultar_servidor', {
         p_matricula: limpa,
       });
-      if (!error && data) return data as ConsultaServidorResultado;
+      return requireLiveResult(data, error, 'Não foi possível consultar a matrícula') as ConsultaServidorResultado;
     }
 
     // Fallback de homologação / testes
@@ -220,7 +417,7 @@ export const dataService = {
   async getVisitantes(): Promise<Visitante[]> {
     if (isSupabaseConfigured) {
       const { data, error } = await supabase.from('visitantes').select('*').order('nome');
-      if (!error && data) return data as Visitante[];
+      return requireLiveResult(data, error, 'Não foi possível carregar visitantes') as Visitante[];
     }
     return getStorage<Visitante[]>(STORAGE_KEYS.VISITANTES, INITIAL_VISITANTES);
   },
@@ -307,12 +504,15 @@ export const dataService = {
     operador?: UserProfile | null
   ): Promise<ConsultaVisitanteResultado> {
     const rawCpf = sanitizeNumbers(cpf);
+    if (!isValidCpf(rawCpf)) {
+      throw new Error('Informe um CPF válido para realizar a consulta.');
+    }
 
     if (isSupabaseConfigured) {
       const { data, error } = await supabase.rpc('rpc_consultar_visitante', {
         p_cpf: rawCpf,
       });
-      if (!error && data) return data as ConsultaVisitanteResultado;
+      return requireLiveResult(data, error, 'Não foi possível consultar o CPF') as ConsultaVisitanteResultado;
     }
 
     const visitantes = await this.getVisitantes();
@@ -335,7 +535,7 @@ export const dataService = {
         data_hora_entrada: m.data_hora_entrada,
         data_hora_saida: m.data_hora_saida || undefined,
         motivo: m.motivo,
-        departamento: m.departamento_destino?.sigla || 'SME',
+        departamento: m.departamento_destino?.sigla || 'SMEDU',
         setor: m.setor_destino?.sigla || 'Geral',
       }));
 
@@ -367,10 +567,11 @@ export const dataService = {
           visitante:visitantes(*),
           departamento_destino:departamentos(*),
           setor_destino:setores(*),
-          servidor_destino:servidores(*)
+          servidor_destino:servidores(*),
+          destinos:movimentacao_destinos(*)
         `)
         .order('data_hora_entrada', { ascending: false });
-      if (!error && data) return data as Movimentacao[];
+      return requireLiveResult(data, error, 'Não foi possível carregar movimentações') as Movimentacao[];
     }
 
     const list = getStorage<Movimentacao[]>(STORAGE_KEYS.MOVIMENTACOES, INITIAL_MOVIMENTACOES);
@@ -397,7 +598,12 @@ export const dataService = {
     operador?: UserProfile | null
   ): Promise<Movimentacao> {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase.rpc('rpc_registrar_entrada', {
+      const destinos = input.destinos?.length ? input.destinos : [{
+        departamento_destino_id: input.departamento_destino_id,
+        setor_destino_id: input.setor_destino_id,
+        servidor_destino_id: input.servidor_destino_id,
+      }];
+      const { data, error } = await supabase.rpc('rpc_registrar_entrada_multidestino_com_cracha', {
         p_tipo_pessoa: input.tipo_pessoa,
         p_pessoa_id: input.pessoa_id,
         p_departamento_destino_id: input.departamento_destino_id,
@@ -406,8 +612,8 @@ export const dataService = {
         p_cracha_numero: input.cracha_numero || null,
         p_motivo: input.motivo,
         p_requer_autorizacao: Boolean(input.requer_autorizacao),
-        p_recepcionista_id: operador?.id || null,
         p_observacoes: input.observacoes || null,
+        p_destinos: destinos,
       });
 
       if (error) throw new Error(error.message);
@@ -426,6 +632,15 @@ export const dataService = {
       throw new Error(
         'Atenção: Esta pessoa já possui uma entrada em andamento no prédio sem registro de saída.'
       );
+    }
+
+    const crachas = getStorage<Cracha[]>(STORAGE_KEYS.CRACHAS, []);
+    const cracha = input.cracha_numero ? crachas.find((item) => item.numero === input.cracha_numero) : undefined;
+    if (input.cracha_numero && !cracha) {
+      throw new Error(`O crachá ${input.cracha_numero} não está cadastrado no inventário.`);
+    }
+    if (cracha && (!cracha.ativo || cracha.situacao !== 'disponivel')) {
+      throw new Error(`O crachá ${cracha.numero} está indisponível para atribuição (${cracha.situacao.replace('_', ' ')}).`);
     }
 
     const movId = `m-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
@@ -447,10 +662,17 @@ export const dataService = {
       autorizacao_status: requerAut ? 'pendente' : 'dispensada',
       observacoes: input.observacoes,
       recepcionista_entrada_id: operador?.id,
+      destinos: input.destinos?.length ? input.destinos : [{
+        departamento_destino_id: input.departamento_destino_id,
+        setor_destino_id: input.setor_destino_id,
+        servidor_destino_id: input.servidor_destino_id,
+      }],
     };
 
     movs.unshift(novaMov);
+    if (cracha) cracha.situacao = 'em_uso';
     setStorage(STORAGE_KEYS.MOVIMENTACOES, movs);
+    if (cracha) setStorage(STORAGE_KEYS.CRACHAS, crachas);
 
     // Se requer autorização, cria o registro
     if (requerAut && input.servidor_destino_id) {
@@ -485,12 +707,13 @@ export const dataService = {
   async registrarSaida(
     movimentacaoId: string,
     operador?: UserProfile | null,
-    observacoes?: string
+    observacoes?: string,
+    crachaDevolvido = true
   ): Promise<Movimentacao> {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase.rpc('rpc_registrar_saida', {
+      const { data, error } = await supabase.rpc('rpc_registrar_saida_com_cracha', {
         p_movimentacao_id: movimentacaoId,
-        p_recepcionista_id: operador?.id || null,
+        p_cracha_devolvido: crachaDevolvido,
         p_observacoes: observacoes || null,
       });
 
@@ -512,6 +735,15 @@ export const dataService = {
     mov.status = 'finalizado';
     mov.data_hora_saida = new Date().toISOString();
     mov.recepcionista_saida_id = operador?.id;
+
+    if (mov.cracha_numero && crachaDevolvido) {
+      const crachas = getStorage<Cracha[]>(STORAGE_KEYS.CRACHAS, []);
+      const cracha = crachas.find((item) => item.numero === mov.cracha_numero);
+      if (cracha) {
+        cracha.situacao = 'disponivel';
+        setStorage(STORAGE_KEYS.CRACHAS, crachas);
+      }
+    }
     if (observacoes) mov.observacoes = `${mov.observacoes || ''} | Saída: ${observacoes}`;
 
     setStorage(STORAGE_KEYS.MOVIMENTACOES, movs);
@@ -541,7 +773,7 @@ export const dataService = {
           movimentacao:movimentacoes(*, visitante:visitantes(*), servidor:servidores(*))
         `)
         .order('created_at', { ascending: false });
-      if (!error && data) return data as Autorizacao[];
+      return requireLiveResult(data, error, 'Não foi possível carregar autorizações') as Autorizacao[];
     }
 
     const auts = getStorage<Autorizacao[]>(STORAGE_KEYS.AUTORIZACOES, INITIAL_AUTORIZACOES);
@@ -607,7 +839,7 @@ export const dataService = {
           servidor_destino:servidores(*)
         `)
         .order('data_hora_prevista', { ascending: true });
-      if (!error && data) return data as Agendamento[];
+      return requireLiveResult(data, error, 'Não foi possível carregar agendamentos') as Agendamento[];
     }
 
     const ags = getStorage<Agendamento[]>(STORAGE_KEYS.AGENDAMENTOS, INITIAL_AGENDAMENTOS);
@@ -653,12 +885,24 @@ export const dataService = {
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
-      if (!error && data) return data as AuditoriaLog[];
+      return requireLiveResult(data, error, 'Não foi possível carregar logs de auditoria') as AuditoriaLog[];
     }
     return getStorage<AuditoriaLog[]>(STORAGE_KEYS.AUDITORIA, INITIAL_AUDITORIA_LOGS);
   },
 
   async registrarLogAuditoria(log: Partial<AuditoriaLog>): Promise<void> {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('auditoria_logs').insert({
+        usuario_email: log.usuario_email || null,
+        acao: log.acao || 'OPERACAO',
+        tabela: log.tabela || null,
+        registro_id: log.registro_id || null,
+        detalhes: log.detalhes || {},
+      });
+      if (error) throw new Error(`Não foi possível registrar auditoria: ${error.message}`);
+      return;
+    }
+
     const logs = getStorage<AuditoriaLog[]>(STORAGE_KEYS.AUDITORIA, INITIAL_AUDITORIA_LOGS);
     const novoLog: AuditoriaLog = {
       id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -667,7 +911,7 @@ export const dataService = {
       tabela: log.tabela,
       registro_id: log.registro_id,
       detalhes: log.detalhes || {},
-      ip_origem: log.ip_origem || '192.168.1.100 (Recepção)',
+      ip_origem: log.ip_origem,
       created_at: new Date().toISOString(),
     };
     logs.unshift(novoLog);
