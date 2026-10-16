@@ -50,12 +50,12 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
     <aside
       className={cn(
         'w-[212px] bg-[linear-gradient(160deg,#075fa7_0%,#005a9c_48%,#043c74_100%)] border-r border-[#0a71bb] shadow-[8px_0_22px_-18px_rgba(18,44,82,.36)] flex flex-col shrink-0 min-h-[calc(100vh-65px)] text-white dark:from-[#075fa7] dark:via-[#005a9c] dark:to-[#043c74] dark:border-[#0a71bb]',
-        'fixed lg:static top-[65px] bottom-0 left-0 z-30 transition-[transform,width] duration-200',
-        isCollapsed && 'lg:w-[64px]',
-        isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        'fixed md:static top-[65px] bottom-0 left-0 z-30 transition-[transform,width] duration-200',
+        isCollapsed && 'md:w-[64px]',
+        isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       )}
     >
-      <div className={cn('p-3 flex-1 space-y-6 overflow-y-auto', isCollapsed && 'lg:px-2')}>
+      <div className={cn('p-3 flex-1 space-y-6 overflow-y-auto', isCollapsed && 'md:px-2')}>
         {/* Seção Operacional */}
         <div>
           {!isCollapsed && <div className="px-3 mb-2 text-[11px] font-bold tracking-wider text-blue-100/80 uppercase">
@@ -73,7 +73,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
                   className={({ isActive }) =>
                     cn(
                       'flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all group',
-                      isCollapsed && 'lg:justify-center lg:px-2',
+                      isCollapsed && 'md:justify-center md:px-2',
                       isActive
                         ? 'bg-white text-[#005a9c] border border-white font-bold shadow-[0_8px_18px_-10px_rgba(0,0,0,.55)]'
                         : 'text-white/90 hover:text-white hover:bg-white/15'
@@ -112,7 +112,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
                   className={({ isActive }) =>
                     cn(
                       'flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all group',
-                      isCollapsed && 'lg:justify-center lg:px-2',
+                      isCollapsed && 'md:justify-center md:px-2',
                       isActive
                         ? 'bg-white text-[#005a9c] border border-white font-bold shadow-[0_8px_18px_-10px_rgba(0,0,0,.55)]'
                         : 'text-white/90 hover:text-white hover:bg-white/15'

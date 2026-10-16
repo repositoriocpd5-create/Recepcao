@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, LogOut, Database, RefreshCw, Moon, Sun, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Shield, LogOut, Database, RefreshCw, Moon, Sun, PanelLeftClose, PanelLeftOpen, Menu, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -10,9 +10,10 @@ import { resetTestData } from '@/services/dataService';
 interface NavbarProps {
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
+  onOpenMobileMenu: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSidebar }) => {
+export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSidebar, onOpenMobileMenu }) => {
   const { user, logout, login, isSupabaseLive } = useAuth();
   const [theme, setTheme] = useState<'dark' | 'light'>(
     () => (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'),
@@ -76,7 +77,20 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#dce4f0] px-4 lg:px-8 py-3 shadow-[0_2px_10px_rgba(18,44,82,.04)] dark:bg-[#0f1422]/95 dark:border-slate-800/80 dark:shadow-none">
-      <div className="flex items-center justify-between gap-4">
+      <div className="md:hidden">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={onOpenMobileMenu} className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[#d7e6f6] bg-white text-[#087ef5] shadow-sm" aria-label="Abrir menu de navegação"><Menu className="h-6 w-6" /></button>
+          <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[#b9d9f3] bg-white shadow-sm"><img src="/assets/brasao_itaguai.png" alt="Brasão do Município de Itaguaí" className="h-9 w-9 object-contain" /></div>
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="flex items-start gap-1.5"><h1 className="text-[13px] font-extrabold leading-[1.05] tracking-wide text-[#082b57]">SECRETARIA MUNICIPAL<br />DE EDUCAÇÃO</h1><span className="mt-0.5 rounded border border-[#b9d9f3] bg-[#edf5ff] px-1.5 py-0.5 text-[9px] font-bold text-[#087ef5]">SMEDU</span></div>
+            <p className="mt-1 truncate text-[11px] text-[#68809f]">Sistema de Recepção e Controle de Acesso</p>
+          </div>
+          <button type="button" onClick={logout} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#e1f0ff] text-[#087ef5]" aria-label="Sair do sistema" title="Sair do sistema"><UserRound className="h-6 w-6" /></button>
+        </div>
+        {!isSupabaseLive && <div className="mt-3 flex justify-center"><span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#fed59b] bg-[#fff8eb] px-4 text-sm font-bold text-[#ee7900]"><Database className="h-4 w-4" />Modo Homologação Ativo</span></div>}
+      </div>
+
+      <div className="hidden md:flex items-center justify-between gap-4">
         {/* Brand identity */}
         <div className="flex items-center gap-3">
           <button

@@ -44,7 +44,7 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
@@ -54,7 +54,7 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal Dialog */}
       <div
         className={cn(
-          'relative w-full bg-white border border-[#dce4f0] rounded-2xl p-6 shadow-[0_24px_52px_-16px_rgba(18,44,82,.28)] z-10 overflow-hidden max-h-[90vh] flex flex-col dark:bg-[#121826] dark:border-slate-700/80 dark:shadow-2xl',
+          'relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[24px] border border-[#dce4f0] bg-white p-5 shadow-[0_24px_52px_-16px_rgba(18,44,82,.28)] sm:max-h-[90vh] sm:rounded-2xl sm:p-6 dark:border-slate-700/80 dark:bg-[#121826] dark:shadow-2xl',
           maxWidths[maxWidth]
         )}
       >
@@ -65,7 +65,8 @@ export const Modal: React.FC<ModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-[#627289] hover:text-[#005a9c] hover:bg-[#edf5fc] transition-colors dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800"
+            className="grid h-11 w-11 place-items-center rounded-xl text-[#627289] transition-colors hover:bg-[#edf5fc] hover:text-[#005a9c] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+            aria-label="Fechar janela"
           >
             <X className="w-5 h-5" />
           </button>

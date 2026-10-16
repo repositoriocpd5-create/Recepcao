@@ -47,6 +47,7 @@ import {
 import { formatDateTime, formatTime } from '@/lib/utils';
 import { biometricProvider, isBiometricAgentConfigured, DeviceStatus, IdentificationMethod } from '@/services/identification';
 import { generateInstitutionalPdf } from '@/services/pdfService';
+import { ReceptionClock } from '@/components/recepcao/ReceptionClock';
 
 export const RecepcaoPage: React.FC = () => {
   const { user } = useAuth();
@@ -681,9 +682,9 @@ export const RecepcaoPage: React.FC = () => {
       <div className="hidden md:flex items-center gap-1.5 text-[11px] text-[#7b8ca4] dark:text-slate-500">
         <span>Início</span><ChevronRight className="w-3 h-3" /><span>Recepção</span><ChevronRight className="w-3 h-3" /><span className="text-[#005a9c] dark:text-emerald-400">Balcão da Recepção Central</span>
       </div>
-      {/* 1. Cabeçalho de Recepção e Indicadores Rápidos */}
+      {/* 1. Cabeçalho de Recepção */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-1">
-        <div>
+        <div className="order-2 md:order-1">
           <div className="flex items-center gap-2">
             <span className="p-3 rounded-2xl bg-[#dcfce7] text-[#16a34a] border border-[#ccefd8] shadow-sm dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-500/30">
               <UserCheck className="w-6 h-6" />
@@ -695,8 +696,11 @@ export const RecepcaoPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Indicadores de fluxo imediato */}
-        <div className="flex items-center gap-3">
+        <div className="order-1 md:order-2"><ReceptionClock /></div>
+      </div>
+
+      {/* Indicadores de fluxo imediato */}
+      <div className="hidden flex-wrap items-center justify-end gap-3 md:flex">
           <div className="bg-white border border-[#dce4f0] rounded-2xl px-5 py-3 flex items-center gap-4 shadow-[0_12px_24px_-18px_rgba(18,44,82,.35)] dark:bg-[#121826] dark:border-slate-800">
             <div className="p-2.5 rounded-2xl bg-[#edf5fc] text-[#0877c9] dark:bg-blue-950/60 dark:text-blue-400"><Users className="w-5 h-5" /></div>
             <div>
@@ -723,11 +727,10 @@ export const RecepcaoPage: React.FC = () => {
             <CircleHelp className="w-4 h-4" />
             <span className="sr-only">Ver atalhos do teclado</span>
           </Button>
-        </div>
       </div>
 
       {/* 2. Seleção do fluxo principal: a identificação é o único passo nesta tela. */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Card Servidor */}
         <div
           onClick={() => {
@@ -737,13 +740,13 @@ export const RecepcaoPage: React.FC = () => {
             setIsIdentificationModalOpen(true);
           }}
           title="Identificar servidor — atalhos Alt + S ou Alt + 1"
-          className={`group relative overflow-hidden cursor-pointer rounded-2xl p-5 lg:p-6 border transition-all duration-200 text-left flex items-center gap-5 min-w-0 min-h-[128px] ${
+          className={`group relative flex min-h-[156px] min-w-0 cursor-pointer items-center gap-5 overflow-hidden rounded-[20px] border p-5 text-left transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
             identificationMethod === 'matricula'
               ? 'bg-[linear-gradient(135deg,#eff8ff_0%,#fff_66%,#e2f1ff_100%)] border-[#8cc8ff] shadow-[0_18px_32px_-20px_rgba(8,119,201,.65)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
               : 'bg-white border-[#dce4f0] hover:border-[#72afe5] hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-22px_rgba(8,119,201,.65)] dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
           }`}
         >
-          <div className="relative z-10 w-20 h-20 shrink-0 rounded-2xl bg-[#dcecff] border border-[#c5e0fa] flex items-center justify-center text-[#1677e8] shadow-sm dark:bg-blue-950/60 dark:border-blue-500/30 dark:text-blue-400">
+          <div className="relative z-10 flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-[#c5e0fa] bg-[#dcecff] text-[#1677e8] shadow-sm dark:border-blue-500/30 dark:bg-blue-950/60 dark:text-blue-400">
             <Briefcase className="w-8 h-8" />
           </div>
           <div className="relative z-10 min-w-0 flex-1">
@@ -751,7 +754,7 @@ export const RecepcaoPage: React.FC = () => {
             <p className="text-sm font-medium text-[#173b70] dark:text-slate-400 mt-0.5">Identificar por matrícula</p>
             <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de servidores <kbd className="ml-1 rounded border border-[#b9d9f3] bg-white/70 px-1 font-mono text-[10px] text-[#0877d1]">Alt S / 1</kbd></p>
           </div>
-          <div className={`relative z-10 shrink-0 ${identificationMethod === 'matricula' ? 'self-start text-[10px] mt-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-emerald-600' : 'w-11 h-11 rounded-full bg-[#0877d1] text-white grid place-items-center shadow-md group-hover:translate-x-1 transition-transform'}`}>
+          <div className={`absolute bottom-5 right-5 z-10 shrink-0 ${identificationMethod === 'matricula' ? 'top-5 text-[10px] rounded-full bg-[#dcfce7] px-2.5 py-1 text-emerald-600' : 'grid h-12 w-12 place-items-center rounded-full bg-[#087ef5] text-white shadow-md transition-transform group-hover:translate-x-1'}`}>
             {identificationMethod === 'matricula' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar servidor" /><span className="sr-only">Alt S</span></>}
           </div>
         </div>
@@ -765,7 +768,7 @@ export const RecepcaoPage: React.FC = () => {
             setIsIdentificationModalOpen(true);
           }}
           title="Identificar visitante — atalho Alt + V"
-          className={`group relative overflow-hidden cursor-pointer rounded-2xl p-5 lg:p-6 border transition-all duration-200 text-left flex items-center gap-5 min-w-0 min-h-[128px] ${
+          className={`group relative flex min-h-[156px] min-w-0 cursor-pointer items-center gap-5 overflow-hidden rounded-[20px] border p-5 text-left transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
             identificationMethod === 'cpf'
               ? 'bg-[linear-gradient(135deg,#effdf5_0%,#fff_66%,#dcfce7_100%)] border-[#a7ebc3] shadow-[0_18px_32px_-20px_rgba(22,163,74,.48)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
               : 'bg-white border-[#dce4f0] hover:border-[#7fd6a5] hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-22px_rgba(22,163,74,.6)] dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
@@ -779,7 +782,7 @@ export const RecepcaoPage: React.FC = () => {
             <p className="text-sm font-medium text-[#173b70] dark:text-slate-400 mt-0.5">Identificar por CPF</p>
             <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de visitantes <kbd className="ml-1 rounded border border-[#bfe7ce] bg-white/70 px-1 font-mono text-[10px] text-[#16964a]">Alt V</kbd></p>
           </div>
-          <div className={`relative z-10 shrink-0 ${identificationMethod === 'cpf' ? 'self-start text-[10px] mt-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-emerald-600' : 'w-11 h-11 rounded-full bg-[#0aa45a] text-white grid place-items-center shadow-md group-hover:translate-x-1 transition-transform'}`}>
+          <div className={`absolute bottom-5 right-5 z-10 shrink-0 ${identificationMethod === 'cpf' ? 'top-5 text-[10px] rounded-full bg-[#dcfce7] px-2.5 py-1 text-emerald-600' : 'grid h-12 w-12 place-items-center rounded-full bg-[#00a65a] text-white shadow-md transition-transform group-hover:translate-x-1'}`}>
             {identificationMethod === 'cpf' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar visitante" /><span className="sr-only">Alt V</span></>}
           </div>
         </div>
