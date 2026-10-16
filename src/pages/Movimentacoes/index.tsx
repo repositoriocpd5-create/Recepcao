@@ -126,7 +126,7 @@ export const MovimentacoesPage: React.FC = () => {
           item.tipo_pessoa,
           item.servidor?.matricula || item.visitante?.cpf || '—',
           item.cracha_numero || 'S/C',
-          `${item.departamento_destino?.sigla || 'SMEDU'} - ${item.setor_destino?.sigla || 'Geral'}`,
+          `${item.departamento_destino?.sigla || 'SMEDU'} - ${item.setor_destino?.nome || 'Geral'}`,
           formatDateTime(item.data_hora_entrada),
           item.data_hora_saida ? formatDateTime(item.data_hora_saida) : 'Em aberto',
           formatarTempoPermanencia(item.data_hora_entrada, item.data_hora_saida),
@@ -248,7 +248,7 @@ export const MovimentacoesPage: React.FC = () => {
                   const nome = m.servidor?.nome || m.visitante?.nome || 'Não identificado';
                   const doc = m.servidor?.matricula || m.visitante?.cpf || '-';
                   const dep = m.departamento_destino?.sigla || 'SMEDU';
-                  const setor = m.setor_destino?.sigla || 'Geral';
+                  const setor = m.setor_destino?.nome || 'Geral';
 
                   return (
                     <tr key={m.id} className="hover:bg-slate-800/20 transition-colors">
@@ -383,7 +383,7 @@ export const MovimentacoesPage: React.FC = () => {
                     <tr key={item.id} className="text-[#37475e] dark:text-slate-300">
                       <td className="p-3 font-mono">{formatDateTime(item.data_hora_entrada)}</td>
                       <td className="p-3 font-mono">{item.data_hora_saida ? formatDateTime(item.data_hora_saida) : 'Em andamento'}</td>
-                      <td className="p-3">{item.departamento_destino?.sigla || 'SMEDU'} - {item.setor_destino?.sigla || 'Geral'}<div className="text-[10px] text-[#627289] dark:text-slate-400 mt-0.5">{item.motivo}</div></td>
+                      <td className="p-3">{item.departamento_destino?.sigla || 'SMEDU'} - {item.setor_destino?.nome || 'Geral'}<div className="text-[10px] text-[#627289] dark:text-slate-400 mt-0.5">{item.motivo}</div></td>
                       <td className="p-3 font-mono">{item.cracha_numero || 'S/C'}</td>
                       <td className="p-3"><Badge variant={item.status === 'no_predio' ? 'success' : item.status === 'pendente_autorizacao' ? 'warning' : 'neutral'}>{item.status === 'no_predio' ? 'No prédio' : item.status === 'pendente_autorizacao' ? 'Pendente' : 'Finalizado'}</Badge></td>
                     </tr>

@@ -45,6 +45,11 @@ const MATRICULAS_FICTICIAS_LEGADAS = new Set([
   'SME-300112', 'SME-400553', 'SME-500881',
 ]);
 
+/** Captura o hostname/IP do terminal para registro de auditoria. */
+function getTerminalInfo(): string {
+  return window.location.hostname || 'terminal-recepcao';
+}
+
 function getStorage<T>(key: string, initial: T): T {
   try {
     const data = localStorage.getItem(key);
@@ -147,6 +152,12 @@ export const dataService = {
       departamento: deps.find((d) => d.id === s.departamento_id),
     }));
     return departamentoId ? enriched.filter((s) => s.departamento_id === departamentoId) : enriched;
+  },
+
+  async getServidorSetorVinculos(): Promise<Array<{ servidor_id: string; setor_id: string }>> {
+    if (!isSupabaseConfigured) return [];
+    const { data, error } = await supabase.from('servidor_setor_vinculos').select('servidor_id, setor_id');
+    return requireLiveResult(data, error, 'Não foi possível carregar os vínculos de servidores') as Array<{ servidor_id: string; setor_id: string }>;
   },
 
   async salvarDepartamento(departamento: Partial<Departamento>): Promise<Departamento> {
@@ -403,7 +414,8 @@ export const dataService = {
       tabela: 'servidores',
       registro_id: servidor.id,
       detalhes: { matricula: servidor.matricula, nome: servidor.nome },
-    });
+      ip_origem: getTerminalInfo(),
+    });
 
     return {
       encontrado: true,
@@ -493,7 +505,8 @@ export const dataService = {
       tabela: 'visitantes',
       registro_id: novoVisitante.id,
       detalhes: { cpf: novoVisitante.cpf, nome: novoVisitante.nome },
-    });
+      ip_origem: getTerminalInfo(),
+    });
 
     return novoVisitante;
   },
@@ -545,7 +558,8 @@ export const dataService = {
       tabela: 'visitantes',
       registro_id: visitante.id,
       detalhes: { cpf: rawCpf, nome: visitante.nome },
-    });
+      ip_origem: getTerminalInfo(),
+    });
 
     return {
       encontrado: true,
@@ -698,7 +712,8 @@ export const dataService = {
         cracha: input.cracha_numero,
         motivo: input.motivo,
       },
-    });
+      ip_origem: getTerminalInfo(),
+    });
 
     return novaMov;
   },
@@ -757,7 +772,8 @@ export const dataService = {
         data_hora_saida: mov.data_hora_saida,
         cracha: mov.cracha_numero,
       },
-    });
+      ip_origem: getTerminalInfo(),
+    });
 
     return mov;
   },
@@ -823,7 +839,8 @@ export const dataService = {
       tabela: 'autorizacoes',
       registro_id: autorizacaoId,
       detalhes: { aprovado, motivo: motivoResposta },
-    });
+      ip_origem: getTerminalInfo(),
+    });
   },
 
   // 10. Agendamentos
@@ -884,8 +901,8 @@ export const dataService = {
         .from('auditoria_logs')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
-      return requireLiveResult(data, error, 'Não foi possível carregar logs de auditoria') as AuditoriaLog[];
+        .limit(500);
+      return requireLiveResult(data, error, 'Não foi possível carregar logs de auditoria') as AuditoriaLog[];
     }
     return getStorage<AuditoriaLog[]>(STORAGE_KEYS.AUDITORIA, INITIAL_AUDITORIA_LOGS);
   },
@@ -893,13 +910,15 @@ export const dataService = {
   async registrarLogAuditoria(log: Partial<AuditoriaLog>): Promise<void> {
     if (isSupabaseConfigured) {
       const { error } = await supabase.from('auditoria_logs').insert({
+        usuario_id: log.usuario_id || null,
         usuario_email: log.usuario_email || null,
         acao: log.acao || 'OPERACAO',
         tabela: log.tabela || null,
         registro_id: log.registro_id || null,
         detalhes: log.detalhes || {},
+        ip_origem: log.ip_origem || null,
       });
-      if (error) throw new Error(`Não foi possível registrar auditoria: ${error.message}`);
+      if (error) console.warn(`Auditoria: ${error.message}`);
       return;
     }
 

@@ -244,7 +244,7 @@ export const ServidoresPage: React.FC = () => {
                 { value: '', label: 'Geral / Gabinete do Dep.' },
                 ...setores
                   .filter((st) => st.departamento_id === depId)
-                  .map((st) => ({ value: st.id, label: `${st.sigla} - ${st.nome}` })),
+                  .map((st) => ({ value: st.id, label: st.nome })),
               ]}
             />
           </div>

@@ -18,6 +18,7 @@ import {
   Fingerprint,
   QrCode,
   Barcode,
+  Camera,
   FileDown,
   Plus,
   Trash2,
@@ -48,6 +49,7 @@ import { formatDateTime, formatTime } from '@/lib/utils';
 import { biometricProvider, isBiometricAgentConfigured, DeviceStatus, IdentificationMethod } from '@/services/identification';
 import { generateInstitutionalPdf } from '@/services/pdfService';
 import { ReceptionClock } from '@/components/recepcao/ReceptionClock';
+import { BarcodeCameraScanner } from '@/components/recepcao/BarcodeCameraScanner';
 
 export const RecepcaoPage: React.FC = () => {
   const { user } = useAuth();
@@ -75,6 +77,7 @@ export const RecepcaoPage: React.FC = () => {
   const [isBarcodeLoading, setIsBarcodeLoading] = useState(false);
   const [isBarcodeReturnModalOpen, setIsBarcodeReturnModalOpen] = useState(false);
   const [returnBarcodeInput, setReturnBarcodeInput] = useState('');
+  const [cameraTarget, setCameraTarget] = useState<'entrada' | 'devolucao' | null>(null);
   const [returnBarcodeFeedback, setReturnBarcodeFeedback] = useState<{ valid: boolean; message: string } | null>(null);
   const [isReturningBadge, setIsReturningBadge] = useState(false);
   const returnBarcodeInputRef = useRef<HTMLInputElement>(null);
@@ -87,6 +90,7 @@ export const RecepcaoPage: React.FC = () => {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [setores, setSetores] = useState<Setor[]>([]);
   const [todosServidores, setTodosServidores] = useState<Servidor[]>([]);
+  const [vinculosServidorSetor, setVinculosServidorSetor] = useState<Array<{ servidor_id: string; setor_id: string }>>([]);
 
   // Pessoas no prédio em tempo real
   const [pessoasNoPredio, setPessoasNoPredio] = useState<Movimentacao[]>([]);
@@ -143,20 +147,42 @@ export const RecepcaoPage: React.FC = () => {
   const carregarDadosIniciais = async () => {
     setIsLoadingPredio(true);
     try {
-      const [deps, sets, servs, movs] = await Promise.all([
+      const resultados = await Promise.allSettled([
         dataService.getDepartamentos(),
         dataService.getSetores(),
         dataService.getServidores(),
         dataService.getMovimentacoes(),
+        dataService.getServidorSetorVinculos(),
       ]);
-      setDepartamentos(deps);
-      setSetores(sets);
-      setTodosServidores(servs);
-      setPessoasNoPredio(movs.filter((m) => m.status === 'no_predio' || m.status === 'pendente_autorizacao'));
 
-      if (deps.length > 0 && !formDestinoDepId) {
-        setFormDestinoDepId(deps[0].id);
+      const [depsResultado, setoresResultado, servidoresResultado, movimentacoesResultado, vinculosResultado] = resultados;
+      if (depsResultado.status === 'fulfilled') {
+        setDepartamentos(depsResultado.value);
+        if (depsResultado.value.length > 0 && !formDestinoDepId) {
+          setFormDestinoDepId(depsResultado.value[0].id);
+        }
+      } else {
+        console.error('Erro ao carregar departamentos:', depsResultado.reason);
       }
+
+      if (setoresResultado.status === 'fulfilled') {
+        setSetores(setoresResultado.value);
+      } else {
+        console.error('Erro ao carregar setores:', setoresResultado.reason);
+      }
+
+      if (servidoresResultado.status === 'fulfilled') {
+        setTodosServidores(servidoresResultado.value);
+      } else {
+        console.error('Erro ao carregar servidores:', servidoresResultado.reason);
+      }
+
+      if (movimentacoesResultado.status === 'fulfilled') {
+        setPessoasNoPredio(movimentacoesResultado.value.filter((m) => m.status === 'no_predio' || m.status === 'pendente_autorizacao'));
+      } else {
+        console.error('Erro ao carregar movimentações:', movimentacoesResultado.reason);
+      }
+      if (vinculosResultado.status === 'fulfilled') setVinculosServidorSetor(vinculosResultado.value);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
     } finally {
@@ -176,7 +202,7 @@ export const RecepcaoPage: React.FC = () => {
           item.tipo_pessoa,
           item.servidor?.matricula || item.visitante?.cpf || '—',
           item.cracha_numero || 'S/C',
-          `${item.departamento_destino?.sigla || 'SMEDU'} - ${item.setor_destino?.sigla || 'Geral'}`,
+          `${item.departamento_destino?.sigla || 'SMEDU'} - ${item.setor_destino?.nome || 'Geral'}`,
           item.motivo,
           formatDateTime(item.data_hora_entrada),
           item.status === 'pendente_autorizacao' ? 'Pendente' : 'No prédio',
@@ -253,9 +279,8 @@ export const RecepcaoPage: React.FC = () => {
   const setoresFiltrados = setores.filter((s) => s.departamento_id === formDestinoDepId);
   const servidoresDestinoFiltrados = todosServidores.filter((servidor) => {
     const texto = formServidorDestinoBusca.trim().toLocaleLowerCase('pt-BR');
-    const pertenceAoDestino =
-      servidor.departamento_id === formDestinoDepId &&
-      servidor.setor_id === formDestinoSetorId;
+    const pertenceAoDestino = servidor.setor_id === formDestinoSetorId ||
+      vinculosServidorSetor.some((vinculo) => vinculo.servidor_id === servidor.id && vinculo.setor_id === formDestinoSetorId);
     return pertenceAoDestino && (!texto || `${servidor.nome} ${servidor.matricula} ${servidor.cargo}`.toLocaleLowerCase('pt-BR').includes(texto));
   });
 
@@ -353,6 +378,7 @@ export const RecepcaoPage: React.FC = () => {
 
   // Abrir modal de entrada para Servidor ou Visitante
   const handleIniciarEntrada = (crachaNumero = '') => {
+    void carregarDadosIniciais();
     setFormCracha(crachaNumero);
     setFormCrachaFeedback(null);
     setFormDestinoDepId('');
@@ -386,7 +412,7 @@ export const RecepcaoPage: React.FC = () => {
 
   const handleBarcodeRead = async (event: React.FormEvent) => {
     event.preventDefault();
-    const barcode = barcodeInput.trim();
+    const barcode = barcodeInput.trim().toUpperCase();
     if (!barcode) return;
     setIsBarcodeLoading(true);
     setBarcodeFeedback(null);
@@ -430,7 +456,7 @@ export const RecepcaoPage: React.FC = () => {
 
   const handleQuickBarcodeReturn = async (event: React.FormEvent) => {
     event.preventDefault();
-    const barcode = returnBarcodeInput.trim();
+    const barcode = returnBarcodeInput.trim().toUpperCase();
     if (!barcode) return;
     setIsReturningBadge(true);
     setReturnBarcodeFeedback(null);
@@ -900,7 +926,7 @@ export const RecepcaoPage: React.FC = () => {
                   <span className="text-slate-400 block text-[11px]">Lotação / Departamento:</span>
                   <span className="font-semibold text-slate-200">
                     {servidorResultado.servidor.departamento?.sigla || 'SMEDU'} -{' '}
-                    {servidorResultado.servidor.setor?.sigla || 'Geral'}
+                    {servidorResultado.servidor.setor?.nome || 'Geral'}
                   </span>
                 </div>
                 <div className="bg-[#141b2d] p-3 rounded-lg border border-slate-800">
@@ -1076,7 +1102,7 @@ export const RecepcaoPage: React.FC = () => {
                   const nome = m.servidor?.nome || m.visitante?.nome || 'Não identificado';
                   const doc = m.servidor?.matricula || m.visitante?.cpf || '-';
                   const dep = m.departamento_destino?.sigla || 'SMEDU';
-                  const setor = m.setor_destino?.sigla || 'Geral';
+                  const setor = m.setor_destino?.nome || 'Geral';
 
                   return (
                     <tr key={m.id} className="hover:bg-slate-800/30 transition-colors">
@@ -1134,17 +1160,31 @@ export const RecepcaoPage: React.FC = () => {
         )}
       </Card>
 
+      <BarcodeCameraScanner
+        isOpen={cameraTarget !== null}
+        onClose={() => setCameraTarget(null)}
+        onDetected={(value) => {
+          if (cameraTarget === 'entrada') {
+            setFormCracha(value);
+            setFormCrachaFeedback(null);
+          } else if (cameraTarget === 'devolucao') {
+            setReturnBarcodeInput(value);
+            setReturnBarcodeFeedback(null);
+          }
+          setCameraTarget(null);
+        }}
+      />
       <Modal
         isOpen={isBarcodeReturnModalOpen}
-        onClose={() => setIsBarcodeReturnModalOpen(false)}
+        onClose={() => { if (!cameraTarget && !isReturningBadge) setIsBarcodeReturnModalOpen(false); }}
         title="Devolução rápida de crachá"
-        description="Receba o crachá VISITANTE, leia o código de barras e a saída será registrada automaticamente."
+        description="Leia ou digite o código e confirme a devolução antes de registrar a saída."
         maxWidth="md"
       >
         <form onSubmit={handleQuickBarcodeReturn} className="space-y-4">
           <div className="rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] p-3 flex items-start gap-3 dark:border-emerald-500/30 dark:bg-emerald-950/30">
             <span className="p-2 rounded-lg bg-white text-[#16a34a] dark:bg-emerald-900/50"><Barcode className="w-5 h-5" /></span>
-            <div className="text-xs text-[#166534] dark:text-emerald-200"><strong>Ação automática.</strong><br />A leitura confirma a devolução, encerra a entrada em andamento e libera o crachá para o próximo visitante.</div>
+            <div className="text-xs text-[#166534] dark:text-emerald-200"><strong>Confirmação obrigatória.</strong> A leitura apenas preenche o código. A saída e a liberação do crachá acontecem somente após selecionar Registrar devolução.</div>
           </div>
           {!returnBarcodeFeedback?.valid && (
             <Input
@@ -1157,6 +1197,7 @@ export const RecepcaoPage: React.FC = () => {
               autoFocus
             />
           )}
+          {!returnBarcodeFeedback?.valid && <Button type="button" variant="outline" className="min-h-11" onClick={() => setCameraTarget('devolucao')} disabled={isReturningBadge}><Camera className="w-4 h-4" /> Ler com câmera do celular</Button>}
           {returnBarcodeFeedback && (
             <div className={`rounded-xl border-2 p-4 text-sm font-semibold ${returnBarcodeFeedback.valid ? 'border-[#86efac] bg-[#f0fdf4] text-[#166534] dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-200' : 'animate-pulse border-[#f87171] bg-[#fef2f2] text-[#b91c1c] shadow-[0_0_0_3px_rgba(248,113,113,.12)] dark:border-rose-500/50 dark:bg-rose-950/30 dark:text-rose-200'}`}>
               {returnBarcodeFeedback.message}
@@ -1279,7 +1320,7 @@ export const RecepcaoPage: React.FC = () => {
               label="Setor"
               value={novoServSetorId}
               onChange={(event) => setNovoServSetorId(event.target.value)}
-              options={[{ value: '', label: 'Sem setor específico' }, ...setores.filter((item) => item.departamento_id === novoServDepartamentoId).map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))]}
+              options={[{ value: '', label: 'Sem setor específico' }, ...setores.filter((item) => item.departamento_id === novoServDepartamentoId).map((item) => ({ value: item.id, label: item.nome }))]}
             />
           </div>
           <Input label="Ramal" value={novoServRamal} onChange={(event) => setNovoServRamal(event.target.value)} placeholder="Ex.: 1001" />
@@ -1318,7 +1359,7 @@ export const RecepcaoPage: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Cargo</span><span className="font-semibold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.cargo}</span></div>
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Lotação</span><span className="font-semibold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.departamento?.sigla || 'SMEDU'} - {servidorResultado.servidor.setor?.sigla || 'Geral'}</span></div>
+              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Lotação</span><span className="font-semibold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.departamento?.sigla || 'SMEDU'} - {servidorResultado.servidor.setor?.nome || 'Geral'}</span></div>
               <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Contato</span><span className="font-semibold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.telefone || servidorResultado.servidor.email || 'Não informado'}</span></div>
             </div>
             <div className="flex justify-end gap-3 pt-1">
@@ -1431,6 +1472,7 @@ export const RecepcaoPage: React.FC = () => {
             <p className="mt-1 text-[11px] text-[#627289] dark:text-slate-400">
               O leitor USB preenche este campo automaticamente. Deixe em branco somente se não houver entrega de crachá.
             </p>
+            <Button type="button" size="sm" variant="outline" className="mt-2 min-h-11" onClick={() => setCameraTarget('entrada')}><Camera className="w-4 h-4" /> Ler com câmera do celular</Button>
             {formCrachaFeedback && (
               <p className={`mt-1 text-[11px] font-medium ${formCrachaFeedback.includes('disponível') ? 'text-[#16a34a] dark:text-emerald-300' : 'text-[#dc2626] dark:text-rose-300'}`}>
                 {formCrachaFeedback}
@@ -1440,42 +1482,46 @@ export const RecepcaoPage: React.FC = () => {
 
           {activeTab === 'visitante' && <section className="space-y-3 border-t border-[#dce4f0] pt-4">
             <div className="flex justify-between"><div><h3 className="font-bold text-[#102755]">Destinos da visita (até 10)</h3><p className="text-xs text-[#627289]">Selecione os departamentos e setores que serão visitados.</p></div><Badge variant="neutral">{destinosVisita.length}/10</Badge></div>
-            {destinosVisita.map((destino, index) => <div key={index} className="rounded-xl border border-[#d6e6f7] bg-[#f8fbff] p-3 space-y-3"><div className="flex justify-between font-bold text-sm"><span>Destino {index + 1}</span>{destinosVisita.length > 1 && <button type="button" onClick={() => setDestinosVisita((items) => items.filter((_, itemIndex) => itemIndex !== index))} className="text-rose-500"><Trash2 className="w-4 h-4" /></button>}</div><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Select label="Departamento de destino" value={destino.departamento_destino_id} onChange={(event) => atualizarDestinoVisita(index, { departamento_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar departamento' }, ...departamentos.map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))]} required /><Select label="Setor específico" value={destino.setor_destino_id} onChange={(event) => atualizarDestinoVisita(index, { setor_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar setor' }, ...setores.filter((item) => item.departamento_id === destino.departamento_destino_id).map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))]} disabled={!destino.departamento_destino_id} required /></div></div>)}
+            {destinosVisita.map((destino, index) => <div key={index} className="rounded-xl border border-[#d6e6f7] bg-[#f8fbff] p-3 space-y-3"><div className="flex justify-between font-bold text-sm"><span>Destino {index + 1}</span>{destinosVisita.length > 1 && <button type="button" onClick={() => setDestinosVisita((items) => items.filter((_, itemIndex) => itemIndex !== index))} className="text-rose-500"><Trash2 className="w-4 h-4" /></button>}</div><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Select label="Departamento de destino" value={destino.departamento_destino_id} onChange={(event) => atualizarDestinoVisita(index, { departamento_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar departamento' }, ...departamentos.map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))]} required /><Select label="Setor específico" value={destino.setor_destino_id} onChange={(event) => atualizarDestinoVisita(index, { setor_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar setor' }, ...setores.filter((item) => item.departamento_id === destino.departamento_destino_id).map((item) => ({ value: item.id, label: item.nome }))]} disabled={!destino.departamento_destino_id} required /></div></div>)}
             {destinosVisita.length < 10 && <button type="button" onClick={adicionarDestinoVisita} className="flex w-full justify-center gap-2 rounded-xl border border-dashed border-[#52a6fb] py-2 text-sm font-semibold text-[#0877d1]"><Plus className="w-4 h-4" />Adicionar outro destino</button>}
           </section>}
           <div className={activeTab === 'visitante' ? 'hidden' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'}>
             <Select
               label="Departamento de Destino"
-              value={formDestinoDepId}
-              onChange={(e) => setFormDestinoDepId(e.target.value)}
+              value={formDestinoSetorId}
+              onChange={(e) => {
+                const setor = setores.find((item) => item.id === e.target.value);
+                setFormDestinoSetorId(e.target.value);
+                setFormDestinoDepId(setor?.departamento_id || '');
+                setFormServidorDestinoId('');
+              }}
               options={[
                 { value: '', label: 'Selecione o departamento' },
-                ...departamentos.map((d) => ({
-                  value: d.id,
-                  label: `${d.sigla} - ${d.nome}`,
+                ...setores.map((s) => ({
+                  value: s.id,
+                  label: `${s.sigla} - ${s.nome}`,
                 })),
               ]}
               required
             />
 
             <Select
-              label="Setor Específico"
-              value={formDestinoSetorId}
-              onChange={(e) => setFormDestinoSetorId(e.target.value)}
+              label="Diretor/Servidor"
+              value={formServidorDestinoId}
+              onChange={(e) => setFormServidorDestinoId(e.target.value)}
               options={[
-                { value: '', label: formDestinoDepId ? 'Selecione o setor' : 'Selecione primeiro o departamento' },
-                ...setoresFiltrados.map((s) => ({
-                  value: s.id,
-                  label: `${s.sigla} - ${s.nome}${s.requer_autorizacao ? ' (Requer Autorização)' : ''}`,
+                { value: '', label: formDestinoSetorId ? 'Selecione o diretor/servidor' : 'Selecione primeiro o departamento' },
+                ...servidoresDestinoFiltrados.map((servidor) => ({
+                  value: servidor.id,
+                  label: `${servidor.nome} — ${servidor.cargo}`,
                 })),
               ]}
-              required
-              disabled={!formDestinoDepId}
+              disabled={!formDestinoSetorId}
             />
           </div>
 
           {/* Servidor anfitrião / destino */}
-          <div className={activeTab === 'visitante' ? 'hidden' : 'relative'}>
+          <div className="hidden">
             <Input
               label="Servidor / Responsável a ser procurado (Opcional)"
               value={formServidorDestinoBusca}

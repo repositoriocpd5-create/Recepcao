@@ -125,8 +125,8 @@ export const LoginPage: React.FC = () => {
             </Button>
           </form>
 
-          {/* Atalhos de homologação e teste */}
-          <div className="mt-6 pt-5 border-t border-slate-800/80">
+          {/* Atalhos disponíveis somente quando não há conexão com o Supabase. */}
+          {!isSupabaseLive && <div className="mt-6 pt-5 border-t border-slate-800/80">
             <div className="text-[11px] font-medium text-slate-400 mb-2.5 text-center">
               Ambiente de testes — Acesso rápido por perfil:
             </div>
@@ -153,7 +153,7 @@ export const LoginPage: React.FC = () => {
                 Gestor
               </button>
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* Rodapé e status de segurança */}

@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/Select';
 import { dataService } from '@/services/dataService';
 import { Departamento, Setor } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { pessoasPorSetor } from '@/services/estruturaImportada';
 
 export const DepartamentosPage: React.FC = () => {
   const { user } = useAuth();
@@ -263,13 +264,14 @@ export const DepartamentosPage: React.FC = () => {
                       >
                         <div>
                           <div className="font-semibold text-[#152238] dark:text-slate-200">
-                            {setor.sigla} — {setor.nome}
+                            {setor.nome}
                           </div>
                           <div className="text-[11px] text-[#627289] dark:text-slate-400">
                             {setor.sala ? `${setor.sala} • ` : ''}
-                            Resp: {setor.responsavel || 'Não informado'}
+                            {pessoasPorSetor.get(setor.nome)?.length || 0} pessoas vinculadas
                             {setor.ramal ? ` • Ramal: ${setor.ramal}` : ''}
                           </div>
+                          <div className="mt-1 text-[10px] text-[#68809f] line-clamp-2">{pessoasPorSetor.get(setor.nome)?.join(' • ')}</div>
                         </div>
 
                         <div className="flex items-center gap-1">

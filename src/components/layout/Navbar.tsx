@@ -144,7 +144,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
           </div>
 
           {/* Quick role switcher for testing */}
-          {user && (
+          {user && !isSupabaseLive && (
             <div className="hidden md:flex items-center gap-1 bg-[#151c2c] border border-slate-700/80 rounded-lg p-0.5 text-xs">
               <span className="px-2 text-slate-400 text-[11px]">Perfil teste:</span>
               {(['recepcionista', 'admin', 'gestor'] as UserRole[]).map((r) => (

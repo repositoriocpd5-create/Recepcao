@@ -52,6 +52,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setUser(u);
               localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(u));
             }
+          } else {
+            // Um perfil de demonstração não possui token do Supabase e, com RLS
+            // ativa, não pode consultar os dados institucionais.
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+            setUser(null);
           }
         } catch (err) {
           console.warn('Erro ao verificar sessão Supabase:', err);
@@ -109,6 +114,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
         throw err;
       }
+    }
+
+    if (isSupabaseConfigured) {
+      setLoading(false);
+      throw new Error('Informe o e-mail e a senha de um usuário cadastrado no Supabase.');
     }
 
     // Modo de demonstração / homologação
