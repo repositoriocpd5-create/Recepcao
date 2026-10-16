@@ -285,10 +285,6 @@ export const RecepcaoPage: React.FC = () => {
   });
 
   useEffect(() => {
-    setFormDestinoSetorId('');
-  }, [formDestinoDepId]);
-
-  useEffect(() => {
     setFormServidorDestinoId('');
     setFormServidorDestinoBusca('');
     setIsServidorDestinoBuscaOpen(false);
