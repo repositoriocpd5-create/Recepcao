@@ -14,7 +14,7 @@ on public.servidor_setor_vinculos for select to authenticated using (true);
 
 with vinculos(departamento_nome, setor_nome, servidor_nome) as (
   values
-+('CME', 'SALA DOS CONSELHOS', 'CRISTIANO DA CRUZ SILVA'),
+('CME', 'SALA DOS CONSELHOS', 'CRISTIANO DA CRUZ SILVA'),
 ('CME', 'SALA DOS CONSELHOS', 'JOSEANE'),
 ('CME', 'SALA DOS CONSELHOS', 'PAULO ROBERTO PEREIRA PIMENTEL'),
 ('Gabinete da Educação', 'Departamento de Marketing Escolar', 'ANA LUIZ'),
