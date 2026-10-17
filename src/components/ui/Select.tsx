@@ -41,8 +41,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             <option
               key={opt.value}
               value={opt.value}
-              className="bg-slate-900 text-slate-100"
-              style={opt.destaque === 'perigo' ? { color: '#dc2626', fontWeight: 600 } : undefined}
+              className={cn('bg-slate-900 text-slate-100', opt.destaque === 'perigo' && 'opcao-perigo')}
             >
               {opt.label}
             </option>

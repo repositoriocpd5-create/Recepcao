@@ -1560,7 +1560,7 @@ export const RecepcaoPage: React.FC = () => {
 
             <Select
               label="Diretor / Servidor"
-              className="min-h-11 rounded-xl"
+              className={`min-h-11 rounded-xl${destinoRequerAutorizacao ? ' select-perigo' : ''}`}
               value={formServidorDestinoId}
               onChange={(e) => setFormServidorDestinoId(e.target.value)}
               options={[
@@ -1571,7 +1571,6 @@ export const RecepcaoPage: React.FC = () => {
                   destaque: servidorExigeAutorizacao(servidor.id) ? 'perigo' as const : undefined,
                 })),
               ]}
-              style={destinoRequerAutorizacao ? { color: '#dc2626', fontWeight: 600 } : undefined}
               disabled={!formDestinoSetorId}
             />
           </div>
