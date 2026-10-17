@@ -48,6 +48,13 @@ export interface Setor {
   departamento?: Departamento;
 }
 
+export interface ServidorSetorVinculo {
+  servidor_id: string;
+  setor_id: string;
+  /** Responsável cuja visita exige autorização prévia da portaria. */
+  requer_autorizacao?: boolean;
+}
+
 export interface Servidor {
   id: string;
   matricula: string;

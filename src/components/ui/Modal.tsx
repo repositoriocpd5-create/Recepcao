@@ -7,6 +7,7 @@ export interface ModalProps {
   onClose: () => void;
   title: string;
   description?: string;
+  icon?: React.ReactNode;
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 }
@@ -16,6 +17,7 @@ export const Modal: React.FC<ModalProps> = ({
   onClose,
   title,
   description,
+  icon,
   children,
   maxWidth = 'lg',
 }) => {
@@ -54,14 +56,21 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal Dialog */}
       <div
         className={cn(
-          'relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[24px] border border-[#dce4f0] bg-white p-5 shadow-[0_24px_52px_-16px_rgba(18,44,82,.28)] sm:max-h-[90vh] sm:rounded-2xl sm:p-6 dark:border-slate-700/80 dark:bg-[#121826] dark:shadow-2xl',
+          'relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[24px] border border-[#dce4f0] bg-white p-5 shadow-[0_24px_52px_-16px_rgba(18,44,82,.28)] sm:max-h-[96vh] sm:rounded-2xl sm:p-6 dark:border-slate-700/80 dark:bg-[#121826] dark:shadow-2xl',
           maxWidths[maxWidth]
         )}
       >
-        <div className="flex items-center justify-between pb-3 border-b border-[#dce4f0] dark:border-slate-800">
-          <div>
-            <h2 className="text-lg font-bold text-[#152238] dark:text-slate-100">{title}</h2>
-            {description && <p className="text-xs text-[#627289] dark:text-slate-400 mt-0.5">{description}</p>}
+        <div className={cn('flex justify-between border-b border-[#dce4f0] dark:border-slate-800', icon ? 'items-start gap-3 pb-4' : 'items-center pb-3')}>
+          <div className={cn(icon && 'flex items-center gap-3.5')}>
+            {icon && (
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#edf5fc] text-[#0b6bbf] dark:bg-slate-800 dark:text-sky-300">
+                {icon}
+              </div>
+            )}
+            <div>
+              <h2 className={cn('font-bold text-[#152238] dark:text-slate-100', icon ? 'text-xl' : 'text-lg')}>{title}</h2>
+              {description && <p className={cn('text-[#627289] dark:text-slate-400 mt-0.5', icon ? 'text-sm' : 'text-xs')}>{description}</p>}
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -72,7 +81,7 @@ export const Modal: React.FC<ModalProps> = ({
           </button>
         </div>
 
-        <div className="py-4 overflow-y-auto flex-1">{children}</div>
+        <div className="py-4 overflow-y-auto flex-1 sm:py-3">{children}</div>
       </div>
     </div>
   );

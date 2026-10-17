@@ -23,6 +23,8 @@ import {
   Plus,
   Trash2,
   CircleHelp,
+  LogIn,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -40,6 +42,7 @@ import {
   Visitante,
   Departamento,
   Setor,
+  ServidorSetorVinculo,
   Movimentacao,
   DestinoVisita,
   ConsultaServidorResultado,
@@ -50,6 +53,15 @@ import { biometricProvider, isBiometricAgentConfigured, DeviceStatus, Identifica
 import { generateInstitutionalPdf } from '@/services/pdfService';
 import { ReceptionClock } from '@/components/recepcao/ReceptionClock';
 import { BarcodeCameraScanner } from '@/components/recepcao/BarcodeCameraScanner';
+
+const MOTIVOS_ACESSO = [
+  'Atendimento institucional',
+  'Reunião',
+  'Entrega de documentos',
+  'Visita técnica',
+  'Prestação de serviço',
+  'Outro',
+];
 
 export const RecepcaoPage: React.FC = () => {
   const { user } = useAuth();
@@ -90,7 +102,7 @@ export const RecepcaoPage: React.FC = () => {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [setores, setSetores] = useState<Setor[]>([]);
   const [todosServidores, setTodosServidores] = useState<Servidor[]>([]);
-  const [vinculosServidorSetor, setVinculosServidorSetor] = useState<Array<{ servidor_id: string; setor_id: string }>>([]);
+  const [vinculosServidorSetor, setVinculosServidorSetor] = useState<ServidorSetorVinculo[]>([]);
 
   // Pessoas no prédio em tempo real
   const [pessoasNoPredio, setPessoasNoPredio] = useState<Movimentacao[]>([]);
@@ -277,12 +289,37 @@ export const RecepcaoPage: React.FC = () => {
 
   // Setores e responsáveis filtrados pelo destino selecionado.
   const setoresFiltrados = setores.filter((s) => s.departamento_id === formDestinoDepId);
+  // A base possui o mesmo setor em mais de um departamento (ex.: DTE em "Estrutura Importada",
+  // "Sub Educação" e "Sub Infraestrutura"); o destino é escolhido pelo nome do setor e reúne
+  // os servidores de todas as ocorrências.
+  const normalizarNomeSetor = (nome?: string) => (nome || '').trim().toLocaleUpperCase('pt-BR');
+  const setoresDestinoOpcoes = Array.from(
+    setores
+    .filter((setor) => setor.ativo !== false)
+      .sort((a, b) => Number(a.departamento?.sigla === 'IMPORT') - Number(b.departamento?.sigla === 'IMPORT'))
+      .reduce((mapa, setor) => {
+        const chave = normalizarNomeSetor(setor.nome);
+        if (!mapa.has(chave)) mapa.set(chave, setor);
+        return mapa;
+      }, new Map<string, Setor>())
+      .values(),
+  ).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const setorDestinoSelecionado = setores.find((s) => s.id === formDestinoSetorId);
+  const idsSetoresDestino = new Set(
+    setorDestinoSelecionado
+      ? setores.filter((s) => normalizarNomeSetor(s.nome) === normalizarNomeSetor(setorDestinoSelecionado.nome)).map((s) => s.id)
+      : [],
+  );
   const servidoresDestinoFiltrados = todosServidores.filter((servidor) => {
     const texto = formServidorDestinoBusca.trim().toLocaleLowerCase('pt-BR');
-    const pertenceAoDestino = servidor.setor_id === formDestinoSetorId ||
-      vinculosServidorSetor.some((vinculo) => vinculo.servidor_id === servidor.id && vinculo.setor_id === formDestinoSetorId);
+    const pertenceAoDestino = idsSetoresDestino.has(servidor.setor_id || '') ||
+      vinculosServidorSetor.some((vinculo) => vinculo.servidor_id === servidor.id && idsSetoresDestino.has(vinculo.setor_id));
     return pertenceAoDestino && (!texto || `${servidor.nome} ${servidor.matricula} ${servidor.cargo}`.toLocaleLowerCase('pt-BR').includes(texto));
   });
+  // A autorização prévia é exigida por responsável (coluna "Exigir Autorização Prévia da Portaria").
+  const servidorExigeAutorizacao = (servidorId: string) =>
+    vinculosServidorSetor.some((vinculo) => vinculo.servidor_id === servidorId && idsSetoresDestino.has(vinculo.setor_id) && vinculo.requer_autorizacao);
+  const destinoRequerAutorizacao = Boolean(formServidorDestinoId) && servidorExigeAutorizacao(formServidorDestinoId);
 
   useEffect(() => {
     setFormServidorDestinoId('');
@@ -517,7 +554,9 @@ export const RecepcaoPage: React.FC = () => {
         throw new Error('Selecione o departamento e o setor de cada destino da visita.');
       }
       const setorEscolhido = setores.find((s) => s.id === destinos[0].setor_destino_id);
-      const requerAutorizacao = destinos.some((destino) => setores.find((s) => s.id === destino.setor_destino_id)?.requer_autorizacao);
+      const requerAutorizacao = activeTab === 'visitante'
+        ? destinos.some((destino) => setores.find((s) => s.id === destino.setor_destino_id)?.requer_autorizacao)
+        : destinoRequerAutorizacao;
 
       const pessoaId =
         activeTab === 'servidor'
@@ -1428,49 +1467,63 @@ export const RecepcaoPage: React.FC = () => {
       <Modal
         isOpen={isEntradaModalOpen}
         onClose={() => setIsEntradaModalOpen(false)}
-        title="Entrada em Andamento"
-        description="Confirme o destino e anexe o crachá temporário entregue à pessoa identificada"
+        title="Entrada em andamento"
+        description="Confirme o destino e vincule o crachá entregue."
+        icon={<LogIn className="w-6 h-6" />}
+        maxWidth="xl"
       >
         <form onSubmit={handleConfirmarEntrada} className="space-y-4">
-          <div className="p-3 bg-[#edf5fc] rounded-xl border border-[#c9e1f6] text-xs dark:bg-slate-900/80 dark:border-slate-800">
-            <span className="text-slate-400">Identificação:</span>
-            <div className="text-[#152238] font-bold text-sm mt-0.5 dark:text-slate-100">
-              {activeTab === 'servidor'
-                ? servidorResultado?.servidor?.nome
-                : visitanteResultado?.visitante?.nome}
+          <div className="flex items-center gap-3.5 rounded-2xl border border-[#c9e1f6] bg-[#edf5fc] px-4 py-3 dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#dcebf9] text-[#0b6bbf] dark:bg-slate-800 dark:text-sky-300">
+              <User className="w-5 h-5" />
             </div>
-            <div className="text-[#16a34a] font-mono text-[11px] dark:text-emerald-400">
-              {activeTab === 'servidor'
-                ? `Matrícula: ${servidorResultado?.servidor?.matricula}`
-                : `CPF: ${visitanteResultado?.visitante?.cpf}`}
+            <div className="min-w-0">
+              <span className="text-xs text-[#627289] dark:text-slate-400">Pessoa identificada</span>
+              <div className="truncate text-base font-extrabold leading-tight text-[#102755] dark:text-slate-100">
+                {activeTab === 'servidor'
+                  ? servidorResultado?.servidor?.nome
+                  : visitanteResultado?.visitante?.nome}
+              </div>
+              <div className="text-sm text-[#627289] dark:text-slate-400">
+                {activeTab === 'servidor'
+                  ? <>Matrícula: <span className="ml-1">{servidorResultado?.servidor?.matricula}</span></>
+                  : <>CPF: <span className="ml-1">{visitanteResultado?.visitante?.cpf}</span></>}
+              </div>
             </div>
           </div>
 
-          <div>
-            <Input
-              label="Crachá temporário / código de barras"
-              value={formCracha}
-              onChange={(e) => {
-                setFormCracha(e.target.value);
-                setFormCrachaFeedback(null);
-              }}
-              onBlur={() => { void validarCrachaParaEntrada(); }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  void validarCrachaParaEntrada();
-                }
-              }}
-              placeholder="Leia ou digite o código do crachá VISITANTE"
-              icon={<Barcode className="w-4 h-4" />}
-              autoFocus
-            />
-            <p className="mt-1 text-[11px] text-[#627289] dark:text-slate-400">
-              O leitor USB preenche este campo automaticamente. Deixe em branco somente se não houver entrega de crachá.
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-base font-extrabold text-[#102755] dark:text-slate-100">Crachá temporário</h3>
+              <span className="text-xs text-[#627289] dark:text-slate-400">Opcional</span>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                aria-label="Crachá temporário"
+                className="min-h-11 rounded-xl"
+                value={formCracha}
+                onChange={(e) => {
+                  setFormCracha(e.target.value);
+                  setFormCrachaFeedback(null);
+                }}
+                onBlur={() => { void validarCrachaParaEntrada(); }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    void validarCrachaParaEntrada();
+                  }
+                }}
+                placeholder="Leia ou digite o código do crachá"
+                icon={<Barcode className="w-5 h-5" />}
+                autoFocus
+              />
+              <Button type="button" size="sm" variant="outline" className="min-h-11 shrink-0 rounded-xl" onClick={() => setCameraTarget('entrada')} aria-label="Ler com a câmera"><Camera className="w-4 h-4" /><span className="hidden sm:inline">Ler com a câmera</span></Button>
+            </div>
+            <p className="text-xs text-[#627289] dark:text-slate-400">
+              O leitor USB preenche este campo automaticamente. Deixe em branco se não houver entrega de crachá.
             </p>
-            <Button type="button" size="sm" variant="outline" className="mt-2 min-h-11" onClick={() => setCameraTarget('entrada')}><Camera className="w-4 h-4" /> Ler com câmera do celular</Button>
             {formCrachaFeedback && (
-              <p className={`mt-1 text-[11px] font-medium ${formCrachaFeedback.includes('disponível') ? 'text-[#16a34a] dark:text-emerald-300' : 'text-[#dc2626] dark:text-rose-300'}`}>
+              <p className={`text-xs font-medium ${formCrachaFeedback.includes('disponível') ? 'text-[#16a34a] dark:text-emerald-300' : 'text-[#dc2626] dark:text-rose-300'}`}>
                 {formCrachaFeedback}
               </p>
             )}
@@ -1481,9 +1534,13 @@ export const RecepcaoPage: React.FC = () => {
             {destinosVisita.map((destino, index) => <div key={index} className="rounded-xl border border-[#d6e6f7] bg-[#f8fbff] p-3 space-y-3"><div className="flex justify-between font-bold text-sm"><span>Destino {index + 1}</span>{destinosVisita.length > 1 && <button type="button" onClick={() => setDestinosVisita((items) => items.filter((_, itemIndex) => itemIndex !== index))} className="text-rose-500"><Trash2 className="w-4 h-4" /></button>}</div><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Select label="Departamento de destino" value={destino.departamento_destino_id} onChange={(event) => atualizarDestinoVisita(index, { departamento_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar departamento' }, ...departamentos.map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))]} required /><Select label="Setor específico" value={destino.setor_destino_id} onChange={(event) => atualizarDestinoVisita(index, { setor_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar setor' }, ...setores.filter((item) => item.departamento_id === destino.departamento_destino_id).map((item) => ({ value: item.id, label: item.nome }))]} disabled={!destino.departamento_destino_id} required /></div></div>)}
             {destinosVisita.length < 10 && <button type="button" onClick={adicionarDestinoVisita} className="flex w-full justify-center gap-2 rounded-xl border border-dashed border-[#52a6fb] py-2 text-sm font-semibold text-[#0877d1]"><Plus className="w-4 h-4" />Adicionar outro destino</button>}
           </section>}
+          {activeTab !== 'visitante' && (
+            <h3 className="-mb-2 text-base font-extrabold text-[#102755] dark:text-slate-100">Destino e atendimento</h3>
+          )}
           <div className={activeTab === 'visitante' ? 'hidden' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'}>
             <Select
-              label="Departamento de Destino"
+              label="Departamento de destino"
+              className="min-h-11 rounded-xl"
               value={formDestinoSetorId}
               onChange={(e) => {
                 const setor = setores.find((item) => item.id === e.target.value);
@@ -1493,7 +1550,7 @@ export const RecepcaoPage: React.FC = () => {
               }}
               options={[
                 { value: '', label: 'Selecione o departamento' },
-                ...setores.map((s) => ({
+                ...setoresDestinoOpcoes.map((s) => ({
                   value: s.id,
                   label: `${s.sigla} - ${s.nome}`,
                 })),
@@ -1502,16 +1559,19 @@ export const RecepcaoPage: React.FC = () => {
             />
 
             <Select
-              label="Diretor/Servidor"
+              label="Diretor / Servidor"
+              className="min-h-11 rounded-xl"
               value={formServidorDestinoId}
               onChange={(e) => setFormServidorDestinoId(e.target.value)}
               options={[
-                { value: '', label: formDestinoSetorId ? 'Selecione o diretor/servidor' : 'Selecione primeiro o departamento' },
+                { value: '', label: formDestinoSetorId ? 'Selecione uma pessoa' : 'Selecione primeiro o departamento' },
                 ...servidoresDestinoFiltrados.map((servidor) => ({
                   value: servidor.id,
                   label: `${servidor.nome} — ${servidor.cargo}`,
+                  destaque: servidorExigeAutorizacao(servidor.id) ? 'perigo' as const : undefined,
                 })),
               ]}
+              style={destinoRequerAutorizacao ? { color: '#dc2626', fontWeight: 600 } : undefined}
               disabled={!formDestinoSetorId}
             />
           </div>
@@ -1566,42 +1626,53 @@ export const RecepcaoPage: React.FC = () => {
             )}
           </div>
 
-          <Input
-            label="Motivo do Acesso"
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Select
+            label="Motivo do acesso"
+            className="min-h-11 rounded-xl"
             value={formMotivo}
             onChange={(e) => setFormMotivo(e.target.value)}
-            placeholder="Ex: Reunião pedagógica, entrega de documento..."
+            options={Array.from(new Set([formMotivo, ...MOTIVOS_ACESSO])).map((motivo) => ({ value: motivo, label: motivo }))}
             required
           />
 
-          <Input
-            label="Observações / Pertences declarados (Notebook, volumes...)"
-            value={formObservacoes}
-            onChange={(e) => setFormObservacoes(e.target.value)}
-            placeholder="Ex: Portando pasta com documentos e notebook Dell"
-          />
+          <div className="space-y-1.5">
+            <label htmlFor="observacoes-entrada" className="flex items-baseline gap-2 text-xs font-medium text-slate-300">
+              Observações / Pertences declarados
+              <span className="font-normal text-[#627289] dark:text-slate-400">Opcional</span>
+            </label>
+            <textarea
+              id="observacoes-entrada"
+              rows={1}
+              value={formObservacoes}
+              onChange={(e) => setFormObservacoes(e.target.value)}
+              placeholder="Ex.: pasta e notebook Dell"
+              className="block min-h-11 w-full resize-y rounded-xl border border-slate-700/80 bg-[#121826] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            />
+          </div>
+          </div>
 
-          {setores.find((s) => s.id === formDestinoSetorId)?.requer_autorizacao && (
-            <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2">
+          {activeTab !== 'visitante' && destinoRequerAutorizacao && (
+            <div className="px-3 py-2 rounded-lg bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
               <span>
-                <strong>Atenção:</strong> Este setor requer autorização formal prévia. A entrada ficará
-                como "Pendente de Autorização" até a liberação pelo responsável.
+                <strong>Atenção:</strong> Este setor requer autorização formal prévia. A entrada ficará "Pendente de Autorização" até a liberação.
               </span>
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#dce4f0] dark:border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#dce4f0] dark:border-slate-800">
             <Button
               type="button"
               variant="outline"
+              className="min-h-11 rounded-xl px-6"
               onClick={() => setIsEntradaModalOpen(false)}
             >
               Cancelar
             </Button>
-            <Button type="submit" variant="primary" isLoading={isSubmittingEntrada}>
-              <CheckCircle className="w-4 h-4" />
-              <span>Registrar Entrada Atômica</span>
+            <Button type="submit" variant="primary" className="min-h-11 rounded-xl px-6" isLoading={isSubmittingEntrada}>
+              <LogIn className="w-5 h-5" />
+              <span>Registrar entrada</span>
             </Button>
           </div>
         </form>

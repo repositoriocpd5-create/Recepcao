@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 export interface SelectOption {
   value: string;
   label: string;
+  /** Destaca a opção em vermelho (ex.: responsável que exige autorização prévia). */
+  destaque?: 'perigo';
 }
 
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
@@ -36,7 +38,12 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           {...props}
         >
           {options.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-slate-900 text-slate-100">
+            <option
+              key={opt.value}
+              value={opt.value}
+              className="bg-slate-900 text-slate-100"
+              style={opt.destaque === 'perigo' ? { color: '#dc2626', fontWeight: 600 } : undefined}
+            >
               {opt.label}
             </option>
           ))}

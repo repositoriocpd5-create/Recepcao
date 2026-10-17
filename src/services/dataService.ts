@@ -13,6 +13,7 @@ import {
   UserProfile,
   Cracha,
   CrachaStatus,
+  ServidorSetorVinculo,
 } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
@@ -154,10 +155,13 @@ export const dataService = {
     return departamentoId ? enriched.filter((s) => s.departamento_id === departamentoId) : enriched;
   },
 
-  async getServidorSetorVinculos(): Promise<Array<{ servidor_id: string; setor_id: string }>> {
+  async getServidorSetorVinculos(): Promise<ServidorSetorVinculo[]> {
     if (!isSupabaseConfigured) return [];
-    const { data, error } = await supabase.from('servidor_setor_vinculos').select('servidor_id, setor_id');
-    return requireLiveResult(data, error, 'Não foi possível carregar os vínculos de servidores') as Array<{ servidor_id: string; setor_id: string }>;
+    const { data, error } = await supabase.from('servidor_setor_vinculos').select('servidor_id, setor_id, requer_autorizacao');
+    if (!error) return (data || []) as ServidorSetorVinculo[];
+    // Bancos sem a migração 20261017120000 ainda não possuem a coluna requer_autorizacao.
+    const legado = await supabase.from('servidor_setor_vinculos').select('servidor_id, setor_id');
+    return requireLiveResult(legado.data, legado.error, 'Não foi possível carregar os vínculos de servidores') as ServidorSetorVinculo[];
   },
 
   async salvarDepartamento(departamento: Partial<Departamento>): Promise<Departamento> {
@@ -307,11 +311,21 @@ export const dataService = {
   // 2. Servidores
   async getServidores(): Promise<Servidor[]> {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('servidores')
-        .select('*, departamento:departamentos(*), setor:setores(*)')
-        .order('nome');
-      return requireLiveResult(data, error, 'Não foi possível carregar servidores') as Servidor[];
+      // O PostgREST limita cada resposta a 1000 linhas; o quadro tem mais servidores que isso.
+      const tamanhoPagina = 1000;
+      const todos: Servidor[] = [];
+      for (let inicio = 0; ; inicio += tamanhoPagina) {
+        const { data, error } = await supabase
+          .from('servidores')
+          // servidor_setor_vinculos cria uma segunda relação servidores↔setores; a FK precisa ser explícita.
+          .select('*, departamento:departamentos(*), setor:setores!servidores_setor_id_fkey(*)')
+          .order('nome')
+          .order('id')
+          .range(inicio, inicio + tamanhoPagina - 1);
+        const pagina = requireLiveResult(data, error, 'Não foi possível carregar servidores') as Servidor[];
+        todos.push(...pagina);
+        if (pagina.length < tamanhoPagina) return todos;
+      }
     }
     const deps = await this.getDepartamentos();
     const sets = await this.getSetores();
@@ -415,7 +429,8 @@ export const dataService = {
       registro_id: servidor.id,
       detalhes: { matricula: servidor.matricula, nome: servidor.nome },
       ip_origem: getTerminalInfo(),
-    });
+    });
+
 
     return {
       encontrado: true,
@@ -506,7 +521,8 @@ export const dataService = {
       registro_id: novoVisitante.id,
       detalhes: { cpf: novoVisitante.cpf, nome: novoVisitante.nome },
       ip_origem: getTerminalInfo(),
-    });
+    });
+
 
     return novoVisitante;
   },
@@ -559,7 +575,8 @@ export const dataService = {
       registro_id: visitante.id,
       detalhes: { cpf: rawCpf, nome: visitante.nome },
       ip_origem: getTerminalInfo(),
-    });
+    });
+
 
     return {
       encontrado: true,
@@ -577,11 +594,11 @@ export const dataService = {
         .from('movimentacoes')
         .select(`
           *,
-          servidor:servidores(*),
+          servidor:servidores!movimentacoes_servidor_id_fkey(*),
           visitante:visitantes(*),
           departamento_destino:departamentos(*),
           setor_destino:setores(*),
-          servidor_destino:servidores(*),
+          servidor_destino:servidores!movimentacoes_servidor_destino_id_fkey(*),
           destinos:movimentacao_destinos(*)
         `)
         .order('data_hora_entrada', { ascending: false });
@@ -713,7 +730,8 @@ export const dataService = {
         motivo: input.motivo,
       },
       ip_origem: getTerminalInfo(),
-    });
+    });
+
 
     return novaMov;
   },
@@ -773,7 +791,8 @@ export const dataService = {
         cracha: mov.cracha_numero,
       },
       ip_origem: getTerminalInfo(),
-    });
+    });
+
 
     return mov;
   },
@@ -786,7 +805,7 @@ export const dataService = {
         .select(`
           *,
           servidor_solicitado:servidores(*),
-          movimentacao:movimentacoes(*, visitante:visitantes(*), servidor:servidores(*))
+          movimentacao:movimentacoes(*, visitante:visitantes(*), servidor:servidores!movimentacoes_servidor_id_fkey(*))
         `)
         .order('created_at', { ascending: false });
       return requireLiveResult(data, error, 'Não foi possível carregar autorizações') as Autorizacao[];
@@ -840,7 +859,8 @@ export const dataService = {
       registro_id: autorizacaoId,
       detalhes: { aprovado, motivo: motivoResposta },
       ip_origem: getTerminalInfo(),
-    });
+    });
+
   },
 
   // 10. Agendamentos
@@ -853,7 +873,7 @@ export const dataService = {
           visitante:visitantes(*),
           departamento:departamentos(*),
           setor:setores(*),
-          servidor_destino:servidores(*)
+          servidor_destino:servidores!agendamentos_servidor_destino_id_fkey(*)
         `)
         .order('data_hora_prevista', { ascending: true });
       return requireLiveResult(data, error, 'Não foi possível carregar agendamentos') as Agendamento[];
@@ -902,7 +922,8 @@ export const dataService = {
         .select('*')
         .order('created_at', { ascending: false })
         .limit(500);
-      return requireLiveResult(data, error, 'Não foi possível carregar logs de auditoria') as AuditoriaLog[];
+      return requireLiveResult(data, error, 'Não foi possível carregar logs de auditoria') as AuditoriaLog[];
+
     }
     return getStorage<AuditoriaLog[]>(STORAGE_KEYS.AUDITORIA, INITIAL_AUDITORIA_LOGS);
   },
