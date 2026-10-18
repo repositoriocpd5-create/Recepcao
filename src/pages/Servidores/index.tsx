@@ -45,7 +45,6 @@ export const ServidoresPage: React.FC = () => {
       setServidores(servs);
       setDepartamentos(deps);
       setSetores(sets);
-      if (deps.length > 0 && !depId) setDepId(deps[0].id);
     } catch (err) {
       console.error(err);
     } finally {
@@ -63,7 +62,7 @@ export const ServidoresPage: React.FC = () => {
     setMatricula(`SME-${Math.floor(100000 + Math.random() * 900000)}`);
     setCargo('');
     setLotacao('');
-    setDepId(departamentos[0]?.id || '');
+    setDepId('');
     setSetorId('');
     setRamal('');
     setStatus('ativo');
@@ -76,7 +75,7 @@ export const ServidoresPage: React.FC = () => {
     setMatricula(s.matricula);
     setCargo(s.cargo);
     setLotacao(s.lotacao || '');
-    setDepId(s.departamento_id);
+    setDepId(s.departamento_id || '');
     setSetorId(s.setor_id || '');
     setRamal(s.ramal || '');
     setStatus(s.status);
@@ -89,13 +88,13 @@ export const ServidoresPage: React.FC = () => {
     try {
       await dataService.salvarServidor({
         id: editId || undefined,
-        nome,
-        matricula,
-        cargo,
-        lotacao,
-        departamento_id: depId,
-        setor_id: setorId || undefined,
-        ramal,
+        nome: nome.trim(),
+        matricula: matricula.trim(),
+        cargo: cargo.trim(),
+        lotacao: lotacao.trim(),
+        departamento_id: depId || (null as any),
+        setor_id: depId && setorId ? setorId : (null as any),
+        ramal: ramal.trim(),
         status,
       });
       setIsModalOpen(false);
@@ -113,15 +112,30 @@ export const ServidoresPage: React.FC = () => {
       s.nome.toLowerCase().includes(termo) ||
       s.matricula.toLowerCase().includes(termo) ||
       (s.lotacao || '').toLowerCase().includes(termo);
-    const lotacaoServidor = s.lotacao || `${s.departamento?.sigla || 'SMEDU'}${s.setor ? ` (${s.setor.sigla})` : ''}`;
     const matchesDep = selectedDep === 'todos' || s.departamento_id === selectedDep;
     const matchesCargo = selectedCargo === 'todos' || s.cargo === selectedCargo;
-    const matchesLotacao = selectedLotacao === 'todos' || lotacaoServidor === selectedLotacao;
+    const matchesLotacao = selectedLotacao === 'todos' || s.lotacao === selectedLotacao;
     return matchesSearch && matchesDep && matchesCargo && matchesLotacao;
   });
 
   const cargosDisponiveis = Array.from(new Set(servidores.map((servidor) => servidor.cargo).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  const lotacoesDisponiveis = Array.from(new Set(servidores.map((servidor) => servidor.lotacao || `${servidor.departamento?.sigla || 'SMEDU'}${servidor.setor ? ` (${servidor.setor.sigla})` : ''}`).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  
+  // Lotações oficiais cadastradas exclusivamente a partir do campo 'lotacao' do quadro de servidores
+  const lotacoesCadastradas = Array.from(
+    new Set(
+      servidores
+        .map((servidor) => (servidor.lotacao || '').trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  // Opções para o select no modal (assegura inclusão da lotação atual mesmo se ainda não constar na lista)
+  const lotacoesSelectOptions = Array.from(
+    new Set([
+      ...lotacoesCadastradas,
+      ...(lotacao.trim() ? [lotacao.trim()] : []),
+    ])
+  ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
   const servidoresOrdenados = [...filtrados].sort((a, b) => {
     const valueFor = (servidor: Servidor) => {
@@ -209,8 +223,8 @@ export const ServidoresPage: React.FC = () => {
             value={selectedLotacao}
             onChange={(e) => setSelectedLotacao(e.target.value)}
             options={[
-              { value: 'todos', label: 'Todas as Lotações (Dep/Setor)' },
-              ...lotacoesDisponiveis.map((lotacaoDisponivel) => ({ value: lotacaoDisponivel, label: lotacaoDisponivel })),
+              { value: 'todos', label: 'Todas as Lotações Cadastradas' },
+              ...lotacoesCadastradas.map((lotacaoCadastrada) => ({ value: lotacaoCadastrada, label: lotacaoCadastrada })),
             ]}
           />
         </div>
@@ -282,22 +296,37 @@ export const ServidoresPage: React.FC = () => {
           </div>
 
           <Input label="Cargo Oficial *" value={cargo} onChange={(e) => setCargo(e.target.value)} required />
-          <Input label="Lotação *" value={lotacao} onChange={(e) => setLotacao(e.target.value)} required />
+          <Select
+            label="Lotação *"
+            value={lotacao}
+            onChange={(e) => setLotacao(e.target.value)}
+            options={[
+              { value: '', label: 'Selecione a lotação cadastrada...' },
+              ...lotacoesSelectOptions.map((item) => ({ value: item, label: item })),
+            ]}
+            required
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select
-              label="Departamento *"
+              label="Departamento (Sede / Opcional)"
               value={depId}
-              onChange={(e) => setDepId(e.target.value)}
-              options={departamentos.map((d) => ({ value: d.id, label: `${d.sigla} - ${d.nome}` }))}
-              required
+              onChange={(e) => {
+                setDepId(e.target.value);
+                setSetorId('');
+              }}
+              options={[
+                { value: '', label: 'Sem departamento (Lotação escolar / externa)' },
+                ...departamentos.map((d) => ({ value: d.id, label: `${d.sigla} - ${d.nome}` })),
+              ]}
             />
             <Select
-              label="Setor Específico"
+              label="Setor Específico (Opcional)"
               value={setorId}
               onChange={(e) => setSetorId(e.target.value)}
+              disabled={!depId}
               options={[
-                { value: '', label: 'Geral / Gabinete do Dep.' },
+                { value: '', label: depId ? 'Geral / Gabinete do Dep.' : 'Selecione um departamento primeiro' },
                 ...setores
                   .filter((st) => st.departamento_id === depId)
                   .map((st) => ({ value: st.id, label: st.nome })),
