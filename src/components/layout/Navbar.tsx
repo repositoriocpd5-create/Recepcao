@@ -14,7 +14,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSidebar, onOpenMobileMenu }) => {
-  const { user, logout, login, isSupabaseLive } = useAuth();
+  const { user, logout, login, isSupabaseLive, switchDemoRole } = useAuth();
   const [theme, setTheme] = useState<'dark' | 'light'>(
     () => (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'),
   );
@@ -23,11 +23,23 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
   const [profileLoginError, setProfileLoginError] = useState('');
   const [isProfileLoginLoading, setIsProfileLoginLoading] = useState(false);
 
+  const getRoleEmail = (role: UserRole, defaultEmail: string) => {
+    try {
+      const raw = localStorage.getItem('sme_admin_users');
+      if (raw) {
+        const users = JSON.parse(raw);
+        const found = users.find((u: any) => u.role === role);
+        if (found?.email) return found.email;
+      }
+    } catch {}
+    return defaultEmail;
+  };
+
   const profileOptions: Record<UserRole, { label: string; email: string }> = {
-    recepcionista: { label: 'Recepcionista', email: 'recepcionista.smedu@edu.itaguai.rj.gov.br' },
-    admin: { label: 'Admin', email: 'cpdinfra@edu.itaguai.rj.gov.br' },
-    gestor: { label: 'Gestor', email: 'cpdinfra@edu.itaguai.rj.gov.br' },
-    atendente: { label: 'Atendente', email: '' },
+    recepcionista: { label: 'Recepcionista', email: getRoleEmail('recepcionista', 'recepcao@sme.gov.br') },
+    admin: { label: 'Admin', email: getRoleEmail('admin', 'admin@sme.gov.br') },
+    gestor: { label: 'Gestor', email: getRoleEmail('gestor', 'gestor@sme.gov.br') },
+    atendente: { label: 'Atendente', email: getRoleEmail('atendente', '') },
   };
 
   const openProfileLogin = (role: UserRole) => {
@@ -132,7 +144,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
               {(['recepcionista', 'admin', 'gestor'] as UserRole[]).map((r) => (
                 <button
                   key={r}
-                  onClick={() => openProfileLogin(r)}
+                  onClick={() => switchDemoRole(r)}
                   className={`px-2 py-0.5 rounded text-[11px] capitalize font-medium transition-colors ${
                     user.role === r
                       ? 'bg-emerald-600 text-white shadow-sm'
@@ -165,8 +177,9 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
           {/* User profile dropdown & logout */}
           {user && (
             <div className="flex items-center gap-3 pl-2 border-l border-slate-800">
-              <div className="text-right hidden sm:block">
+              <div className="text-right hidden sm:block" title={user.email}>
                 <div className="text-xs font-semibold text-slate-200">{user.nome_completo}</div>
+                <div className="text-[10px] text-slate-400 font-mono truncate max-w-[180px]">{user.email}</div>
                 <div className="text-[11px] text-emerald-400 flex items-center justify-end gap-1">
                   <Shield className="w-3 h-3" />
                   <span className="capitalize">{user.role}</span>

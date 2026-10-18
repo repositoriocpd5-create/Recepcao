@@ -25,6 +25,7 @@ import {
   INITIAL_AUTORIZACOES,
   INITIAL_AGENDAMENTOS,
   INITIAL_AUDITORIA_LOGS,
+  DEMO_USERS,
 } from './mockData';
 import { SERVIDORES_OFICIAIS } from './servidoresOficiais';
 
@@ -40,6 +41,7 @@ const STORAGE_KEYS = {
   AUDITORIA: 'sme_auditoria',
   CRACHAS: 'smedu_crachas',
   SERVIDOR_SETOR_VINCULOS: 'sme_servidor_setor_vinculos',
+  USUARIOS: 'sme_admin_users',
 };
 
 type MovimentacaoAdminUpdate = Pick<
@@ -1134,5 +1136,80 @@ export const dataService = {
       fluxoPorDepartamento,
       ultimasMovimentacoes: movs.slice(0, 8),
     };
+  },
+
+  // 13. Gestão e Sincronização de Operadores / Usuários do Sistema
+  async getUsuariosSistema(): Promise<UserProfile[]> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('nome_completo');
+        if (!error && data && data.length > 0) {
+          return data as UserProfile[];
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar perfis do Supabase, utilizando armazenamento local:', err);
+      }
+    }
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.USUARIOS);
+      if (raw) return JSON.parse(raw) as UserProfile[];
+    } catch {}
+    return DEMO_USERS.map((u) => ({ ...u }));
+  },
+
+  async salvarUsuarioSistema(u: UserProfile): Promise<void> {
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            email: u.email,
+            nome_completo: u.nome_completo,
+            cargo: u.cargo,
+            role: u.role,
+            ativo: u.ativo,
+          })
+          .eq('id', u.id);
+        if (error) console.warn('Aviso ao atualizar perfil no Supabase:', error);
+      } catch (err) {
+        console.warn('Erro ao salvar perfil no Supabase:', err);
+      }
+    }
+
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.USUARIOS);
+      const users: UserProfile[] = raw ? JSON.parse(raw) : DEMO_USERS.map((x) => ({ ...x }));
+      const idx = users.findIndex((item) => item.id === u.id);
+      let updated: UserProfile[];
+      if (idx >= 0) {
+        updated = users.map((item) => (item.id === u.id ? { ...item, ...u } : item));
+      } else {
+        updated = [...users, u];
+      }
+      localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(updated));
+    } catch (err) {
+      console.error('Erro ao salvar usuário no localStorage:', err);
+    }
+  },
+
+  async excluirUsuarioSistema(id: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('profiles').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Erro ao excluir perfil no Supabase:', err);
+      }
+    }
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.USUARIOS);
+      if (raw) {
+        const users = JSON.parse(raw) as UserProfile[];
+        const filtered = users.filter((u) => u.id !== id);
+        localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(filtered));
+      }
+    } catch {}
   },
 };

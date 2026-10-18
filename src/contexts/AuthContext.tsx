@@ -11,11 +11,24 @@ interface AuthContextType {
   login: (email: string, password?: string, demoRole?: UserRole) => Promise<boolean>;
   logout: () => Promise<void>;
   switchDemoRole: (role: UserRole) => void;
+  updateUserProfile: (updatedProfile: Partial<UserProfile> & { id?: string; role?: UserRole; email?: string }) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_STORAGE_KEY = 'sme_authenticated_user';
+const ADMIN_USERS_STORAGE_KEY = 'sme_admin_users';
+
+function getAvailableDemoUsers(): UserProfile[] {
+  try {
+    const raw = localStorage.getItem(ADMIN_USERS_STORAGE_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list) && list.length > 0) return list;
+    }
+  } catch {}
+  return DEMO_USERS;
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(() => {
@@ -122,10 +135,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Modo de demonstração / homologação
+    const available = getAvailableDemoUsers();
     const selectedDemo =
-      DEMO_USERS.find((d) => d.email.toLowerCase() === email.toLowerCase()) ||
-      DEMO_USERS.find((d) => d.role === demoRole) ||
-      DEMO_USERS[1]; // recepcionista por padrão
+      available.find((d) => d.email.toLowerCase() === email.toLowerCase()) ||
+      available.find((d) => d.role === demoRole) ||
+      available[1] ||
+      available[0] ||
+      DEMO_USERS[1];
 
     setUser(selectedDemo);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(selectedDemo));
@@ -160,9 +176,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchDemoRole = (role: UserRole) => {
-    const target = DEMO_USERS.find((u) => u.role === role) || DEMO_USERS[0];
+    const available = getAvailableDemoUsers();
+    const target = available.find((u) => u.role === role) || available[0] || DEMO_USERS[0];
     setUser(target);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(target));
+  };
+
+  const updateUserProfile = (updatedProfile: Partial<UserProfile> & { id?: string; role?: UserRole; email?: string }) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const isTarget =
+        (updatedProfile.id && prev.id === updatedProfile.id) ||
+        (updatedProfile.role && prev.role === updatedProfile.role) ||
+        (updatedProfile.email && prev.email.toLowerCase() === updatedProfile.email.toLowerCase());
+
+      if (isTarget) {
+        const merged: UserProfile = { ...prev, ...updatedProfile };
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(merged));
+        return merged;
+      }
+      return prev;
+    });
   };
 
   return (
@@ -174,6 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         switchDemoRole,
+        updateUserProfile,
       }}
     >
       {children}

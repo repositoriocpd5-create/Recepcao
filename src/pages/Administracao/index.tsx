@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   ShieldCheck,
@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
-import { resetTestData } from '@/services/dataService';
+import { resetTestData, dataService } from '@/services/dataService';
 import { DEMO_USERS } from '@/services/mockData';
 import { UserProfile, UserRole } from '@/types';
 import { cn } from '@/lib/utils';
@@ -79,9 +79,22 @@ function gerarId() {
 }
 
 export const AdministracaoPage: React.FC = () => {
-  const { user, switchDemoRole } = useAuth();
+  const { user, switchDemoRole, updateUserProfile } = useAuth();
   const [resetSuccess, setResetSuccess] = useState(false);
   const [usuarios, setUsuarios] = useState<UserProfile[]>(loadUsers);
+
+  useEffect(() => {
+    let ativo = true;
+    dataService.getUsuariosSistema().then((res) => {
+      if (ativo && res && res.length > 0) {
+        setUsuarios(res);
+        saveUsers(res);
+      }
+    });
+    return () => {
+      ativo = false;
+    };
+  }, []);
 
   // Modal de Novo / Editar usuário
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -158,16 +171,22 @@ export const AdministracaoPage: React.FC = () => {
       return;
     }
 
+    let userSalvo: UserProfile;
     let updated: UserProfile[];
+
     if (editingUser) {
-      updated = usuarios.map((u) =>
-        u.id === editingUser.id
-          ? { ...u, nome_completo: formNome.trim(), email: formEmail.trim(), cargo: formCargo.trim(), role: formRole, ativo: formAtivo }
-          : u
-      );
+      userSalvo = {
+        ...editingUser,
+        nome_completo: formNome.trim(),
+        email: formEmail.trim(),
+        cargo: formCargo.trim(),
+        role: formRole,
+        ativo: formAtivo,
+      };
+      updated = usuarios.map((u) => (u.id === editingUser.id ? userSalvo : u));
       exibirToast(`Usuário "${formNome}" atualizado com sucesso!`);
     } else {
-      const novoUsuario: UserProfile = {
+      userSalvo = {
         id: gerarId(),
         nome_completo: formNome.trim(),
         email: formEmail.trim(),
@@ -176,13 +195,36 @@ export const AdministracaoPage: React.FC = () => {
         ativo: formAtivo,
         created_at: new Date().toISOString(),
       };
-      updated = [...usuarios, novoUsuario];
+      updated = [...usuarios, userSalvo];
       exibirToast(`Usuário "${formNome}" adicionado com sucesso!`);
     }
 
     saveUsers(updated);
     setUsuarios(updated);
     setIsModalOpen(false);
+
+    // Persiste no backend / Supabase
+    dataService.salvarUsuarioSistema(userSalvo);
+
+    // Sincroniza a sessão ativa caso o operador editado seja o usuário logado
+    if (user && (user.id === userSalvo.id || user.role === userSalvo.role || user.email.toLowerCase() === (editingUser?.email || '').toLowerCase())) {
+      updateUserProfile(userSalvo);
+    }
+
+    // Registra log de auditoria da alteração
+    dataService.registrarLogAuditoria({
+      usuario_email: user?.email || userSalvo.email,
+      acao: editingUser ? 'ATUALIZAR_USUARIO' : 'CRIAR_USUARIO',
+      tabela: 'profiles',
+      registro_id: userSalvo.id,
+      detalhes: {
+        nome_completo: userSalvo.nome_completo,
+        email: userSalvo.email,
+        cargo: userSalvo.cargo,
+        role: userSalvo.role,
+        ativo: userSalvo.ativo,
+      },
+    });
   }
 
   function handleExcluirUsuario(u: UserProfile) {
@@ -194,16 +236,31 @@ export const AdministracaoPage: React.FC = () => {
     const updated = usuarios.filter((x) => x.id !== u.id);
     saveUsers(updated);
     setUsuarios(updated);
+    dataService.excluirUsuarioSistema(u.id);
+
+    dataService.registrarLogAuditoria({
+      usuario_email: user?.email || 'admin@sme.gov.br',
+      acao: 'EXCLUIR_USUARIO',
+      tabela: 'profiles',
+      registro_id: u.id,
+      detalhes: { nome: u.nome_completo, email: u.email },
+    });
+
     exibirToast(`Usuário "${u.nome_completo}" removido.`);
   }
 
   function handleToggleAtivo(u: UserProfile) {
-    const updated = usuarios.map((x) =>
-      x.id === u.id ? { ...x, ativo: !x.ativo } : x
-    );
+    const userModificado: UserProfile = { ...u, ativo: !u.ativo };
+    const updated = usuarios.map((x) => (x.id === u.id ? userModificado : x));
     saveUsers(updated);
     setUsuarios(updated);
-    exibirToast(`Usuário "${u.nome_completo}" ${!u.ativo ? 'ativado' : 'desativado'}.`);
+    dataService.salvarUsuarioSistema(userModificado);
+
+    if (user && (user.id === u.id || user.role === u.role)) {
+      updateUserProfile(userModificado);
+    }
+
+    exibirToast(`Usuário "${u.nome_completo}" ${userModificado.ativo ? 'ativado' : 'desativado'}.`);
   }
 
   const totalAtivos = usuarios.filter((u) => u.ativo).length;

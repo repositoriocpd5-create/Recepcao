@@ -41,12 +41,22 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const demoEmail =
+      let demoEmail =
         role === 'admin'
           ? 'admin@sme.gov.br'
           : role === 'gestor'
           ? 'gestor@sme.gov.br'
           : 'recepcao@sme.gov.br';
+
+      try {
+        const raw = localStorage.getItem('sme_admin_users');
+        if (raw) {
+          const list = JSON.parse(raw);
+          const found = list.find((u: any) => u.role === role);
+          if (found?.email) demoEmail = found.email;
+        }
+      } catch {}
+
       await login(demoEmail, '', role);
       navigate('/recepcao');
     } catch (err: any) {
