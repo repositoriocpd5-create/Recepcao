@@ -27,3 +27,10 @@ dist-ssr
 .env
 .env.*.local
 !.env.example
+
+# Claude config
+.claude/
+
+# Planilhas e dados locais
+*.xls
+*.xlsx

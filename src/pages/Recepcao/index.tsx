@@ -891,7 +891,7 @@ export const RecepcaoPage: React.FC = () => {
           title="Identificar servidor — atalhos Alt + S ou Alt + 1"
           className={`group relative flex min-h-[156px] min-w-0 cursor-pointer items-center gap-5 overflow-hidden rounded-[20px] border p-5 text-left transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
             identificationMethod === 'matricula'
-              ? 'bg-[linear-gradient(135deg,#eff8ff_0%,#fff_66%,#e2f1ff_100%)] border-[#8cc8ff] shadow-[0_18px_32px_-20px_rgba(8,119,201,.65)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
+              ? 'bg-[linear-gradient(135deg,#eff8ff_0%,#fff_66%,#e2f1ff_100%)] dark:bg-none border-[#8cc8ff] shadow-[0_18px_32px_-20px_rgba(8,119,201,.65)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
               : 'bg-white border-[#dce4f0] hover:border-[#72afe5] hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-22px_rgba(8,119,201,.65)] dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
           }`}
         >
@@ -919,7 +919,7 @@ export const RecepcaoPage: React.FC = () => {
           title="Identificar visitante — atalho Alt + V"
           className={`group relative flex min-h-[156px] min-w-0 cursor-pointer items-center gap-5 overflow-hidden rounded-[20px] border p-5 text-left transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
             identificationMethod === 'cpf'
-              ? 'bg-[linear-gradient(135deg,#effdf5_0%,#fff_66%,#dcfce7_100%)] border-[#a7ebc3] shadow-[0_18px_32px_-20px_rgba(22,163,74,.48)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
+              ? 'bg-[linear-gradient(135deg,#effdf5_0%,#fff_66%,#dcfce7_100%)] dark:bg-none border-[#a7ebc3] shadow-[0_18px_32px_-20px_rgba(22,163,74,.48)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
               : 'bg-white border-[#dce4f0] hover:border-[#7fd6a5] hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-22px_rgba(22,163,74,.6)] dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
           }`}
         >
@@ -1201,7 +1201,7 @@ export const RecepcaoPage: React.FC = () => {
         </CardHeader>
 
         {pessoasNoPredio.length === 0 ? (
-          <div className="min-h-[208px] rounded-xl border border-dashed border-[#d7e6f5] bg-[linear-gradient(180deg,#fff_0%,#f8fbff_100%)] px-6 py-8 text-center">
+          <div className="min-h-[208px] rounded-xl border border-dashed border-[#d7e6f5] bg-[linear-gradient(180deg,#fff_0%,#f8fbff_100%)] px-6 py-8 text-center dark:bg-none dark:bg-[#101625] dark:border-slate-700">
             <span className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-[#e8f3ff] text-[#5f9df2] shadow-inner"><Briefcase className="w-8 h-8" /></span>
             <p className="text-sm font-semibold text-[#5f7599]">Nenhuma pessoa registrada com movimentação aberta no momento.</p>
             <p className="mt-1 text-xs text-[#8aa0bd]">Assim que houver registros de entrada, eles serão exibidos aqui em tempo real.</p>

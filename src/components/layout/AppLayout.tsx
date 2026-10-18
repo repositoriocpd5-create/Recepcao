@@ -18,7 +18,7 @@ export const AppLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_88%_74%,#e9f5ff_0,transparent_26%),linear-gradient(135deg,#f7fbff_0%,#eef6ff_100%)] text-[#152238] dark:bg-[#0b0f19] dark:text-slate-100">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_88%_74%,#e9f5ff_0,transparent_26%),linear-gradient(135deg,#f7fbff_0%,#eef6ff_100%)] text-[#152238] dark:bg-none dark:bg-[#0b0f19] dark:text-slate-100">
       <Navbar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} onOpenMobileMenu={() => setMobileMenuOpen(true)} />
 
       <div className="flex flex-1 relative">
