@@ -39,7 +39,20 @@ const STORAGE_KEYS = {
   AGENDAMENTOS: 'sme_agendamentos',
   AUDITORIA: 'sme_auditoria',
   CRACHAS: 'smedu_crachas',
+  SERVIDOR_SETOR_VINCULOS: 'sme_servidor_setor_vinculos',
 };
+
+type MovimentacaoAdminUpdate = Pick<
+  Movimentacao,
+  | 'departamento_destino_id'
+  | 'setor_destino_id'
+  | 'servidor_destino_id'
+  | 'motivo'
+  | 'data_hora_entrada'
+  | 'data_hora_saida'
+  | 'status'
+  | 'observacoes'
+>;
 
 const MATRICULAS_FICTICIAS_LEGADAS = new Set([
   'SME-100201', 'SME-100452', 'SME-200781', 'SME-200994',
@@ -156,12 +169,55 @@ export const dataService = {
   },
 
   async getServidorSetorVinculos(): Promise<ServidorSetorVinculo[]> {
-    if (!isSupabaseConfigured) return [];
-    const { data, error } = await supabase.from('servidor_setor_vinculos').select('servidor_id, setor_id, requer_autorizacao');
-    if (!error) return (data || []) as ServidorSetorVinculo[];
-    // Bancos sem a migração 20261017120000 ainda não possuem a coluna requer_autorizacao.
-    const legado = await supabase.from('servidor_setor_vinculos').select('servidor_id, setor_id');
-    return requireLiveResult(legado.data, legado.error, 'Não foi possível carregar os vínculos de servidores') as ServidorSetorVinculo[];
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('servidor_setor_vinculos').select('servidor_id, setor_id, requer_autorizacao');
+      if (!error) return (data || []) as ServidorSetorVinculo[];
+      // Bancos sem a migração 20261017120000 ainda não possuem a coluna requer_autorizacao.
+      const legado = await supabase.from('servidor_setor_vinculos').select('servidor_id, setor_id');
+      return requireLiveResult(legado.data, legado.error, 'Não foi possível carregar os vínculos de servidores') as ServidorSetorVinculo[];
+    }
+
+    const salvos = getStorage<ServidorSetorVinculo[]>(STORAGE_KEYS.SERVIDOR_SETOR_VINCULOS, []);
+    if (salvos.length) return salvos;
+    const servidores = await this.getServidores();
+    return servidores
+      .filter((servidor) => servidor.setor_id)
+      .map((servidor) => ({ servidor_id: servidor.id, setor_id: servidor.setor_id!, requer_autorizacao: false }));
+  },
+
+  async salvarServidorSetorVinculo(vinculo: ServidorSetorVinculo): Promise<ServidorSetorVinculo> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase
+        .from('servidor_setor_vinculos')
+        .upsert(vinculo, { onConflict: 'servidor_id,setor_id' })
+        .select('servidor_id, setor_id, requer_autorizacao')
+        .single();
+      return requireLiveResult(data, error, 'Não foi possível salvar o vínculo da pessoa ao setor') as ServidorSetorVinculo;
+    }
+
+    const vinculos = await this.getServidorSetorVinculos();
+    const indice = vinculos.findIndex((item) => item.servidor_id === vinculo.servidor_id && item.setor_id === vinculo.setor_id);
+    if (indice >= 0) vinculos[indice] = vinculo;
+    else vinculos.push(vinculo);
+    setStorage(STORAGE_KEYS.SERVIDOR_SETOR_VINCULOS, vinculos);
+    return vinculo;
+  },
+
+  async excluirServidorSetorVinculo(servidorId: string, setorId: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase
+        .from('servidor_setor_vinculos')
+        .delete()
+        .eq('servidor_id', servidorId)
+        .eq('setor_id', setorId)
+        .select('servidor_id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('A remoção foi bloqueada pelas permissões do Supabase.');
+      return;
+    }
+
+    const vinculos = await this.getServidorSetorVinculos();
+    setStorage(STORAGE_KEYS.SERVIDOR_SETOR_VINCULOS, vinculos.filter((item) => item.servidor_id !== servidorId || item.setor_id !== setorId));
   },
 
   async salvarDepartamento(departamento: Partial<Departamento>): Promise<Departamento> {
@@ -629,6 +685,78 @@ export const dataService = {
           : undefined,
       })),
     }));
+  },
+
+  async atualizarMovimentacaoAdministrativa(
+    movimentacaoId: string,
+    atualizacao: MovimentacaoAdminUpdate,
+    operador?: UserProfile | null
+  ): Promise<Movimentacao> {
+    if (operador?.role !== 'admin') {
+      throw new Error('Apenas administradores podem editar movimentações.');
+    }
+
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase
+        .from('movimentacoes')
+        .update(atualizacao)
+        .eq('id', movimentacaoId)
+        .select()
+        .single();
+      return requireLiveResult(data, error, 'Não foi possível atualizar a movimentação') as Movimentacao;
+    }
+
+    const movimentacoes = getStorage<Movimentacao[]>(STORAGE_KEYS.MOVIMENTACOES, INITIAL_MOVIMENTACOES);
+    const indice = movimentacoes.findIndex((item) => item.id === movimentacaoId);
+    if (indice < 0) throw new Error('Movimentação não encontrada.');
+
+    movimentacoes[indice] = { ...movimentacoes[indice], ...atualizacao };
+    setStorage(STORAGE_KEYS.MOVIMENTACOES, movimentacoes);
+    await this.registrarLogAuditoria({
+      usuario_email: operador.email,
+      acao: 'EDICAO_ADMINISTRATIVA_MOVIMENTACAO',
+      tabela: 'movimentacoes',
+      registro_id: movimentacaoId,
+      detalhes: atualizacao,
+      ip_origem: getTerminalInfo(),
+    });
+    return movimentacoes[indice];
+  },
+
+  async excluirMovimentacaoAdministrativa(
+    movimentacaoId: string,
+    operador?: UserProfile | null
+  ): Promise<void> {
+    if (operador?.role !== 'admin') {
+      throw new Error('Apenas administradores podem excluir movimentações.');
+    }
+
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase
+        .from('movimentacoes')
+        .delete()
+        .eq('id', movimentacaoId)
+        .select('id');
+      if (error) throw new Error(error.message);
+      if (!data?.length) {
+        throw new Error('A exclusão foi bloqueada pelas permissões do Supabase. Aplique a migration administrativa no banco remoto.');
+      }
+      return;
+    }
+
+    const movimentacoes = getStorage<Movimentacao[]>(STORAGE_KEYS.MOVIMENTACOES, INITIAL_MOVIMENTACOES);
+    const movimentacao = movimentacoes.find((item) => item.id === movimentacaoId);
+    if (!movimentacao) throw new Error('Movimentação não encontrada.');
+
+    setStorage(STORAGE_KEYS.MOVIMENTACOES, movimentacoes.filter((item) => item.id !== movimentacaoId));
+    await this.registrarLogAuditoria({
+      usuario_email: operador.email,
+      acao: 'EXCLUSAO_ADMINISTRATIVA_MOVIMENTACAO',
+      tabela: 'movimentacoes',
+      registro_id: movimentacaoId,
+      detalhes: { pessoa: movimentacao.servidor_id || movimentacao.visitante_id },
+      ip_origem: getTerminalInfo(),
+    });
   },
 
   // 7. Registro Atômico de Entrada

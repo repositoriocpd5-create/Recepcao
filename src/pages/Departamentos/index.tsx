@@ -15,7 +15,8 @@ import {
   SlidersHorizontal,
   FolderTree,
   AlertTriangle,
-  Users
+  Users,
+  UserPlus
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -24,9 +25,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { dataService } from '@/services/dataService';
-import { Departamento, Setor } from '@/types';
+import { Departamento, Servidor, ServidorSetorVinculo, Setor } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { pessoasPorSetor } from '@/services/estruturaImportada';
 import { cn } from '@/lib/utils';
 
 export const DepartamentosPage: React.FC = () => {
@@ -34,6 +34,8 @@ export const DepartamentosPage: React.FC = () => {
   const isAdmin = user?.role === 'admin' || !user;
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [setores, setSetores] = useState<Setor[]>([]);
+  const [servidores, setServidores] = useState<Servidor[]>([]);
+  const [vinculos, setVinculos] = useState<ServidorSetorVinculo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Estados de controle rápido de autorização e UX
@@ -60,16 +62,21 @@ export const DepartamentosPage: React.FC = () => {
   const [setorRamal, setSetorRamal] = useState('');
   const [setorSala, setSetorSala] = useState('');
   const [setorRequerAut, setSetorRequerAut] = useState(false);
+  const [servidorParaVincular, setServidorParaVincular] = useState('');
 
   const carregarDados = async () => {
     setIsLoading(true);
     try {
-      const [deps, sets] = await Promise.all([
+      const [deps, sets, servidorList, vinculoList] = await Promise.all([
         dataService.getDepartamentos(),
         dataService.getSetores(),
+        dataService.getServidores(),
+        dataService.getServidorSetorVinculos(),
       ]);
       setDepartamentos(deps);
       setSetores(sets);
+      setServidores(servidorList);
+      setVinculos(vinculoList);
       if (deps.length > 0 && !setorDepId) setSetorDepId(deps[0].id);
     } catch (err) {
       console.error(err);
@@ -81,6 +88,41 @@ export const DepartamentosPage: React.FC = () => {
   useEffect(() => {
     carregarDados();
   }, []);
+
+  const pessoasDoSetor = (setorId: string) => vinculos
+    .filter((vinculo) => vinculo.setor_id === setorId)
+    .map((vinculo) => ({ vinculo, servidor: servidores.find((servidor) => servidor.id === vinculo.servidor_id) }))
+    .filter((item): item is { vinculo: ServidorSetorVinculo; servidor: Servidor } => Boolean(item.servidor));
+
+  const handleVincularPessoa = async () => {
+    if (!editingSetor || !servidorParaVincular) return;
+    try {
+      await dataService.salvarServidorSetorVinculo({ servidor_id: servidorParaVincular, setor_id: editingSetor.id, requer_autorizacao: false });
+      setServidorParaVincular('');
+      await carregarDados();
+    } catch (err: any) {
+      alert(`Não foi possível vincular a pessoa: ${err.message}`);
+    }
+  };
+
+  const handleAlterarAutorizacaoPessoa = async (vinculo: ServidorSetorVinculo) => {
+    try {
+      await dataService.salvarServidorSetorVinculo({ ...vinculo, requer_autorizacao: !vinculo.requer_autorizacao });
+      await carregarDados();
+    } catch (err: any) {
+      alert(`Não foi possível atualizar a autorização: ${err.message}`);
+    }
+  };
+
+  const handleDesvincularPessoa = async (vinculo: ServidorSetorVinculo) => {
+    if (!confirm('Remover esta pessoa do setor?')) return;
+    try {
+      await dataService.excluirServidorSetorVinculo(vinculo.servidor_id, vinculo.setor_id);
+      await carregarDados();
+    } catch (err: any) {
+      alert(`Não foi possível remover o vínculo: ${err.message}`);
+    }
+  };
 
   // Alternância rápida da regra 'Requer Autorização' diretamente no card do setor
   const handleToggleRequerAutorizacao = async (setor: Setor) => {
@@ -511,7 +553,7 @@ export const DepartamentosPage: React.FC = () => {
 
                   <div className="space-y-2.5">
                     {setoresDoDep.map((setor) => {
-                      const pessoas = pessoasPorSetor.get(setor.nome) || [];
+                      const pessoas = pessoasDoSetor(setor.id);
                       const isAtualizando = loadingSetorId === setor.id;
 
                       return (
@@ -560,7 +602,7 @@ export const DepartamentosPage: React.FC = () => {
 
                               {pessoas.length > 0 && (
                                 <div className="mt-1.5 text-[10px] text-[#68809f] line-clamp-1 dark:text-slate-400">
-                                  {pessoas.join(' • ')}
+                                  {pessoas.map((pessoa) => pessoa.servidor.nome).join(' • ')}
                                 </div>
                               )}
                             </div>
@@ -810,6 +852,39 @@ export const DepartamentosPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {editingSetor ? (
+            <div className="space-y-3 rounded-2xl border border-[#dce4f0] bg-[#f8fbff] p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="flex items-center gap-2 text-xs font-extrabold text-[#0d1f45] dark:text-slate-100"><Users className="h-4 w-4 text-[#0d6efd]" /> Pessoas vinculadas</h3>
+                  <p className="mt-0.5 text-[11px] text-[#627289] dark:text-slate-400">Defina individualmente quem exige autorização prévia.</p>
+                </div>
+                <Badge variant="neutral">{pessoasDoSetor(editingSetor.id).length}</Badge>
+              </div>
+
+              <div className="flex gap-2">
+                <Select className="flex-1" aria-label="Pessoa para vincular" value={servidorParaVincular} onChange={(event) => setServidorParaVincular(event.target.value)} options={[{ value: '', label: 'Selecionar pessoa para vincular' }, ...servidores.filter((servidor) => !vinculos.some((vinculo) => vinculo.setor_id === editingSetor.id && vinculo.servidor_id === servidor.id)).map((servidor) => ({ value: servidor.id, label: `${servidor.nome} · ${servidor.cargo}` }))]} />
+                <Button type="button" variant="outline" onClick={handleVincularPessoa} disabled={!servidorParaVincular} title="Vincular pessoa"><UserPlus className="h-4 w-4" /><span className="hidden sm:inline">Vincular</span></Button>
+              </div>
+
+              <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
+                {pessoasDoSetor(editingSetor.id).map(({ vinculo, servidor }) => (
+                  <div key={`${vinculo.servidor_id}-${vinculo.setor_id}`} className="flex items-center gap-3 rounded-xl border border-[#dce4f0] bg-white p-2.5 dark:border-slate-800 dark:bg-slate-950/40">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-blue-50 text-xs font-extrabold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">{servidor.nome.charAt(0)}</span>
+                    <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-[#0d1f45] dark:text-slate-100">{servidor.nome}</p><p className="truncate text-[10px] text-[#627289] dark:text-slate-400">{servidor.cargo}</p></div>
+                    <button type="button" onClick={() => handleAlterarAutorizacaoPessoa(vinculo)} className={cn('rounded-full border px-2.5 py-1 text-[10px] font-extrabold transition-colors', vinculo.requer_autorizacao ? 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-200' : 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300')}>
+                      {vinculo.requer_autorizacao ? 'Requer autorização' : 'Livre acesso'}
+                    </button>
+                    <button type="button" onClick={() => handleDesvincularPessoa(vinculo)} className="rounded-lg p-1.5 text-[#627289] hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40" title="Remover vínculo"><X className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+                {pessoasDoSetor(editingSetor.id).length === 0 && <p className="py-3 text-center text-xs text-[#627289] dark:text-slate-400">Nenhuma pessoa vinculada a este setor.</p>}
+              </div>
+            </div>
+          ) : (
+            <p className="rounded-xl border border-dashed border-[#dce4f0] p-3 text-xs text-[#627289] dark:border-slate-800 dark:text-slate-400">Salve o setor primeiro para vincular pessoas e configurar a autorização individual.</p>
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#dce4f0] dark:border-slate-800">
             <Button type="button" variant="outline" onClick={() => setIsSetorModalOpen(false)}>

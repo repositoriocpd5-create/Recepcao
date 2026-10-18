@@ -2,14 +2,10 @@ import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   ShieldCheck,
-  Database,
   Users,
-  Server,
-  Key,
   RefreshCw,
   AlertTriangle,
   CheckCircle2,
-  Lock,
   UserPlus,
   Pencil,
   Trash2,
@@ -83,7 +79,7 @@ function gerarId() {
 }
 
 export const AdministracaoPage: React.FC = () => {
-  const { user, isSupabaseLive, switchDemoRole } = useAuth();
+  const { user, switchDemoRole } = useAuth();
   const [resetSuccess, setResetSuccess] = useState(false);
   const [usuarios, setUsuarios] = useState<UserProfile[]>(loadUsers);
 
@@ -223,9 +219,7 @@ export const AdministracaoPage: React.FC = () => {
             </span>
             <h2 className="text-xl font-bold text-slate-100">Painel de Administração do Sistema</h2>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Diagnóstico de infraestrutura, controle de operadores, políticas de segurança e ambiente
-          </p>
+          <p className="text-xs text-slate-400 mt-1">Controle de operadores, papéis e permissões do sistema</p>
         </div>
 
         <Button variant="danger" size="sm" onClick={handleResetData}>
@@ -240,66 +234,6 @@ export const AdministracaoPage: React.FC = () => {
           <span>Dados de teste restaurados com sucesso para o estado original! Reiniciando...</span>
         </div>
       )}
-
-      {/* Diagnóstico da Stack Técnica: Supabase + Netlify + GitHub */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Supabase Status */}
-        <Card className="border-slate-800">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-medium">Banco de Dados & Backend</span>
-            <Database className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="mt-3">
-            <div className="text-base font-bold text-slate-100">
-              {isSupabaseLive ? 'Supabase PostgreSQL' : 'Ambiente Homologação Local'}
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              {isSupabaseLive
-                ? 'Conexão ativa com PostgreSQL, RLS e RPC atômico'
-                : 'Simulação transacional em memória / LocalStorage'}
-            </p>
-            <div className="mt-3">
-              <Badge variant={isSupabaseLive ? 'success' : 'warning'}>
-                {isSupabaseLive ? 'Supabase Conectado' : 'Modo Demonstração / Testes'}
-              </Badge>
-            </div>
-          </div>
-        </Card>
-
-        {/* GitHub & CI/CD */}
-        <Card className="border-slate-800">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-medium">Controle de Versão</span>
-            <Server className="w-4 h-4 text-blue-400" />
-          </div>
-          <div className="mt-3">
-            <div className="text-base font-bold text-slate-100">GitHub Repository</div>
-            <p className="text-xs text-slate-400 mt-1">
-              Branch: <span className="font-mono text-blue-400">main</span> • Migrações versionadas
-            </p>
-            <div className="mt-3">
-              <Badge variant="info">Deploy por Commit Configurado</Badge>
-            </div>
-          </div>
-        </Card>
-
-        {/* Netlify Hosting */}
-        <Card className="border-slate-800">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-medium">Hospedagem Frontend</span>
-            <Lock className="w-4 h-4 text-teal-400" />
-          </div>
-          <div className="mt-3">
-            <div className="text-base font-bold text-slate-100">Netlify SPA</div>
-            <p className="text-xs text-slate-400 mt-1">
-              Build: <span className="font-mono text-emerald-400">npm run build</span> • Dist: dist
-            </p>
-            <div className="mt-3">
-              <Badge variant="success">netlify.toml Presente</Badge>
-            </div>
-          </div>
-        </Card>
-      </div>
 
       {/* ─── GESTÃO DE USUÁRIOS DO SISTEMA ─── */}
       <Card className="border-slate-800 overflow-hidden">
@@ -465,38 +399,6 @@ export const AdministracaoPage: React.FC = () => {
               );
             })}
           </div>
-        </div>
-      </Card>
-
-      {/* Guia de Configuração de Variáveis de Ambiente */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Key className="w-4 h-4 text-amber-400" />
-            <CardTitle>Configuração para Conectar ao Supabase Definitivo</CardTitle>
-          </div>
-          <CardDescription>
-            Instruções para apontar esta aplicação para um projeto ativo no Supabase
-          </CardDescription>
-        </CardHeader>
-
-        <div className="space-y-3 text-xs text-slate-300">
-          <p>
-            Para conectar o sistema a um projeto real no Supabase, crie o arquivo{' '}
-            <code className="text-emerald-400 font-mono bg-slate-900 px-1 py-0.5 rounded">.env</code>{' '}
-            na raiz com as variáveis públicas do seu dashboard Supabase:
-          </p>
-
-          <pre className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-emerald-400 font-mono text-xs overflow-x-auto">
-            {`VITE_SUPABASE_URL=https://xxxxxxxxxxxxxxxx.supabase.co\nVITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`}
-          </pre>
-
-          <p className="text-slate-400">
-            As migrações SQL já estão estruturadas em{' '}
-            <code className="text-emerald-400 font-mono">supabase/migrations/</code> com tabelas,
-            índices, constraints e funções atômicas (<code className="font-mono">rpc_registrar_entrada</code>,{' '}
-            <code className="font-mono">rpc_registrar_saida</code>) prontas para execução via Supabase CLI ou SQL Editor.
-          </p>
         </div>
       </Card>
 

@@ -12,15 +12,18 @@ import {
   Eye,
   Pencil,
   Trash2,
+  ArrowDown,
+  ArrowUp,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { dataService } from '@/services/dataService';
 import { generateInstitutionalPdf } from '@/services/pdfService';
-import { Movimentacao } from '@/types';
+import { Departamento, Movimentacao, MovimentacaoStatus, Servidor, Setor } from '@/types';
 import { formatDateTime } from '@/lib/utils';
 
 export const MovimentacoesPage: React.FC = () => {
@@ -31,6 +34,20 @@ export const MovimentacoesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'no_predio' | 'finalizado' | 'pendente_autorizacao'>('todos');
   const [tipoFilter, setTipoFilter] = useState<'todos' | 'servidor' | 'visitante'>('todos');
+  const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+  const [setores, setSetores] = useState<Setor[]>([]);
+  const [servidores, setServidores] = useState<Servidor[]>([]);
+  const [sortColumn, setSortColumn] = useState<'pessoa' | 'documento' | 'cracha' | 'destino' | 'motivo' | 'entrada' | 'saida' | 'tempo' | 'status'>('entrada');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [editingMovement, setEditingMovement] = useState<Movimentacao | null>(null);
+  const [movementToDelete, setMovementToDelete] = useState<Movimentacao | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [adminMessage, setAdminMessage] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    departamento_destino_id: '', setor_destino_id: '', servidor_destino_id: '', motivo: '',
+    data_hora_entrada: '', data_hora_saida: '', status: 'no_predio' as MovimentacaoStatus, observacoes: '',
+  });
 
   // Modal de saída
   const [isSaidaModalOpen, setIsSaidaModalOpen] = useState(false);
@@ -53,8 +70,13 @@ export const MovimentacoesPage: React.FC = () => {
   const carregarMovimentacoes = async () => {
     setIsLoading(true);
     try {
-      const data = await dataService.getMovimentacoes();
+      const [data, deps, sectorList, serverList] = await Promise.all([
+        dataService.getMovimentacoes(), dataService.getDepartamentos(), dataService.getSetores(), dataService.getServidores(),
+      ]);
       setMovimentacoes(data);
+      setDepartamentos(deps);
+      setSetores(sectorList);
+      setServidores(serverList);
     } catch (err) {
       console.error(err);
     } finally {
@@ -95,6 +117,90 @@ export const MovimentacoesPage: React.FC = () => {
 
     return matchesSearch && matchesStatus && matchesTipo;
   });
+
+  const movimentacoesOrdenadas = [...filtradas].sort((a, b) => {
+    const valueFor = (item: Movimentacao) => {
+      switch (sortColumn) {
+        case 'pessoa': return item.servidor?.nome || item.visitante?.nome || '';
+        case 'documento': return item.servidor?.matricula || item.visitante?.cpf || '';
+        case 'cracha': return item.cracha_numero || '';
+        case 'destino': return `${item.departamento_destino?.sigla || ''} ${item.setor_destino?.nome || ''}`;
+        case 'motivo': return item.motivo || '';
+        case 'entrada': return item.data_hora_entrada || '';
+        case 'saida': return item.data_hora_saida || '';
+        case 'tempo': return new Date(item.data_hora_saida || Date.now()).getTime() - new Date(item.data_hora_entrada).getTime();
+        case 'status': return item.status;
+      }
+    };
+    const first = valueFor(a);
+    const second = valueFor(b);
+    const comparison = typeof first === 'number' && typeof second === 'number'
+      ? first - second
+      : String(first).localeCompare(String(second), 'pt-BR');
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
+  const toggleSort = (column: typeof sortColumn) => {
+    if (column === sortColumn) setSortDirection((direction) => direction === 'asc' ? 'desc' : 'asc');
+    else { setSortColumn(column); setSortDirection('asc'); }
+  };
+
+  const toLocalDateTime = (value?: string | null) => value ? new Date(value).toISOString().slice(0, 16) : '';
+
+  const openEdit = (movimentacao: Movimentacao) => {
+    setEditForm({
+      departamento_destino_id: movimentacao.departamento_destino_id,
+      setor_destino_id: movimentacao.setor_destino_id,
+      servidor_destino_id: movimentacao.servidor_destino_id || '',
+      motivo: movimentacao.motivo,
+      data_hora_entrada: toLocalDateTime(movimentacao.data_hora_entrada),
+      data_hora_saida: toLocalDateTime(movimentacao.data_hora_saida),
+      status: movimentacao.status,
+      observacoes: movimentacao.observacoes || '',
+    });
+    setEditingMovement(movimentacao);
+  };
+
+  const handleSaveEdit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingMovement) return;
+    if (editForm.status === 'finalizado' && !editForm.data_hora_saida) return alert('Informe o horário de saída para finalizar o registro.');
+    if (editForm.status !== 'finalizado' && editForm.data_hora_saida) return alert('Remova o horário de saída ou altere o status para Finalizado.');
+    setIsSavingEdit(true);
+    try {
+      await dataService.atualizarMovimentacaoAdministrativa(editingMovement.id, {
+        ...editForm,
+        servidor_destino_id: editForm.servidor_destino_id || undefined,
+        data_hora_entrada: new Date(editForm.data_hora_entrada).toISOString(),
+        data_hora_saida: editForm.data_hora_saida ? new Date(editForm.data_hora_saida).toISOString() : null,
+      }, user);
+      setEditingMovement(null);
+      setAdminMessage('Movimentação atualizada com sucesso.');
+      await carregarMovimentacoes();
+    } catch (err: any) { alert(`Não foi possível atualizar a movimentação: ${err.message}`); }
+    finally { setIsSavingEdit(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!movementToDelete) return;
+    setIsDeleting(true);
+    try {
+      await dataService.excluirMovimentacaoAdministrativa(movementToDelete.id, user);
+      setMovementToDelete(null);
+      setAdminMessage('Movimentação excluída permanentemente.');
+      await carregarMovimentacoes();
+    } catch (err: any) { alert(`Não foi possível excluir a movimentação: ${err.message}`); }
+    finally { setIsDeleting(false); }
+  };
+
+  const renderSortHeader = (column: typeof sortColumn, label: string, className = '') => (
+    <th className={`py-3 px-4 ${className}`}>
+      <button type="button" onClick={() => toggleSort(column)} className="inline-flex items-center gap-1 hover:text-emerald-400 transition-colors" aria-label={`Ordenar por ${label}`}>
+        <span>{label}</span>
+        {sortColumn === column && (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
+      </button>
+    </th>
+  );
 
   const openVisitorHistory = (movimentacao: Movimentacao) => {
     if (movimentacao.tipo_pessoa !== 'visitante' || !movimentacao.visitante_id) return;
@@ -231,20 +337,20 @@ export const MovimentacoesPage: React.FC = () => {
             <table className="w-full table-fixed text-left text-xs">
               <thead className="bg-[#151c2d] text-slate-400 border-b border-slate-800 uppercase font-mono text-[10px]">
                 <tr>
-                  <th className="py-3 px-4">Pessoa / Tipo</th>
-                  <th className="hidden 2xl:table-cell py-3 px-2.5">Documento</th>
-                  <th className="py-3 px-4">Crachá</th>
-                  <th className="py-3 px-4">Destino (Dep/Setor)</th>
-                  <th className="hidden 2xl:table-cell py-3 px-2.5">Motivo Declarado</th>
-                  <th className="py-3 px-4">Horário Entrada</th>
-                  <th className="py-3 px-4">Horário Saída</th>
-                  <th className="py-3 px-3">Tempo</th>
-                  <th className="py-3 px-4">Status</th>
+                  {renderSortHeader('pessoa', 'Pessoa / Tipo')}
+                  {renderSortHeader('documento', 'Documento', 'hidden 2xl:table-cell !px-2.5')}
+                  {renderSortHeader('cracha', 'Crachá')}
+                  {renderSortHeader('destino', 'Destino (Dep/Setor)')}
+                  {renderSortHeader('motivo', 'Motivo Declarado', 'hidden 2xl:table-cell !px-2.5')}
+                  {renderSortHeader('entrada', 'Horário Entrada')}
+                  {renderSortHeader('saida', 'Horário Saída')}
+                  {renderSortHeader('tempo', 'Tempo', '!px-3')}
+                  {renderSortHeader('status', 'Status')}
                   <th className="py-3 px-4 text-right">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {filtradas.map((m) => {
+                {movimentacoesOrdenadas.map((m) => {
                   const nome = m.servidor?.nome || m.visitante?.nome || 'Não identificado';
                   const doc = m.servidor?.matricula || m.visitante?.cpf || '-';
                   const dep = m.departamento_destino?.sigla || 'SMEDU';
@@ -317,7 +423,7 @@ export const MovimentacoesPage: React.FC = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() => alert('Edição de movimentação disponível apenas mediante confirmação administrativa.')}
+                              onClick={() => openEdit(m)}
                               className="p-1.5 text-[#0877c9] hover:bg-[#edf5fc] rounded-md transition-colors dark:text-blue-400 dark:hover:bg-blue-950/40"
                               title="Editar registro"
                               aria-label="Editar registro"
@@ -326,7 +432,7 @@ export const MovimentacoesPage: React.FC = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() => alert('Exclusão de movimentação disponível apenas mediante confirmação administrativa.')}
+                              onClick={() => setMovementToDelete(m)}
                               className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-md transition-colors dark:text-rose-400 dark:hover:bg-rose-950/40"
                               title="Excluir registro"
                               aria-label="Excluir registro"
@@ -396,6 +502,59 @@ export const MovimentacoesPage: React.FC = () => {
         )}
       </Modal>
 
+      <Modal
+        isOpen={Boolean(editingMovement)}
+        onClose={() => setEditingMovement(null)}
+        title="Editar movimentação"
+        description="Alterações administrativas são registradas na auditoria."
+        maxWidth="xl"
+      >
+        <form onSubmit={handleSaveEdit} className="space-y-4">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300">
+            <span className="text-slate-400">Pessoa / tipo:</span>{' '}
+            <strong>{editingMovement?.servidor?.nome || editingMovement?.visitante?.nome || 'Não identificado'} · {editingMovement?.tipo_pessoa}</strong>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Select label="Departamento" value={editForm.departamento_destino_id} onChange={(event) => setEditForm((form) => ({ ...form, departamento_destino_id: event.target.value, setor_destino_id: '', servidor_destino_id: '' }))} options={departamentos.map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))} required />
+            <Select label="Setor" value={editForm.setor_destino_id} onChange={(event) => setEditForm((form) => ({ ...form, setor_destino_id: event.target.value, servidor_destino_id: '' }))} options={setores.filter((item) => item.departamento_id === editForm.departamento_destino_id).map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))} required />
+            <Select label="Responsável" value={editForm.servidor_destino_id} onChange={(event) => setEditForm((form) => ({ ...form, servidor_destino_id: event.target.value }))} options={[{ value: '', label: 'Sem responsável definido' }, ...servidores.map((item) => ({ value: item.id, label: item.nome }))]} />
+            <Select label="Status" value={editForm.status} onChange={(event) => setEditForm((form) => ({ ...form, status: event.target.value as MovimentacaoStatus }))} options={[{ value: 'no_predio', label: 'No Prédio' }, { value: 'pendente_autorizacao', label: 'Pendente' }, { value: 'finalizado', label: 'Finalizado' }, { value: 'recusado', label: 'Recusado' }]} required />
+          </div>
+          <Input label="Motivo declarado" value={editForm.motivo} onChange={(event) => setEditForm((form) => ({ ...form, motivo: event.target.value }))} required />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input label="Horário de entrada" type="datetime-local" value={editForm.data_hora_entrada} onChange={(event) => setEditForm((form) => ({ ...form, data_hora_entrada: event.target.value }))} required />
+            <Input label="Horário de saída" type="datetime-local" value={editForm.data_hora_saida} onChange={(event) => setEditForm((form) => ({ ...form, data_hora_saida: event.target.value }))} />
+          </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-slate-300">Observações</label>
+            <textarea value={editForm.observacoes} onChange={(event) => setEditForm((form) => ({ ...form, observacoes: event.target.value }))} rows={3} className="w-full rounded-lg border border-slate-700/80 bg-[#121826] px-3 py-2 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+          </div>
+          <div className="flex justify-end gap-3 border-t border-slate-800 pt-4">
+            <Button type="button" variant="outline" onClick={() => setEditingMovement(null)}>Cancelar</Button>
+            <Button type="submit" variant="primary" isLoading={isSavingEdit}>Salvar alterações</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(movementToDelete)}
+        onClose={() => setMovementToDelete(null)}
+        title="Excluir movimentação permanentemente?"
+        description="Esta ação remove o registro e não pode ser desfeita."
+        maxWidth="sm"
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-3 text-sm text-slate-200">
+            <strong>{movementToDelete?.servidor?.nome || movementToDelete?.visitante?.nome || 'Registro selecionado'}</strong>
+            <div className="mt-1 text-xs text-slate-400">Entrada: {movementToDelete && formatDateTime(movementToDelete.data_hora_entrada)}</div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setMovementToDelete(null)}>Cancelar</Button>
+            <Button variant="danger" onClick={handleDelete} isLoading={isDeleting}>Excluir permanentemente</Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Modal de Saída */}
       <Modal
         isOpen={isSaidaModalOpen}
@@ -437,6 +596,13 @@ export const MovimentacoesPage: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {adminMessage && (
+        <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-emerald-500/30 bg-slate-900 px-4 py-3 text-sm font-semibold text-emerald-300 shadow-xl">
+          {adminMessage}
+          <button type="button" onClick={() => setAdminMessage(null)} className="ml-3 text-slate-400 hover:text-white" aria-label="Fechar notificação">×</button>
+        </div>
+      )}
     </div>
   );
 };

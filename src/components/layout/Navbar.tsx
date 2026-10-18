@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, LogOut, Database, RefreshCw, Moon, Sun, PanelLeftClose, PanelLeftOpen, Menu, UserRound } from 'lucide-react';
+import { Shield, LogOut, RefreshCw, Moon, Sun, PanelLeftClose, PanelLeftOpen, Menu, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -87,7 +87,6 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
           </div>
           <button type="button" onClick={logout} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#e1f0ff] text-[#087ef5]" aria-label="Sair do sistema" title="Sair do sistema"><UserRound className="h-6 w-6" /></button>
         </div>
-        {!isSupabaseLive && <div className="mt-3 flex justify-center"><span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#fed59b] bg-[#fff8eb] px-4 text-sm font-bold text-[#ee7900]"><Database className="h-4 w-4" />Modo Homologação Ativo</span></div>}
       </div>
 
       <div className="hidden md:flex items-center justify-between gap-4">
@@ -126,23 +125,6 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
 
         {/* Status Pills and User actions */}
         <div className="flex items-center gap-3">
-          {/* Supabase status indicator */}
-          <div
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-              isSupabaseLive
-                ? 'bg-emerald-950/50 text-emerald-400 border-emerald-500/30'
-                : 'bg-amber-950/40 text-amber-300 border-amber-500/30'
-            }`}
-            title={
-              isSupabaseLive
-                ? 'Conectado ao Supabase PostgreSQL com RLS'
-                : 'Ambiente de Testes / Modo Homologação com Armazenamento Local'
-            }
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>{isSupabaseLive ? 'Supabase Conectado' : 'Modo Homologação Ativo'}</span>
-          </div>
-
           {/* Quick role switcher for testing */}
           {user && !isSupabaseLive && (
             <div className="hidden md:flex items-center gap-1 bg-[#151c2c] border border-slate-700/80 rounded-lg p-0.5 text-xs">

@@ -1587,9 +1587,9 @@ export const RecepcaoPage: React.FC = () => {
         title="Entrada em andamento"
         description="Confirme o destino e vincule o crachá entregue."
         icon={<LogIn className="w-6 h-6" />}
-        maxWidth="xl"
+        maxWidth="3xl"
       >
-        <form onSubmit={handleConfirmarEntrada} className="space-y-4">
+        <form onSubmit={handleConfirmarEntrada} className="space-y-3 sm:space-y-3.5">
           <div className="flex items-center gap-3.5 rounded-2xl border border-[#c9e1f6] bg-[#edf5fc] px-4 py-3 dark:border-slate-800 dark:bg-slate-900/80">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#dcebf9] text-[#0b6bbf] dark:bg-slate-800 dark:text-sky-300">
               <User className="w-5 h-5" />

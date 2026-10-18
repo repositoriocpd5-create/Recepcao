@@ -131,16 +131,6 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
         </div>
       </div>
 
-      {/* Rodapé da sidebar com versão e ambiente */}
-      <div className={cn('p-3 border-t border-white/20 bg-[#043c74]/60 text-[11px] text-blue-50', isCollapsed && 'lg:hidden')}>
-        <div className="flex items-center justify-between">
-          <span className="font-mono">v1.0.0-homolog</span>
-          <span className="text-emerald-200 font-medium">Build Homologado</span>
-        </div>
-        <p className="text-[10px] text-blue-100/70 mt-1">
-          Segurança Supabase RLS ativa
-        </p>
-      </div>
     </aside>
   );
 };

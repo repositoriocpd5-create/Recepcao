@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Search, Plus, Edit2, RefreshCw } from 'lucide-react';
+import { ArrowDown, ArrowUp, Briefcase, Search, Plus, Edit2, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -16,6 +16,10 @@ export const ServidoresPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDep, setSelectedDep] = useState('todos');
+  const [selectedCargo, setSelectedCargo] = useState('todos');
+  const [selectedLotacao, setSelectedLotacao] = useState('todos');
+  const [sortColumn, setSortColumn] = useState<'nome' | 'matricula' | 'cargo' | 'lotacao' | 'status'>('nome');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Modal de edição / criação
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -109,9 +113,43 @@ export const ServidoresPage: React.FC = () => {
       s.nome.toLowerCase().includes(termo) ||
       s.matricula.toLowerCase().includes(termo) ||
       (s.lotacao || '').toLowerCase().includes(termo);
+    const lotacaoServidor = s.lotacao || `${s.departamento?.sigla || 'SMEDU'}${s.setor ? ` (${s.setor.sigla})` : ''}`;
     const matchesDep = selectedDep === 'todos' || s.departamento_id === selectedDep;
-    return matchesSearch && matchesDep;
+    const matchesCargo = selectedCargo === 'todos' || s.cargo === selectedCargo;
+    const matchesLotacao = selectedLotacao === 'todos' || lotacaoServidor === selectedLotacao;
+    return matchesSearch && matchesDep && matchesCargo && matchesLotacao;
   });
+
+  const cargosDisponiveis = Array.from(new Set(servidores.map((servidor) => servidor.cargo).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const lotacoesDisponiveis = Array.from(new Set(servidores.map((servidor) => servidor.lotacao || `${servidor.departamento?.sigla || 'SMEDU'}${servidor.setor ? ` (${servidor.setor.sigla})` : ''}`).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  const servidoresOrdenados = [...filtrados].sort((a, b) => {
+    const valueFor = (servidor: Servidor) => {
+      switch (sortColumn) {
+        case 'nome': return servidor.nome;
+        case 'matricula': return servidor.matricula;
+        case 'cargo': return servidor.cargo;
+        case 'lotacao': return servidor.lotacao || `${servidor.departamento?.sigla || 'SMEDU'} ${servidor.setor?.sigla || ''}`;
+        case 'status': return servidor.status;
+      }
+    };
+    const comparison = valueFor(a).localeCompare(valueFor(b), 'pt-BR');
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
+  const toggleSort = (column: typeof sortColumn) => {
+    if (column === sortColumn) setSortDirection((direction) => direction === 'asc' ? 'desc' : 'asc');
+    else { setSortColumn(column); setSortDirection('asc'); }
+  };
+
+  const renderSortHeader = (column: typeof sortColumn, label: string) => (
+    <th className="py-3 px-4">
+      <button type="button" onClick={() => toggleSort(column)} className="inline-flex items-center gap-1 transition-colors hover:text-emerald-400" aria-label={`Ordenar por ${label}`}>
+        {label}
+        {sortColumn === column && (sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+      </button>
+    </th>
+  );
 
   return (
     <div className="space-y-6">
@@ -141,7 +179,7 @@ export const ServidoresPage: React.FC = () => {
       </div>
 
       <Card>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Input
             placeholder="Buscar por nome, matrícula ou CPF..."
             value={searchTerm}
@@ -155,6 +193,24 @@ export const ServidoresPage: React.FC = () => {
             options={[
               { value: 'todos', label: 'Todos os Departamentos' },
               ...departamentos.map((d) => ({ value: d.id, label: `${d.sigla} - ${d.nome}` })),
+            ]}
+          />
+
+          <Select
+            value={selectedCargo}
+            onChange={(e) => setSelectedCargo(e.target.value)}
+            options={[
+              { value: 'todos', label: 'Todos os Cargos / Funções' },
+              ...cargosDisponiveis.map((cargoDisponivel) => ({ value: cargoDisponivel, label: cargoDisponivel })),
+            ]}
+          />
+
+          <Select
+            value={selectedLotacao}
+            onChange={(e) => setSelectedLotacao(e.target.value)}
+            options={[
+              { value: 'todos', label: 'Todas as Lotações (Dep/Setor)' },
+              ...lotacoesDisponiveis.map((lotacaoDisponivel) => ({ value: lotacaoDisponivel, label: lotacaoDisponivel })),
             ]}
           />
         </div>
@@ -172,16 +228,16 @@ export const ServidoresPage: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead className="bg-[#151c2d] text-slate-400 border-b border-slate-800 uppercase font-mono text-[10px]">
               <tr>
-                <th className="py-3 px-4">Nome do Servidor</th>
-                <th className="py-3 px-4">Matrícula</th>
-                <th className="py-3 px-4">Cargo / Função</th>
-                <th className="py-3 px-4">Lotação (Dep/Setor)</th>
-                <th className="py-3 px-4">Status</th>
+                {renderSortHeader('nome', 'Nome do Servidor')}
+                {renderSortHeader('matricula', 'Matrícula')}
+                {renderSortHeader('cargo', 'Cargo / Função')}
+                {renderSortHeader('lotacao', 'Lotação (Dep/Setor)')}
+                {renderSortHeader('status', 'Status')}
                 <th className="py-3 px-4 text-right">Ação</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {filtrados.map((s) => (
+              {servidoresOrdenados.map((s) => (
                 <tr key={s.id} className="hover:bg-slate-800/20 transition-colors">
                   <td className="py-3 px-4 font-semibold text-slate-100">{s.nome}</td>
                   <td className="py-3 px-4 font-mono text-emerald-400 font-bold">{s.matricula}</td>
