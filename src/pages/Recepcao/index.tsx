@@ -192,7 +192,8 @@ export const RecepcaoPage: React.FC = () => {
   const [isSubmittingEntrada, setIsSubmittingEntrada] = useState(false);
   const [isAutorizacaoModalOpen, setIsAutorizacaoModalOpen] = useState(false);
   const [autorizacaoMeio, setAutorizacaoMeio] = useState('');
-  const [autorizacaoConfirmada, setAutorizacaoConfirmada] = useState(false);
+  // Map de confirmações individuais: chave = servidor_destino_id (ou índice), valor = true/false
+  const [autorizacoesIndividuais, setAutorizacoesIndividuais] = useState<Record<string, boolean>>({});
   const [destinosVisita, setDestinosVisita] = useState<DestinoVisita[]>([{ departamento_destino_id: '', setor_destino_id: '' }]);
   const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
 
@@ -638,7 +639,7 @@ export const RecepcaoPage: React.FC = () => {
       try {
         if (!(await validarCrachaParaEntrada())) return;
         setAutorizacaoMeio('');
-        setAutorizacaoConfirmada(false);
+        setAutorizacoesIndividuais({});
         setIsAutorizacaoModalOpen(true);
       } finally {
         setIsSubmittingEntrada(false);
@@ -1830,14 +1831,24 @@ export const RecepcaoPage: React.FC = () => {
             { valor: 'presencialmente', rotulo: 'Presencialmente', icone: <UserCheck className="w-5 h-5" /> },
             { valor: 'por mensagem/e-mail', rotulo: 'Mensagem / e-mail', icone: <MessageSquare className="w-5 h-5" /> },
           ];
-          const podeConfirmar = Boolean(autorizacaoMeio) && autorizacaoConfirmada;
-
           // Monta lista de destinatários que exigem autorização
           const destinatariosComAut = destinosComAutorizacaoRequerida.map((d, idx) => {
             const srv = todosServidores.find((s) => s.id === d.servidor_destino_id);
             const setor = setores.find((s) => s.id === d.setor_destino_id);
-            return { srv, setor, idx };
+            const chave = d.servidor_destino_id || `destino-${idx}`;
+            return { srv, setor, idx, chave };
           });
+
+          // Há responsáveis com autorizacao? Usa confirmações individuais; caso contrário, usa estado legado
+          const temMultiplos = destinatariosComAut.length > 0;
+          const todasConfirmadas = temMultiplos
+            ? destinatariosComAut.every(({ chave }) => Boolean(autorizacoesIndividuais[chave]))
+            : Boolean(autorizacoesIndividuais['__unico__']);
+          const podeConfirmar = Boolean(autorizacaoMeio) && todasConfirmadas;
+
+          const toggleConfirmacao = (chave: string) => {
+            setAutorizacoesIndividuais((prev) => ({ ...prev, [chave]: !prev[chave] }));
+          };
 
           return (
             <form
@@ -1847,7 +1858,7 @@ export const RecepcaoPage: React.FC = () => {
               }}
             >
               <div className="space-y-5 px-5 pb-6 pt-6 sm:px-7">
-                {/* Quem visita → quem autoriza (primeiro responsável, legado) */}
+                {/* Quem visita → quem autoriza (cabeçalho resumo) */}
                 <div className="grid grid-cols-1 items-center gap-3 rounded-2xl border border-[#dce6f3] bg-white p-4 shadow-[0_10px_30px_-18px_rgba(18,44,82,.35)] sm:grid-cols-[1fr_auto_1fr] dark:border-slate-800 dark:bg-slate-900/60">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-xl font-extrabold text-white">{pessoaNome.charAt(0)}</div>
@@ -1867,72 +1878,18 @@ export const RecepcaoPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Como falar com o responsável */}
+                {/* Como falar com o responsável principal */}
                 <div className="flex flex-wrap gap-2 text-sm">
                   <span className="inline-flex items-center gap-2 rounded-full border border-[#dce6f3] bg-[#f6f9fe] px-3 py-1.5 text-[#37475e] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><PhoneCall className="h-4 w-4 text-[#0b5ed7]" />Ramal: <strong>{ramal || 'não informado'}</strong></span>
                   <span className="inline-flex items-center gap-2 rounded-full border border-[#dce6f3] bg-[#f6f9fe] px-3 py-1.5 text-[#37475e] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><Building2 className="h-4 w-4 text-[#0b5ed7]" />{setorDestino ? `${setorDestino.sigla} · ${setorDestino.sala || 'sala não informada'}` : 'Setor não informado'}</span>
                 </div>
 
-                {/* ─── NOVO BLOCO: Lista de todos os responsáveis que exigem autorização formal (1 a 10) ─── */}
-                {destinatariosComAut.length > 0 && (
-                  <div className="rounded-2xl border-2 border-amber-300/80 bg-amber-50/60 p-4 dark:border-amber-500/40 dark:bg-amber-950/20">
-                    <div className="mb-3 flex items-center gap-2">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-xs">
-                        <ShieldAlert className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900 dark:text-amber-200">
-                          {destinatariosComAut.length === 1
-                            ? 'Atenção: 1 responsável exige autorização formal'
-                            : `Atenção: ${destinatariosComAut.length} responsáveis exigem autorização formal`}
-                        </p>
-                        <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                          A entrada desta pessoa só pode ser liberada após confirmação individual de cada responsável abaixo.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {destinatariosComAut.map(({ srv, setor, idx }) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-3 rounded-xl border border-amber-200 bg-white px-3 py-2.5 shadow-xs dark:border-amber-700/40 dark:bg-slate-900/60"
-                        >
-                          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 text-sm font-extrabold text-white shadow-xs">
-                            {srv ? srv.nome.charAt(0) : '?'}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs font-extrabold text-[#0d1f45] dark:text-slate-100">
-                              {srv?.nome || 'Responsável não identificado'}
-                            </p>
-                            <p className="truncate text-[11px] text-[#627289] dark:text-slate-400">
-                              {srv?.cargo || '—'} {setor ? `· ${setor.sigla}` : ''}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 flex-col items-end gap-1">
-                            {(srv?.ramal || setor?.ramal) && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100/70 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:border-amber-700/40 dark:bg-amber-950/60 dark:text-amber-300">
-                                <PhoneCall className="h-3 w-3" />
-                                {srv?.ramal || setor?.ramal}
-                              </span>
-                            )}
-                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100/70 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/60 dark:text-amber-200">
-                              <ShieldAlert className="h-3 w-3 text-amber-600" />
-                              Exige Autorização
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* ─── FIM DO BLOCO ─── */}
-
+                {/* ─── BLOCO DE CONFIRMAÇÕES INDIVIDUAIS POR RESPONSÁVEL (1 a 10) ─── */}
                 {/* Meio da autorização */}
                 <fieldset>
                   <legend className="mb-2 text-sm font-extrabold text-[#0d1f45] dark:text-slate-100">Como a autorização foi obtida?</legend>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    {meios.map((meio, index) => {
+                    {meios.map((meio) => {
                       const ativo = autorizacaoMeio === meio.valor;
                       return (
                         <label
@@ -1953,29 +1910,161 @@ export const RecepcaoPage: React.FC = () => {
                   </div>
                 </fieldset>
 
-                {/* Declaração */}
-                <label
-                  className={cn(
-                    'flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition-colors',
-                    autorizacaoConfirmada
-                      ? 'border-[#16a34a] bg-[#eefbf2] dark:bg-emerald-950/40'
-                      : 'border-dashed border-[#c8d9ec] bg-[#fbfdff] hover:border-[#9cc3f5] dark:border-slate-700 dark:bg-slate-900'
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={autorizacaoConfirmada}
-                    onChange={(event) => setAutorizacaoConfirmada(event.target.checked)}
-                    className="mt-0.5 h-5 w-5 shrink-0 accent-[#16a34a]"
-                  />
-                  <span className="text-sm leading-relaxed text-[#37475e] dark:text-slate-300">
-                    Confirmo que <strong className="text-[#0d1f45] dark:text-slate-100">{responsavelNome}</strong> autorizou a entrada de{' '}
-                    <strong className="text-[#0d1f45] dark:text-slate-100">{pessoaNome}</strong>.
-                    <span className="mt-1 block text-xs text-[#627289] dark:text-slate-400">
-                      A confirmação fica registrada na entrada com seu nome e o horário.
+                {/* Confirmações individuais por responsável */}
+                {temMultiplos ? (
+                  <div className="rounded-2xl border-2 border-amber-300/80 bg-amber-50/60 p-4 dark:border-amber-500/40 dark:bg-amber-950/20">
+                    {/* Cabeçalho do bloco */}
+                    <div className="mb-4 flex items-center gap-2">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-xs">
+                        <ShieldAlert className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900 dark:text-amber-200">
+                          {destinatariosComAut.length === 1
+                            ? 'Atenção: 1 responsável exige autorização formal'
+                            : `Atenção: ${destinatariosComAut.length} responsáveis exigem autorização formal`}
+                        </p>
+                        <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                          Confirme individualmente cada responsável antes de liberar a entrada.
+                        </p>
+                      </div>
+                      {/* Contador de confirmações */}
+                      <span className={cn(
+                        'ml-auto shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-extrabold border transition-colors',
+                        todasConfirmadas
+                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-700'
+                          : 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700'
+                      )}>
+                        <CheckCircle2 className="h-3 w-3" />
+                        {destinatariosComAut.filter(({ chave }) => autorizacoesIndividuais[chave]).length}/{destinatariosComAut.length}
+                      </span>
+                    </div>
+
+                    {/* Cards de confirmação individual */}
+                    <div className="space-y-3">
+                      {destinatariosComAut.map(({ srv, setor, idx, chave }) => {
+                        const confirmado = Boolean(autorizacoesIndividuais[chave]);
+                        return (
+                          <label
+                            key={chave}
+                            htmlFor={`conf-${chave}`}
+                            className={cn(
+                              'flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-3.5 transition-all duration-150 select-none',
+                              confirmado
+                                ? 'border-emerald-400 bg-emerald-50 shadow-xs shadow-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-500/60'
+                                : 'border-amber-200 bg-white hover:border-amber-400 hover:bg-amber-50/60 dark:border-amber-700/40 dark:bg-slate-900/50 dark:hover:border-amber-500/60'
+                            )}
+                          >
+                            {/* Checkbox estilizado */}
+                            <div className="mt-0.5 shrink-0">
+                              <input
+                                id={`conf-${chave}`}
+                                type="checkbox"
+                                checked={confirmado}
+                                onChange={() => toggleConfirmacao(chave)}
+                                className="sr-only"
+                              />
+                              <div className={cn(
+                                'w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
+                                confirmado
+                                  ? 'bg-emerald-500 border-emerald-500'
+                                  : 'bg-white border-amber-400 dark:bg-slate-900 dark:border-amber-600'
+                              )}>
+                                {confirmado && (
+                                  <svg viewBox="0 0 12 10" fill="none" className="w-3 h-3">
+                                    <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Avatar */}
+                            <div className={cn(
+                              'grid h-10 w-10 shrink-0 place-items-center rounded-xl text-sm font-extrabold text-white shadow-xs transition-all',
+                              confirmado
+                                ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
+                                : 'bg-gradient-to-br from-amber-400 to-orange-500'
+                            )}>
+                              {srv ? srv.nome.charAt(0) : '?'}
+                            </div>
+
+                            {/* Dados do responsável */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-xs font-extrabold text-[#0d1f45] dark:text-slate-100">
+                                  {srv?.nome || 'Responsável não identificado'}
+                                </p>
+                                {(srv?.ramal || setor?.ramal) && (
+                                  <span className={cn(
+                                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border',
+                                    confirmado
+                                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700'
+                                      : 'bg-amber-100/70 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/40'
+                                  )}>
+                                    <PhoneCall className="h-2.5 w-2.5" />
+                                    {srv?.ramal || setor?.ramal}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-[#627289] dark:text-slate-400 mt-0.5">
+                                {srv?.cargo || '—'}{setor ? ` · ${setor.sigla}` : ''}
+                              </p>
+                              {/* Texto de confirmação */}
+                              <p className={cn(
+                                'text-[11px] font-semibold mt-1.5 transition-colors',
+                                confirmado ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-500'
+                              )}>
+                                {confirmado
+                                  ? `✓ Confirmado — ${srv?.nome || 'Responsável'} autorizou a entrada de ${pessoaNome}.`
+                                  : `Confirmo que ${srv?.nome || 'Responsável'} autorizou a entrada de ${pessoaNome}.`}
+                              </p>
+                            </div>
+
+                            {/* Badge de status */}
+                            <div className="shrink-0 self-center">
+                              {confirmado ? (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-700">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Confirmado
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold bg-amber-100/70 text-amber-900 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700/50">
+                                  <ShieldAlert className="h-3 w-3 text-amber-600" />
+                                  Pendente
+                                </span>
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  /* Caso sem múltiplos — checkbox único legado */
+                  <label
+                    className={cn(
+                      'flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition-colors',
+                      autorizacoesIndividuais['__unico__']
+                        ? 'border-[#16a34a] bg-[#eefbf2] dark:bg-emerald-950/40'
+                        : 'border-dashed border-[#c8d9ec] bg-[#fbfdff] hover:border-[#9cc3f5] dark:border-slate-700 dark:bg-slate-900'
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(autorizacoesIndividuais['__unico__'])}
+                      onChange={() => toggleConfirmacao('__unico__')}
+                      className="mt-0.5 h-5 w-5 shrink-0 accent-[#16a34a]"
+                    />
+                    <span className="text-sm leading-relaxed text-[#37475e] dark:text-slate-300">
+                      Confirmo que <strong className="text-[#0d1f45] dark:text-slate-100">{responsavelNome}</strong> autorizou a entrada de{' '}
+                      <strong className="text-[#0d1f45] dark:text-slate-100">{pessoaNome}</strong>.
+                      <span className="mt-1 block text-xs text-[#627289] dark:text-slate-400">
+                        A confirmação fica registrada na entrada com seu nome e o horário.
+                      </span>
                     </span>
-                  </span>
-                </label>
+                  </label>
+                )}
+                {/* ─── FIM DO BLOCO DE CONFIRMAÇÕES ─── */}
               </div>
 
               <div className="flex flex-col-reverse gap-3 border-t border-[#e3eaf4] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7 dark:border-slate-800">
