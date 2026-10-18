@@ -620,6 +620,14 @@ export const dataService = {
       servidor_destino: m.servidor_destino_id
         ? servidores.find((s) => s.id === m.servidor_destino_id)
         : undefined,
+      destinos: m.destinos?.map((dest) => ({
+        ...dest,
+        departamento_destino: deps.find((d) => d.id === dest.departamento_destino_id),
+        setor_destino: setores.find((st) => st.id === dest.setor_destino_id),
+        servidor_destino: dest.servidor_destino_id
+          ? servidores.find((s) => s.id === dest.servidor_destino_id)
+          : undefined,
+      })),
     }));
   },
 

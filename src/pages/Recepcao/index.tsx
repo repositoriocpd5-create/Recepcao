@@ -278,7 +278,9 @@ export const RecepcaoPage: React.FC = () => {
           item.tipo_pessoa,
           item.servidor?.matricula || item.visitante?.cpf || '—',
           item.cracha_numero || 'S/C',
-          `${item.departamento_destino?.sigla || 'SMEDU'} - ${item.setor_destino?.nome || 'Geral'}`,
+          item.destinos && item.destinos.length > 1
+            ? item.destinos.map((d) => `${d.departamento_destino?.sigla || ''} - ${d.setor_destino?.nome || ''}`).filter(Boolean).join(', ')
+            : `${item.departamento_destino?.sigla || 'SMEDU'} - ${item.setor_destino?.nome || 'Geral'}`,
           item.motivo,
           formatDateTime(item.data_hora_entrada),
           item.status === 'pendente_autorizacao' ? 'Pendente' : 'No prédio',
@@ -352,15 +354,10 @@ export const RecepcaoPage: React.FC = () => {
   };
 
   // Setores e responsáveis filtrados pelo destino selecionado.
-  const setoresFiltrados = setores.filter((s) => s.departamento_id === formDestinoDepId);
-  // A base possui o mesmo setor em mais de um departamento (ex.: DTE em "Estrutura Importada",
-  // "Sub Educação" e "Sub Infraestrutura"); o destino é escolhido pelo nome do setor e reúne
-  // os servidores de todas as ocorrências.
   const normalizarNomeSetor = (nome?: string) => (nome || '').trim().toLocaleUpperCase('pt-BR');
   const setoresDestinoOpcoes = Array.from(
     setores
-    .filter((setor) => setor.ativo !== false)
-      .sort((a, b) => Number(a.departamento?.sigla === 'IMPORT') - Number(b.departamento?.sigla === 'IMPORT'))
+      .filter((setor) => setor.ativo !== false)
       .reduce((mapa, setor) => {
         const chave = normalizarNomeSetor(setor.nome);
         if (!mapa.has(chave)) mapa.set(chave, setor);
@@ -368,29 +365,49 @@ export const RecepcaoPage: React.FC = () => {
       }, new Map<string, Setor>())
       .values(),
   ).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  const setorDestinoSelecionado = setores.find((s) => s.id === formDestinoSetorId);
-  const idsSetoresDestino = new Set(
-    setorDestinoSelecionado
-      ? setores.filter((s) => normalizarNomeSetor(s.nome) === normalizarNomeSetor(setorDestinoSelecionado.nome)).map((s) => s.id)
-      : [],
-  );
-  const servidoresDestinoFiltrados = todosServidores.filter((servidor) => {
-    const texto = formServidorDestinoBusca.trim().toLocaleLowerCase('pt-BR');
-    const pertenceAoDestino = idsSetoresDestino.has(servidor.setor_id || '') ||
-      vinculosServidorSetor.some((vinculo) => vinculo.servidor_id === servidor.id && idsSetoresDestino.has(vinculo.setor_id));
-    return pertenceAoDestino && (!texto || `${servidor.nome} ${servidor.matricula} ${servidor.cargo}`.toLocaleLowerCase('pt-BR').includes(texto));
-  });
-  // A autorização prévia é exigida por responsável (coluna "Exigir Autorização Prévia da Portaria").
-  const servidorExigeAutorizacao = (servidorId: string) =>
-    vinculosServidorSetor.some((vinculo) => vinculo.servidor_id === servidorId && idsSetoresDestino.has(vinculo.setor_id) && vinculo.requer_autorizacao);
-  const destinoRequerAutorizacao = Boolean(formServidorDestinoId) && servidorExigeAutorizacao(formServidorDestinoId);
-  const servidorDestinoSelecionado = todosServidores.find((servidor) => servidor.id === formServidorDestinoId);
 
-  useEffect(() => {
-    setFormServidorDestinoId('');
-    setFormServidorDestinoBusca('');
-    setIsServidorDestinoBuscaOpen(false);
-  }, [formDestinoDepId, formDestinoSetorId]);
+  // Retorna os servidores lotados ou vinculados ao setor informado
+  const obterServidoresPorSetor = (setorId?: string) => {
+    if (!setorId) return [];
+    const setorDestino = setores.find((s) => s.id === setorId);
+    const idsSetores = new Set(
+      setorDestino
+        ? setores.filter((s) => normalizarNomeSetor(s.nome) === normalizarNomeSetor(setorDestino.nome)).map((s) => s.id)
+        : [setorId]
+    );
+    return todosServidores.filter((servidor) => {
+      return idsSetores.has(servidor.setor_id || '') ||
+        vinculosServidorSetor.some((vinculo) => vinculo.servidor_id === servidor.id && idsSetores.has(vinculo.setor_id));
+    });
+  };
+
+  // Verifica se o servidor no setor informado exige autorização formal prévia
+  const servidorExigeAutorizacaoNoSetor = (setorId?: string, servidorId?: string) => {
+    if (!servidorId || !setorId) return false;
+    const setorDestino = setores.find((s) => s.id === setorId);
+    const idsSetores = new Set(
+      setorDestino
+        ? setores.filter((s) => normalizarNomeSetor(s.nome) === normalizarNomeSetor(setorDestino.nome)).map((s) => s.id)
+        : [setorId]
+    );
+    return vinculosServidorSetor.some(
+      (vinculo) => vinculo.servidor_id === servidorId && idsSetores.has(vinculo.setor_id) && vinculo.requer_autorizacao
+    );
+  };
+
+  // Resumo de destinos que exigem autorização formal prévia
+  const destinosComAutorizacaoRequerida = destinosVisita.filter((d) =>
+    Boolean(d.setor_destino_id && d.servidor_destino_id && servidorExigeAutorizacaoNoSetor(d.setor_destino_id, d.servidor_destino_id))
+  );
+  const destinoRequerAutorizacao = destinosComAutorizacaoRequerida.length > 0;
+  const primeiroDestinoAut = destinosComAutorizacaoRequerida[0];
+  const servidorDestinoSelecionado = primeiroDestinoAut
+    ? todosServidores.find((s) => s.id === primeiroDestinoAut.servidor_destino_id)
+    : todosServidores.find((s) => s.id === destinosVisita[0]?.servidor_destino_id);
+  const setorDestinoSelecionado = primeiroDestinoAut
+    ? setores.find((s) => s.id === primeiroDestinoAut.setor_destino_id)
+    : setores.find((s) => s.id === destinosVisita[0]?.setor_destino_id);
+
 
   // Consulta de Servidor por Matrícula
   const handleConsultarMatricula = async (e?: React.FormEvent) => {
@@ -591,9 +608,10 @@ export const RecepcaoPage: React.FC = () => {
     setDestinosVisita((atuais) => atuais.map((destino, atual) => {
       if (atual !== index) return destino;
       const proximo = { ...destino, ...alteracoes };
-      if ('departamento_destino_id' in alteracoes) {
-        proximo.setor_destino_id = '';
-        proximo.servidor_destino_id = undefined;
+      if ('setor_destino_id' in alteracoes) {
+        const setor = setores.find((item) => item.id === alteracoes.setor_destino_id);
+        proximo.departamento_destino_id = setor?.departamento_id || '';
+        proximo.servidor_destino_id = '';
       }
       return proximo;
     }));
@@ -601,7 +619,13 @@ export const RecepcaoPage: React.FC = () => {
 
   const adicionarDestinoVisita = () => {
     if (destinosVisita.length < 10) {
-      setDestinosVisita((atuais) => [...atuais, { departamento_destino_id: '', setor_destino_id: '' }]);
+      setDestinosVisita((atuais) => [...atuais, { departamento_destino_id: '', setor_destino_id: '', servidor_destino_id: '' }]);
+    }
+  };
+
+  const removerDestinoVisita = (index: number) => {
+    if (destinosVisita.length > 1) {
+      setDestinosVisita((atuais) => atuais.filter((_, itemIndex) => itemIndex !== index));
     }
   };
 
@@ -609,7 +633,7 @@ export const RecepcaoPage: React.FC = () => {
   // Responsável que exige autorização prévia: a recepção confirma a autorização antes de registrar.
   const handleConfirmarEntrada = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (activeTab !== 'visitante' && destinoRequerAutorizacao) {
+    if (destinoRequerAutorizacao) {
       setIsSubmittingEntrada(true);
       try {
         if (!(await validarCrachaParaEntrada())) return;
@@ -629,17 +653,26 @@ export const RecepcaoPage: React.FC = () => {
 
     try {
       if (!(await validarCrachaParaEntrada())) return;
-      const destinos = activeTab === 'visitante'
-        ? destinosVisita
-        : [{ departamento_destino_id: formDestinoDepId, setor_destino_id: formDestinoSetorId, servidor_destino_id: formServidorDestinoId || undefined }];
-      if (!destinos.length || destinos.some((destino) => !destino.departamento_destino_id || !destino.setor_destino_id)) {
-        throw new Error('Selecione o departamento e o setor de cada destino da visita.');
+      const destinosValidos = destinosVisita
+        .filter((d) => Boolean(d.setor_destino_id))
+        .map((d) => ({
+          ...d,
+          departamento_destino_id: d.departamento_destino_id || setores.find((s) => s.id === d.setor_destino_id)?.departamento_id || '',
+          servidor_destino_id: d.servidor_destino_id || undefined,
+        }));
+
+      if (!destinosValidos.length) {
+        throw new Error('Selecione pelo menos um departamento de destino para a visita.');
       }
-      const requerAutorizacao = activeTab === 'visitante'
-        ? destinos.some((destino) => setores.find((s) => s.id === destino.setor_destino_id)?.requer_autorizacao)
-        : destinoRequerAutorizacao && autorizacao?.situacao !== 'confirmada';
+
+      const requerAutorizacao = destinoRequerAutorizacao && autorizacao?.situacao !== 'confirmada';
+      const nomesResponsaveisAut = destinosComAutorizacaoRequerida
+        .map((d) => todosServidores.find((s) => s.id === d.servidor_destino_id)?.nome)
+        .filter(Boolean)
+        .join(', ');
+
       const registroAutorizacao = autorizacao?.situacao === 'confirmada'
-        ? `[Autorização prévia] ${servidorDestinoSelecionado?.nome || 'Responsável'} autorizou a visita (${autorizacao.meio}). Confirmado por ${user?.nome_completo || user?.email || 'recepção'} às ${formatTime(new Date().toISOString())}.`
+        ? `[Autorização prévia] ${nomesResponsaveisAut || 'Responsável'} autorizou a visita (${autorizacao.meio}). Confirmado por ${user?.nome_completo || user?.email || 'recepção'} às ${formatTime(new Date().toISOString())}.`
         : '';
       const observacoes = [formObservacoes.trim(), registroAutorizacao].filter(Boolean).join('\n');
 
@@ -654,14 +687,14 @@ export const RecepcaoPage: React.FC = () => {
         {
           tipo_pessoa: activeTab,
           pessoa_id: pessoaId,
-          departamento_destino_id: destinos[0].departamento_destino_id,
-          setor_destino_id: destinos[0].setor_destino_id,
-          servidor_destino_id: destinos[0].servidor_destino_id,
+          departamento_destino_id: destinosValidos[0].departamento_destino_id,
+          setor_destino_id: destinosValidos[0].setor_destino_id,
+          servidor_destino_id: destinosValidos[0].servidor_destino_id,
           cracha_numero: formCracha.trim().toUpperCase(),
           motivo: formMotivo,
           requer_autorizacao: requerAutorizacao,
           observacoes,
-          destinos,
+          destinos: destinosValidos,
         },
         user
       );
@@ -671,10 +704,10 @@ export const RecepcaoPage: React.FC = () => {
       setSearchFeedback({
         type: 'success',
         message: autorizacao?.situacao === 'confirmada'
-          ? `Entrada registrada com autorização de ${servidorDestinoSelecionado?.nome || 'responsável'}.`
+          ? `Entrada registrada com autorização de ${nomesResponsaveisAut || 'responsável'}.`
           : requerAutorizacao
           ? 'Entrada registrada com solicitação de autorização enviada ao setor.'
-          : `Entrada registrada com sucesso! ${destinos.length > 1 ? `${destinos.length} destinos vinculados.` : 'Crachá atribuído.'}`,
+          : `Entrada registrada com sucesso! ${destinosValidos.length > 1 ? `${destinosValidos.length} departamentos vinculados à visita.` : 'Crachá atribuído.'}`,
       });
 
       // Resetar resultados e atualizar lista
@@ -1247,6 +1280,17 @@ export const RecepcaoPage: React.FC = () => {
                             Aos cuidados de: {m.servidor_destino.nome}
                           </div>
                         )}
+                        {m.destinos && m.destinos.length > 1 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            <span
+                              className="inline-flex items-center gap-1 rounded bg-[#0d6efd]/15 px-2 py-0.5 text-[10px] font-semibold text-sky-400 border border-[#0d6efd]/30"
+                              title={m.destinos.map((d, i) => `${i + 1}. ${d.departamento_destino?.sigla || 'Dep'} - ${d.setor_destino?.nome || 'Setor'}${d.servidor_destino ? ` (${d.servidor_destino.nome})` : ''}`).join('\n')}
+                            >
+                              <Building2 className="w-3 h-3 text-sky-400" />
+                              +{m.destinos.length - 1} {m.destinos.length - 1 === 1 ? 'outro departamento' : 'outros departamentos'}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-slate-300 max-w-xs truncate">
                         {m.motivo}
@@ -1601,133 +1645,149 @@ export const RecepcaoPage: React.FC = () => {
             )}
           </div>
 
-          {activeTab === 'visitante' && <section className="space-y-3 border-t border-[#dce4f0] pt-4">
-            <div className="flex justify-between"><div><h3 className="font-bold text-[#102755]">Destinos da visita (até 10)</h3><p className="text-xs text-[#627289]">Selecione os departamentos e setores que serão visitados.</p></div><Badge variant="neutral">{destinosVisita.length}/10</Badge></div>
-            {destinosVisita.map((destino, index) => <div key={index} className="rounded-xl border border-[#d6e6f7] bg-[#f8fbff] p-3 space-y-3"><div className="flex justify-between font-bold text-sm"><span>Destino {index + 1}</span>{destinosVisita.length > 1 && <button type="button" onClick={() => setDestinosVisita((items) => items.filter((_, itemIndex) => itemIndex !== index))} className="text-rose-500"><Trash2 className="w-4 h-4" /></button>}</div><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Select label="Departamento de destino" value={destino.departamento_destino_id} onChange={(event) => atualizarDestinoVisita(index, { departamento_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar departamento' }, ...departamentos.map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))]} required /><Select label="Setor específico" value={destino.setor_destino_id} onChange={(event) => atualizarDestinoVisita(index, { setor_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar setor' }, ...setores.filter((item) => item.departamento_id === destino.departamento_destino_id).map((item) => ({ value: item.id, label: item.nome }))]} disabled={!destino.departamento_destino_id} required /></div></div>)}
-            {destinosVisita.length < 10 && <button type="button" onClick={adicionarDestinoVisita} className="flex w-full justify-center gap-2 rounded-xl border border-dashed border-[#52a6fb] py-2 text-sm font-semibold text-[#0877d1]"><Plus className="w-4 h-4" />Adicionar outro destino</button>}
-          </section>}
-          {activeTab !== 'visitante' && (
-            <h3 className="-mb-2 text-base font-extrabold text-[#102755] dark:text-slate-100">Destino e atendimento</h3>
-          )}
-          <div className={activeTab === 'visitante' ? 'hidden' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'}>
+          {/* Seção de Destinos da Visita (até 10 departamentos) */}
+          <section className="space-y-3 border-t border-[#dce4f0] pt-4 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold text-[#102755] dark:text-slate-100 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-[#0d6efd]" />
+                  Destino e atendimento
+                </h3>
+                <p className="text-xs text-[#627289] dark:text-slate-400">
+                  A visita pode percorrer até 10 departamentos no prédio.
+                </p>
+              </div>
+              <Badge variant={destinosVisita.length >= 10 ? 'warning' : 'neutral'}>
+                {destinosVisita.length}/10 departamentos
+              </Badge>
+            </div>
+
+            <div className="space-y-3">
+              {destinosVisita.map((destino, index) => {
+                const servidoresDoDestino = obterServidoresPorSetor(destino.setor_destino_id);
+                const exigeAut = servidorExigeAutorizacaoNoSetor(destino.setor_destino_id, destino.servidor_destino_id);
+
+                return (
+                  <div
+                    key={index}
+                    className="relative rounded-2xl border border-[#d6e6f7] bg-[#f8fbff] p-3.5 space-y-3 dark:border-slate-800 dark:bg-slate-900/60 transition-all shadow-sm"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#e3effc] text-xs font-bold text-[#0877d1] dark:bg-slate-800 dark:text-sky-300">
+                          {index + 1}
+                        </span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-[#102755] dark:text-slate-200">
+                          Destino {index + 1} {index === 0 && <span className="text-[10px] font-normal text-[#627289] dark:text-slate-400">(Principal)</span>}
+                        </span>
+                      </div>
+                      {destinosVisita.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removerDestinoVisita(index)}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                          title="Remover este destino"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remover</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Select
+                        label="Departamento de destino"
+                        className="min-h-11 rounded-xl"
+                        value={destino.setor_destino_id}
+                        onChange={(event) => atualizarDestinoVisita(index, { setor_destino_id: event.target.value })}
+                        options={[
+                          { value: '', label: 'Selecione o departamento' },
+                          ...setoresDestinoOpcoes.map((s) => ({
+                            value: s.id,
+                            label: `${s.sigla} - ${s.nome}`,
+                          })),
+                        ]}
+                        required
+                      />
+
+                      <Select
+                        label="Diretor / Servidor"
+                        className={`min-h-11 rounded-xl${exigeAut ? ' select-perigo' : ''}`}
+                        value={destino.servidor_destino_id || ''}
+                        onChange={(event) => atualizarDestinoVisita(index, { servidor_destino_id: event.target.value })}
+                        options={[
+                          {
+                            value: '',
+                            label: destino.setor_destino_id ? 'Selecione uma pessoa (opcional)' : 'Selecione primeiro o departamento',
+                          },
+                          ...servidoresDoDestino.map((servidor) => ({
+                            value: servidor.id,
+                            label: `${servidor.nome} — ${servidor.cargo}`,
+                            destaque: servidorExigeAutorizacaoNoSetor(destino.setor_destino_id, servidor.id) ? ('perigo' as const) : undefined,
+                          })),
+                        ]}
+                        disabled={!destino.setor_destino_id}
+                      />
+                    </div>
+
+                    {exigeAut && (
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                        <span>Este responsável exige autorização formal prévia da portaria.</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {destinosVisita.length < 10 ? (
+              <button
+                type="button"
+                onClick={adicionarDestinoVisita}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#52a6fb] bg-[#f0f7ff] py-2.5 text-sm font-semibold text-[#0877d1] hover:bg-[#e4f1ff] transition-colors dark:border-slate-700 dark:bg-slate-900/50 dark:text-sky-400"
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar outro departamento ({destinosVisita.length}/10)
+              </button>
+            ) : (
+              <p className="text-center text-xs text-[#627289] dark:text-slate-400">
+                Limite máximo de 10 departamentos atingido para esta visita.
+              </p>
+            )}
+          </section>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Select
-              label="Departamento de destino"
+              label="Motivo do acesso"
               className="min-h-11 rounded-xl"
-              value={formDestinoSetorId}
-              onChange={(e) => {
-                const setor = setores.find((item) => item.id === e.target.value);
-                setFormDestinoSetorId(e.target.value);
-                setFormDestinoDepId(setor?.departamento_id || '');
-                setFormServidorDestinoId('');
-              }}
-              options={[
-                { value: '', label: 'Selecione o departamento' },
-                ...setoresDestinoOpcoes.map((s) => ({
-                  value: s.id,
-                  label: `${s.sigla} - ${s.nome}`,
-                })),
-              ]}
+              value={formMotivo}
+              onChange={(e) => setFormMotivo(e.target.value)}
+              options={Array.from(new Set([formMotivo, ...MOTIVOS_ACESSO])).map((motivo) => ({ value: motivo, label: motivo }))}
               required
             />
 
-            <Select
-              label="Diretor / Servidor"
-              className={`min-h-11 rounded-xl${destinoRequerAutorizacao ? ' select-perigo' : ''}`}
-              value={formServidorDestinoId}
-              onChange={(e) => setFormServidorDestinoId(e.target.value)}
-              options={[
-                { value: '', label: formDestinoSetorId ? 'Selecione uma pessoa' : 'Selecione primeiro o departamento' },
-                ...servidoresDestinoFiltrados.map((servidor) => ({
-                  value: servidor.id,
-                  label: `${servidor.nome} — ${servidor.cargo}`,
-                  destaque: servidorExigeAutorizacao(servidor.id) ? 'perigo' as const : undefined,
-                })),
-              ]}
-              disabled={!formDestinoSetorId}
-            />
+            <div className="space-y-1.5">
+              <label htmlFor="observacoes-entrada" className="flex items-baseline gap-2 text-xs font-medium text-slate-300">
+                Observações / Pertences declarados
+                <span className="font-normal text-[#627289] dark:text-slate-400">Opcional</span>
+              </label>
+              <textarea
+                id="observacoes-entrada"
+                rows={1}
+                value={formObservacoes}
+                onChange={(e) => setFormObservacoes(e.target.value)}
+                placeholder="Ex.: pasta e notebook Dell"
+                className="block min-h-11 w-full resize-y rounded-xl border border-slate-700/80 bg-[#121826] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              />
+            </div>
           </div>
 
-          {/* Servidor anfitrião / destino */}
-          <div className="hidden">
-            <Input
-              label="Servidor / Responsável a ser procurado (Opcional)"
-              value={formServidorDestinoBusca}
-              onFocus={() => setIsServidorDestinoBuscaOpen(Boolean(formDestinoDepId && formDestinoSetorId))}
-              onChange={(event) => {
-                setFormServidorDestinoBusca(event.target.value);
-                setFormServidorDestinoId('');
-                setIsServidorDestinoBuscaOpen(true);
-              }}
-              placeholder={formDestinoDepId && formDestinoSetorId ? 'Buscar responsável na lotação selecionada' : 'Selecione departamento e setor primeiro'}
-              icon={<Search className="w-4 h-4" />}
-              disabled={!formDestinoDepId || !formDestinoSetorId}
-            />
-            {isServidorDestinoBuscaOpen && formDestinoDepId && formDestinoSetorId && (
-              <div className="absolute z-30 top-full mt-1 w-full max-h-48 overflow-y-auto rounded-xl border border-[#c9d9ed] bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                <button
-                  type="button"
-                  className="w-full rounded-lg px-3 py-2 text-left text-xs text-[#627289] hover:bg-[#edf5fc] dark:text-slate-300 dark:hover:bg-slate-800"
-                  onClick={() => {
-                    setFormServidorDestinoId('');
-                    setFormServidorDestinoBusca('');
-                    setIsServidorDestinoBuscaOpen(false);
-                  }}
-                >
-                  Nenhum servidor específico — atendimento no balcão do setor
-                </button>
-                {servidoresDestinoFiltrados.map((servidor) => (
-                  <button
-                    type="button"
-                    key={servidor.id}
-                    className="w-full rounded-lg px-3 py-2 text-left hover:bg-[#edf5fc] dark:hover:bg-slate-800"
-                    onClick={() => {
-                      setFormServidorDestinoId(servidor.id);
-                      setFormServidorDestinoBusca(`${servidor.nome} — ${servidor.cargo}`);
-                      setIsServidorDestinoBuscaOpen(false);
-                    }}
-                  >
-                    <span className="block text-sm font-semibold text-[#152238] dark:text-slate-100">{servidor.nome}</span>
-                    <span className="block text-[11px] text-[#627289] dark:text-slate-400">{servidor.cargo} · Matrícula {servidor.matricula}</span>
-                  </button>
-                ))}
-                {servidoresDestinoFiltrados.length === 0 && (
-                  <p className="px-3 py-2 text-xs text-[#627289] dark:text-slate-400">Nenhum servidor encontrado nesta lotação.</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Select
-            label="Motivo do acesso"
-            className="min-h-11 rounded-xl"
-            value={formMotivo}
-            onChange={(e) => setFormMotivo(e.target.value)}
-            options={Array.from(new Set([formMotivo, ...MOTIVOS_ACESSO])).map((motivo) => ({ value: motivo, label: motivo }))}
-            required
-          />
-
-          <div className="space-y-1.5">
-            <label htmlFor="observacoes-entrada" className="flex items-baseline gap-2 text-xs font-medium text-slate-300">
-              Observações / Pertences declarados
-              <span className="font-normal text-[#627289] dark:text-slate-400">Opcional</span>
-            </label>
-            <textarea
-              id="observacoes-entrada"
-              rows={1}
-              value={formObservacoes}
-              onChange={(e) => setFormObservacoes(e.target.value)}
-              placeholder="Ex.: pasta e notebook Dell"
-              className="block min-h-11 w-full resize-y rounded-xl border border-slate-700/80 bg-[#121826] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            />
-          </div>
-          </div>
-
-          {activeTab !== 'visitante' && destinoRequerAutorizacao && (
+          {destinoRequerAutorizacao && (
             <div className="px-3 py-2 rounded-lg bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
               <span>
-                <strong>Atenção:</strong> Este responsável exige autorização formal prévia. Na próxima etapa, confirme que ele permitiu a visita; sem confirmação, a entrada ficará "Pendente de Autorização".
+                <strong>Atenção:</strong> Há responsável(is) nos destinos selecionados que exige(m) autorização formal prévia. Na próxima etapa, confirme que a visita foi autorizada; sem confirmação, a entrada ficará "Pendente de Autorização".
               </span>
             </div>
           )}
@@ -1742,7 +1802,7 @@ export const RecepcaoPage: React.FC = () => {
               Cancelar
             </Button>
             <Button type="submit" variant="primary" className="min-h-11 rounded-xl px-6" isLoading={isSubmittingEntrada}>
-              {activeTab !== 'visitante' && destinoRequerAutorizacao
+              {destinoRequerAutorizacao
                 ? <><ShieldCheck className="w-5 h-5" /><span>Confirmar autorização</span></>
                 : <><LogIn className="w-5 h-5" /><span>Registrar entrada</span></>}
             </Button>
@@ -1771,6 +1831,14 @@ export const RecepcaoPage: React.FC = () => {
             { valor: 'por mensagem/e-mail', rotulo: 'Mensagem / e-mail', icone: <MessageSquare className="w-5 h-5" /> },
           ];
           const podeConfirmar = Boolean(autorizacaoMeio) && autorizacaoConfirmada;
+
+          // Monta lista de destinatários que exigem autorização
+          const destinatariosComAut = destinosComAutorizacaoRequerida.map((d, idx) => {
+            const srv = todosServidores.find((s) => s.id === d.servidor_destino_id);
+            const setor = setores.find((s) => s.id === d.setor_destino_id);
+            return { srv, setor, idx };
+          });
+
           return (
             <form
               onSubmit={(event) => {
@@ -1779,7 +1847,7 @@ export const RecepcaoPage: React.FC = () => {
               }}
             >
               <div className="space-y-5 px-5 pb-6 pt-6 sm:px-7">
-                {/* Quem visita → quem autoriza */}
+                {/* Quem visita → quem autoriza (primeiro responsável, legado) */}
                 <div className="grid grid-cols-1 items-center gap-3 rounded-2xl border border-[#dce6f3] bg-white p-4 shadow-[0_10px_30px_-18px_rgba(18,44,82,.35)] sm:grid-cols-[1fr_auto_1fr] dark:border-slate-800 dark:bg-slate-900/60">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-xl font-extrabold text-white">{pessoaNome.charAt(0)}</div>
@@ -1804,6 +1872,61 @@ export const RecepcaoPage: React.FC = () => {
                   <span className="inline-flex items-center gap-2 rounded-full border border-[#dce6f3] bg-[#f6f9fe] px-3 py-1.5 text-[#37475e] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><PhoneCall className="h-4 w-4 text-[#0b5ed7]" />Ramal: <strong>{ramal || 'não informado'}</strong></span>
                   <span className="inline-flex items-center gap-2 rounded-full border border-[#dce6f3] bg-[#f6f9fe] px-3 py-1.5 text-[#37475e] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><Building2 className="h-4 w-4 text-[#0b5ed7]" />{setorDestino ? `${setorDestino.sigla} · ${setorDestino.sala || 'sala não informada'}` : 'Setor não informado'}</span>
                 </div>
+
+                {/* ─── NOVO BLOCO: Lista de todos os responsáveis que exigem autorização formal (1 a 10) ─── */}
+                {destinatariosComAut.length > 0 && (
+                  <div className="rounded-2xl border-2 border-amber-300/80 bg-amber-50/60 p-4 dark:border-amber-500/40 dark:bg-amber-950/20">
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-xs">
+                        <ShieldAlert className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900 dark:text-amber-200">
+                          {destinatariosComAut.length === 1
+                            ? 'Atenção: 1 responsável exige autorização formal'
+                            : `Atenção: ${destinatariosComAut.length} responsáveis exigem autorização formal`}
+                        </p>
+                        <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                          A entrada desta pessoa só pode ser liberada após confirmação individual de cada responsável abaixo.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {destinatariosComAut.map(({ srv, setor, idx }) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-3 rounded-xl border border-amber-200 bg-white px-3 py-2.5 shadow-xs dark:border-amber-700/40 dark:bg-slate-900/60"
+                        >
+                          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 text-sm font-extrabold text-white shadow-xs">
+                            {srv ? srv.nome.charAt(0) : '?'}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-extrabold text-[#0d1f45] dark:text-slate-100">
+                              {srv?.nome || 'Responsável não identificado'}
+                            </p>
+                            <p className="truncate text-[11px] text-[#627289] dark:text-slate-400">
+                              {srv?.cargo || '—'} {setor ? `· ${setor.sigla}` : ''}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            {(srv?.ramal || setor?.ramal) && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100/70 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:border-amber-700/40 dark:bg-amber-950/60 dark:text-amber-300">
+                                <PhoneCall className="h-3 w-3" />
+                                {srv?.ramal || setor?.ramal}
+                              </span>
+                            )}
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100/70 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/60 dark:text-amber-200">
+                              <ShieldAlert className="h-3 w-3 text-amber-600" />
+                              Exige Autorização
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* ─── FIM DO BLOCO ─── */}
 
                 {/* Meio da autorização */}
                 <fieldset>
