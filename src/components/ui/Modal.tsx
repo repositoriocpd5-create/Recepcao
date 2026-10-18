@@ -9,7 +9,9 @@ export interface ModalProps {
   description?: string;
   icon?: React.ReactNode;
   children: React.ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
+  /** 'destaque': cabeçalho azul-escuro de largura total, usado na identificação de pessoas. */
+  variant?: 'padrao' | 'destaque';
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -20,6 +22,7 @@ export const Modal: React.FC<ModalProps> = ({
   icon,
   children,
   maxWidth = 'lg',
+  variant = 'padrao',
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -43,7 +46,49 @@ export const Modal: React.FC<ModalProps> = ({
     lg: 'max-w-lg',
     xl: 'max-w-xl',
     '2xl': 'max-w-2xl',
+    '3xl': 'max-w-3xl',
   };
+
+  if (variant === 'destaque') {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={onClose} />
+        <div
+          className={cn(
+            'relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_32px_64px_-20px_rgba(10,30,70,.45)] sm:max-h-[96vh] sm:rounded-3xl dark:bg-[#121826]',
+            maxWidths[maxWidth]
+          )}
+        >
+          <div className="relative overflow-hidden bg-gradient-to-r from-[#081a40] via-[#0c2558] to-[#123a86] px-5 pb-9 pt-6 sm:px-7 sm:pb-11 sm:pt-8">
+            <div aria-hidden className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full border border-sky-300/15" />
+            <div aria-hidden className="pointer-events-none absolute -right-8 -top-48 h-96 w-96 rounded-full border border-sky-300/10" />
+            <div className="relative flex items-start justify-between gap-4">
+              <div className="flex items-center gap-4">
+                {icon && (
+                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white">
+                    {icon}
+                  </div>
+                )}
+                <div>
+                  <h2 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">{title}</h2>
+                  {description && <p className="mt-0.5 text-sm text-sky-200/90 sm:text-base">{description}</p>}
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20"
+                aria-label="Fechar janela"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="relative -mt-4 flex-1 overflow-y-auto rounded-t-3xl bg-white dark:bg-[#121826]">{children}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4">

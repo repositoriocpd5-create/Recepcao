@@ -25,6 +25,12 @@ import {
   CircleHelp,
   LogIn,
   User,
+  CheckCircle2,
+  Phone,
+  Building2,
+  ShieldCheck,
+  PhoneCall,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -48,11 +54,66 @@ import {
   ConsultaServidorResultado,
   ConsultaVisitanteResultado,
 } from '@/types';
-import { formatDateTime, formatTime } from '@/lib/utils';
+import { cn, formatDateTime, formatTime } from '@/lib/utils';
 import { biometricProvider, isBiometricAgentConfigured, DeviceStatus, IdentificationMethod } from '@/services/identification';
 import { generateInstitutionalPdf } from '@/services/pdfService';
 import { ReceptionClock } from '@/components/recepcao/ReceptionClock';
 import { BarcodeCameraScanner } from '@/components/recepcao/BarcodeCameraScanner';
+
+interface FichaPessoaIdentificadaProps {
+  nome: string;
+  documentos: string;
+  status: { texto: string; tom: 'sucesso' | 'alerta' };
+  dados: Array<{ icone: React.ReactNode; rotulo: string; valor: string }>;
+  extra?: React.ReactNode;
+  acoes: React.ReactNode;
+}
+
+// Conteúdo do modal "Pessoa identificada" (servidor ou visitante).
+export const FichaPessoaIdentificada: React.FC<FichaPessoaIdentificadaProps> = ({ nome, documentos, status, dados, extra, acoes }) => (
+  <>
+    <div className="space-y-6 px-5 pb-6 pt-6 sm:px-7">
+      <div className="flex flex-col gap-4 rounded-2xl border border-[#dce6f3] bg-white p-5 shadow-[0_10px_30px_-18px_rgba(18,44,82,.35)] sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex min-w-0 items-center gap-5">
+          <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-4xl font-extrabold text-white shadow-[0_0_0_4px_#e6f1fd] dark:shadow-[0_0_0_4px_rgba(30,64,120,.5)]">
+            {nome.charAt(0)}
+          </div>
+          <div className="min-w-0">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#627289] dark:text-slate-400">Identificação</span>
+            <h4 className="truncate text-2xl font-extrabold leading-tight text-[#0d1f45] dark:text-slate-100">{nome}</h4>
+            <p className="mt-0.5 text-base text-[#627289] dark:text-slate-400">{documentos}</p>
+          </div>
+        </div>
+        <span className={cn(
+          'inline-flex shrink-0 items-center gap-2 self-start rounded-full border px-4 py-2 text-sm font-semibold sm:self-center',
+          status.tom === 'sucesso'
+            ? 'border-[#bfe8cd] bg-[#eefbf2] text-[#15803d] dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300'
+            : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300'
+        )}>
+          {status.tom === 'sucesso' ? <CheckCircle2 className="h-5 w-5 fill-[#16a34a] text-white" /> : <Clock className="h-5 w-5" />}
+          {status.texto}
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-lg font-extrabold text-[#0d1f45] dark:text-slate-100">Dados cadastrais</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {dados.map((item) => (
+            <div key={item.rotulo} className="flex gap-3.5 rounded-2xl border border-[#dce6f3] bg-[#fbfdff] p-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e9f2fd] text-[#0b5ed7] dark:bg-slate-800 dark:text-sky-300">{item.icone}</div>
+              <div className="min-w-0">
+                <span className="block text-xs text-[#627289] dark:text-slate-400">{item.rotulo}</span>
+                <span className="block break-words text-base font-bold leading-snug text-[#0d1f45] dark:text-slate-100">{item.valor}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {extra}
+    </div>
+    <div className="flex justify-end gap-3 border-t border-[#e3eaf4] px-5 py-5 sm:px-7 dark:border-slate-800">{acoes}</div>
+  </>
+);
 
 const MOTIVOS_ACESSO = [
   'Atendimento institucional',
@@ -129,6 +190,9 @@ export const RecepcaoPage: React.FC = () => {
   const [formMotivo, setFormMotivo] = useState('Atendimento institucional');
   const [formObservacoes, setFormObservacoes] = useState('');
   const [isSubmittingEntrada, setIsSubmittingEntrada] = useState(false);
+  const [isAutorizacaoModalOpen, setIsAutorizacaoModalOpen] = useState(false);
+  const [autorizacaoMeio, setAutorizacaoMeio] = useState('');
+  const [autorizacaoConfirmada, setAutorizacaoConfirmada] = useState(false);
   const [destinosVisita, setDestinosVisita] = useState<DestinoVisita[]>([{ departamento_destino_id: '', setor_destino_id: '' }]);
   const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
 
@@ -320,6 +384,7 @@ export const RecepcaoPage: React.FC = () => {
   const servidorExigeAutorizacao = (servidorId: string) =>
     vinculosServidorSetor.some((vinculo) => vinculo.servidor_id === servidorId && idsSetoresDestino.has(vinculo.setor_id) && vinculo.requer_autorizacao);
   const destinoRequerAutorizacao = Boolean(formServidorDestinoId) && servidorExigeAutorizacao(formServidorDestinoId);
+  const servidorDestinoSelecionado = todosServidores.find((servidor) => servidor.id === formServidorDestinoId);
 
   useEffect(() => {
     setFormServidorDestinoId('');
@@ -541,8 +606,25 @@ export const RecepcaoPage: React.FC = () => {
   };
 
   // Confirmar Entrada Atômica
+  // Responsável que exige autorização prévia: a recepção confirma a autorização antes de registrar.
   const handleConfirmarEntrada = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (activeTab !== 'visitante' && destinoRequerAutorizacao) {
+      setIsSubmittingEntrada(true);
+      try {
+        if (!(await validarCrachaParaEntrada())) return;
+        setAutorizacaoMeio('');
+        setAutorizacaoConfirmada(false);
+        setIsAutorizacaoModalOpen(true);
+      } finally {
+        setIsSubmittingEntrada(false);
+      }
+      return;
+    }
+    await registrarEntrada(null);
+  };
+
+  const registrarEntrada = async (autorizacao: { situacao: 'confirmada'; meio: string } | { situacao: 'pendente' } | null) => {
     setIsSubmittingEntrada(true);
 
     try {
@@ -553,10 +635,13 @@ export const RecepcaoPage: React.FC = () => {
       if (!destinos.length || destinos.some((destino) => !destino.departamento_destino_id || !destino.setor_destino_id)) {
         throw new Error('Selecione o departamento e o setor de cada destino da visita.');
       }
-      const setorEscolhido = setores.find((s) => s.id === destinos[0].setor_destino_id);
       const requerAutorizacao = activeTab === 'visitante'
         ? destinos.some((destino) => setores.find((s) => s.id === destino.setor_destino_id)?.requer_autorizacao)
-        : destinoRequerAutorizacao;
+        : destinoRequerAutorizacao && autorizacao?.situacao !== 'confirmada';
+      const registroAutorizacao = autorizacao?.situacao === 'confirmada'
+        ? `[Autorização prévia] ${servidorDestinoSelecionado?.nome || 'Responsável'} autorizou a visita (${autorizacao.meio}). Confirmado por ${user?.nome_completo || user?.email || 'recepção'} às ${formatTime(new Date().toISOString())}.`
+        : '';
+      const observacoes = [formObservacoes.trim(), registroAutorizacao].filter(Boolean).join('\n');
 
       const pessoaId =
         activeTab === 'servidor'
@@ -575,16 +660,19 @@ export const RecepcaoPage: React.FC = () => {
           cracha_numero: formCracha.trim().toUpperCase(),
           motivo: formMotivo,
           requer_autorizacao: requerAutorizacao,
-          observacoes: formObservacoes,
+          observacoes,
           destinos,
         },
         user
       );
 
+      setIsAutorizacaoModalOpen(false);
       setIsEntradaModalOpen(false);
       setSearchFeedback({
         type: 'success',
-        message: requerAutorizacao
+        message: autorizacao?.situacao === 'confirmada'
+          ? `Entrada registrada com autorização de ${servidorDestinoSelecionado?.nome || 'responsável'}.`
+          : requerAutorizacao
           ? 'Entrada registrada com solicitação de autorização enviada ao setor.'
           : `Entrada registrada com sucesso! ${destinos.length > 1 ? `${destinos.length} destinos vinculados.` : 'Crachá atribuído.'}`,
       });
@@ -1375,73 +1463,57 @@ export const RecepcaoPage: React.FC = () => {
           setSearchFeedback({ type: null, message: '' });
         }}
         title="Pessoa identificada"
-        description="Confirme os dados antes de iniciar o registro de entrada ou saída."
-        maxWidth="xl"
+        description="Confirme os dados para iniciar o registro."
+        icon={<User className="w-7 h-7" />}
+        maxWidth="3xl"
+        variant="destaque"
       >
         {activeTab === 'servidor' && servidorResultado?.encontrado && servidorResultado.servidor && (
-          <div className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#dce4f0] dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-[#edf5fc] border border-[#c9e1f6] flex items-center justify-center font-bold text-[#0877c9] text-lg dark:bg-blue-950/60 dark:border-blue-500/30 dark:text-blue-400">
-                  {servidorResultado.servidor.nome.charAt(0)}
-                </div>
-                <div>
-                  <h4 className="text-base font-bold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.nome}</h4>
-                  <p className="text-xs text-[#627289] dark:text-slate-400">Matrícula: <span className="font-mono font-semibold">{servidorResultado.servidor.matricula}</span> · CPF: {servidorResultado.servidor.cpf}</p>
-                </div>
-              </div>
-              <Badge variant={servidorResultado.no_predio ? 'warning' : 'success'}>{servidorResultado.no_predio ? '● Presente no prédio' : '● Apto para entrada'}</Badge>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Cargo</span><span className="font-semibold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.cargo}</span></div>
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Lotação</span><span className="font-semibold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.departamento?.sigla || 'SMEDU'} - {servidorResultado.servidor.setor?.nome || 'Geral'}</span></div>
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Contato</span><span className="font-semibold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.telefone || servidorResultado.servidor.email || 'Não informado'}</span></div>
-            </div>
-            <div className="flex justify-end gap-3 pt-1">
-              <Button variant="outline" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
+          <FichaPessoaIdentificada
+            nome={servidorResultado.servidor.nome}
+            documentos={`Matrícula: ${servidorResultado.servidor.matricula}  •  CPF: ${servidorResultado.servidor.cpf || '—'}`}
+            status={servidorResultado.no_predio ? { texto: 'Presente no prédio', tom: 'alerta' } : { texto: 'Apto para entrada', tom: 'sucesso' }}
+            dados={[
+              { icone: <Briefcase className="w-5 h-5" />, rotulo: 'Cargo', valor: servidorResultado.servidor.cargo || 'Não informado' },
+              { icone: <Building2 className="w-5 h-5" />, rotulo: 'Lotação', valor: `${servidorResultado.servidor.departamento?.sigla || 'SMEDU'} - ${servidorResultado.servidor.setor?.nome || 'Geral'}` },
+              { icone: <Phone className="w-5 h-5" />, rotulo: 'Contato', valor: servidorResultado.servidor.telefone || servidorResultado.servidor.email || 'Não informado' },
+            ]}
+            acoes={<>
+              <Button variant="outline" className="min-h-12 rounded-xl px-7" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
               {servidorResultado.no_predio && servidorResultado.movimentacao_atual ? (
-                <Button variant="danger" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(servidorResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
+                <Button variant="danger" className="min-h-12 rounded-xl px-7" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(servidorResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
               ) : (
-                <Button variant="primary" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}>Iniciar registro de entrada <ArrowRight className="w-4 h-4" /></Button>
+                <Button variant="primary" className="min-h-12 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-7 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] hover:from-[#2a7fff] hover:to-[#0b52d6]" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}>Iniciar registro de entrada <ArrowRight className="w-5 h-5" /></Button>
               )}
-            </div>
-          </div>
+            </>}
+          />
         )}
 
         {activeTab === 'visitante' && visitanteResultado?.encontrado && visitanteResultado.visitante && (
-          <div className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#dce4f0] dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-[#e8f7ee] border border-[#ccefd8] flex items-center justify-center font-bold text-[#16a34a] text-lg dark:bg-emerald-950/60 dark:border-emerald-500/30 dark:text-emerald-400">
-                  {visitanteResultado.visitante.nome.charAt(0)}
-                </div>
-                <div>
-                  <h4 className="text-base font-bold text-[#152238] dark:text-slate-100">{visitanteResultado.visitante.nome}</h4>
-                  <p className="text-xs text-[#627289] dark:text-slate-400">CPF: <span className="font-mono font-semibold">{visitanteResultado.visitante.cpf}</span>{visitanteResultado.visitante.rg && ` · RG: ${visitanteResultado.visitante.rg}`}</p>
-                </div>
-              </div>
-              <Badge variant={visitanteResultado.no_predio ? 'warning' : 'success'}>{visitanteResultado.no_predio ? '● Entrada em andamento' : '● Apto para entrada'}</Badge>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Empresa / vínculo</span><span className="font-semibold text-[#152238] dark:text-slate-100">{visitanteResultado.visitante.empresa_orgao || 'Cidadão / Particular'}</span></div>
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Telefone</span><span className="font-semibold text-[#152238] dark:text-slate-100">{visitanteResultado.visitante.telefone || 'Não cadastrado'}</span></div>
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Observação permanente</span><span className="font-semibold text-[#152238] dark:text-slate-100">{visitanteResultado.visitante.observacoes || 'Nenhuma ressalva'}</span></div>
-            </div>
-            {visitanteResultado.historico_recente && visitanteResultado.historico_recente.length > 0 && (
-              <div className="p-3 bg-[#f8fbff] rounded-lg border border-[#dce4f0] text-xs dark:bg-slate-900 dark:border-slate-800">
-                <span className="text-[#627289] dark:text-slate-400 font-medium block mb-1">Últimas visitas na SMEDU</span>
+          <FichaPessoaIdentificada
+            nome={visitanteResultado.visitante.nome}
+            documentos={`CPF: ${visitanteResultado.visitante.cpf}${visitanteResultado.visitante.rg ? `  •  RG: ${visitanteResultado.visitante.rg}` : ''}`}
+            status={visitanteResultado.no_predio ? { texto: 'Entrada em andamento', tom: 'alerta' } : { texto: 'Apto para entrada', tom: 'sucesso' }}
+            dados={[
+              { icone: <Briefcase className="w-5 h-5" />, rotulo: 'Empresa / vínculo', valor: visitanteResultado.visitante.empresa_orgao || 'Cidadão / Particular' },
+              { icone: <Phone className="w-5 h-5" />, rotulo: 'Telefone', valor: visitanteResultado.visitante.telefone || 'Não cadastrado' },
+              { icone: <CircleHelp className="w-5 h-5" />, rotulo: 'Observação permanente', valor: visitanteResultado.visitante.observacoes || 'Nenhuma ressalva' },
+            ]}
+            extra={visitanteResultado.historico_recente && visitanteResultado.historico_recente.length > 0 && (
+              <div className="rounded-2xl border border-[#dce6f3] bg-[#fbfdff] p-4 text-xs dark:border-slate-800 dark:bg-slate-900">
+                <span className="mb-1 block font-medium text-[#627289] dark:text-slate-400">Últimas visitas na SMEDU</span>
                 {visitanteResultado.historico_recente.slice(0, 3).map((item) => <div key={item.id} className="flex justify-between gap-3 text-[#37475e] dark:text-slate-300"><span>{formatDateTime(item.data_hora_entrada)} → {item.departamento}/{item.setor} ({item.motivo})</span><span className="shrink-0">{item.data_hora_saida ? 'Saída registrada' : 'Em andamento'}</span></div>)}
               </div>
             )}
-            <div className="flex justify-end gap-3 pt-1">
-              <Button variant="outline" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
+            acoes={<>
+              <Button variant="outline" className="min-h-12 rounded-xl px-7" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
               {visitanteResultado.no_predio && visitanteResultado.movimentacao_atual ? (
-                <Button variant="danger" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(visitanteResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
+                <Button variant="danger" className="min-h-12 rounded-xl px-7" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(visitanteResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
               ) : (
-                <Button variant="primary" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}>Iniciar registro de entrada <ArrowRight className="w-4 h-4" /></Button>
+                <Button variant="primary" className="min-h-12 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-7 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] hover:from-[#2a7fff] hover:to-[#0b52d6]" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}>Iniciar registro de entrada <ArrowRight className="w-5 h-5" /></Button>
               )}
-            </div>
-          </div>
+            </>}
+          />
         )}
       </Modal>
 
@@ -1465,7 +1537,7 @@ export const RecepcaoPage: React.FC = () => {
 
       {/* MODAL 1: Registro Atômico de Entrada */}
       <Modal
-        isOpen={isEntradaModalOpen}
+        isOpen={isEntradaModalOpen && !isAutorizacaoModalOpen}
         onClose={() => setIsEntradaModalOpen(false)}
         title="Entrada em andamento"
         description="Confirme o destino e vincule o crachá entregue."
@@ -1655,7 +1727,7 @@ export const RecepcaoPage: React.FC = () => {
             <div className="px-3 py-2 rounded-lg bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
               <span>
-                <strong>Atenção:</strong> Este setor requer autorização formal prévia. A entrada ficará "Pendente de Autorização" até a liberação.
+                <strong>Atenção:</strong> Este responsável exige autorização formal prévia. Na próxima etapa, confirme que ele permitiu a visita; sem confirmação, a entrada ficará "Pendente de Autorização".
               </span>
             </div>
           )}
@@ -1670,11 +1742,144 @@ export const RecepcaoPage: React.FC = () => {
               Cancelar
             </Button>
             <Button type="submit" variant="primary" className="min-h-11 rounded-xl px-6" isLoading={isSubmittingEntrada}>
-              <LogIn className="w-5 h-5" />
-              <span>Registrar entrada</span>
+              {activeTab !== 'visitante' && destinoRequerAutorizacao
+                ? <><ShieldCheck className="w-5 h-5" /><span>Confirmar autorização</span></>
+                : <><LogIn className="w-5 h-5" /><span>Registrar entrada</span></>}
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* MODAL 1b: Confirmação de autorização prévia do responsável */}
+      <Modal
+        isOpen={isAutorizacaoModalOpen}
+        onClose={() => setIsAutorizacaoModalOpen(false)}
+        title="Autorização do responsável"
+        description="Confirme com o responsável antes de liberar a entrada."
+        icon={<ShieldCheck className="w-7 h-7" />}
+        maxWidth="3xl"
+        variant="destaque"
+      >
+        {(() => {
+          const pessoaNome = (activeTab === 'servidor' ? servidorResultado?.servidor?.nome : visitanteResultado?.visitante?.nome) || 'Pessoa identificada';
+          const responsavelNome = servidorDestinoSelecionado?.nome || 'Responsável';
+          const setorDestino = setores.find((s) => s.id === formDestinoSetorId);
+          const ramal = servidorDestinoSelecionado?.ramal || setorDestino?.ramal;
+          const meios = [
+            { valor: 'por ramal/telefone', rotulo: 'Ramal / telefone', icone: <PhoneCall className="w-5 h-5" /> },
+            { valor: 'presencialmente', rotulo: 'Presencialmente', icone: <UserCheck className="w-5 h-5" /> },
+            { valor: 'por mensagem/e-mail', rotulo: 'Mensagem / e-mail', icone: <MessageSquare className="w-5 h-5" /> },
+          ];
+          const podeConfirmar = Boolean(autorizacaoMeio) && autorizacaoConfirmada;
+          return (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (podeConfirmar) void registrarEntrada({ situacao: 'confirmada', meio: autorizacaoMeio });
+              }}
+            >
+              <div className="space-y-5 px-5 pb-6 pt-6 sm:px-7">
+                {/* Quem visita → quem autoriza */}
+                <div className="grid grid-cols-1 items-center gap-3 rounded-2xl border border-[#dce6f3] bg-white p-4 shadow-[0_10px_30px_-18px_rgba(18,44,82,.35)] sm:grid-cols-[1fr_auto_1fr] dark:border-slate-800 dark:bg-slate-900/60">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-xl font-extrabold text-white">{pessoaNome.charAt(0)}</div>
+                    <div className="min-w-0">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#627289] dark:text-slate-400">Visitante</span>
+                      <p className="truncate text-sm font-extrabold text-[#0d1f45] dark:text-slate-100">{pessoaNome}</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="mx-auto hidden h-5 w-5 text-[#9fb2cc] sm:block" aria-hidden />
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#fdecec] text-xl font-extrabold text-[#dc2626] dark:bg-rose-950/50 dark:text-rose-300">{responsavelNome.charAt(0)}</div>
+                    <div className="min-w-0">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#dc2626] dark:text-rose-300">Autoriza a visita</span>
+                      <p className="truncate text-sm font-extrabold text-[#0d1f45] dark:text-slate-100">{responsavelNome}</p>
+                      <p className="truncate text-xs text-[#627289] dark:text-slate-400">{servidorDestinoSelecionado?.cargo || setorDestino?.nome}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Como falar com o responsável */}
+                <div className="flex flex-wrap gap-2 text-sm">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-[#dce6f3] bg-[#f6f9fe] px-3 py-1.5 text-[#37475e] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><PhoneCall className="h-4 w-4 text-[#0b5ed7]" />Ramal: <strong>{ramal || 'não informado'}</strong></span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-[#dce6f3] bg-[#f6f9fe] px-3 py-1.5 text-[#37475e] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><Building2 className="h-4 w-4 text-[#0b5ed7]" />{setorDestino ? `${setorDestino.sigla} · ${setorDestino.sala || 'sala não informada'}` : 'Setor não informado'}</span>
+                </div>
+
+                {/* Meio da autorização */}
+                <fieldset>
+                  <legend className="mb-2 text-sm font-extrabold text-[#0d1f45] dark:text-slate-100">Como a autorização foi obtida?</legend>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {meios.map((meio, index) => {
+                      const ativo = autorizacaoMeio === meio.valor;
+                      return (
+                        <label
+                          key={meio.valor}
+                          className={cn(
+                            'flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0d6efd]/40',
+                            ativo
+                              ? 'border-[#0d6efd] bg-[#eef5ff] text-[#0647c4] ring-2 ring-[#0d6efd]/25 dark:bg-blue-950/50 dark:text-sky-300'
+                              : 'border-[#dce6f3] bg-white text-[#37475e] hover:border-[#9cc3f5] hover:bg-[#f6f9fe] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300'
+                          )}
+                        >
+                          <input type="radio" name="autorizacao-meio" value={meio.valor} checked={ativo} onChange={() => setAutorizacaoMeio(meio.valor)} className="sr-only" />
+                          <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-lg', ativo ? 'bg-[#0d6efd] text-white' : 'bg-[#e9f2fd] text-[#0b5ed7] dark:bg-slate-800 dark:text-sky-300')}>{meio.icone}</span>
+                          {meio.rotulo}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                {/* Declaração */}
+                <label
+                  className={cn(
+                    'flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition-colors',
+                    autorizacaoConfirmada
+                      ? 'border-[#16a34a] bg-[#eefbf2] dark:bg-emerald-950/40'
+                      : 'border-dashed border-[#c8d9ec] bg-[#fbfdff] hover:border-[#9cc3f5] dark:border-slate-700 dark:bg-slate-900'
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={autorizacaoConfirmada}
+                    onChange={(event) => setAutorizacaoConfirmada(event.target.checked)}
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-[#16a34a]"
+                  />
+                  <span className="text-sm leading-relaxed text-[#37475e] dark:text-slate-300">
+                    Confirmo que <strong className="text-[#0d1f45] dark:text-slate-100">{responsavelNome}</strong> autorizou a entrada de{' '}
+                    <strong className="text-[#0d1f45] dark:text-slate-100">{pessoaNome}</strong>.
+                    <span className="mt-1 block text-xs text-[#627289] dark:text-slate-400">
+                      A confirmação fica registrada na entrada com seu nome e o horário.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 border-t border-[#e3eaf4] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={isSubmittingEntrada}
+                  onClick={() => void registrarEntrada({ situacao: 'pendente' })}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-semibold text-[#b45309] transition-colors hover:bg-amber-50 disabled:opacity-50 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                >
+                  <Clock className="h-4 w-4" /> Sem resposta? Deixar pendente
+                </button>
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" className="min-h-12 flex-1 rounded-xl px-6 sm:flex-none" onClick={() => setIsAutorizacaoModalOpen(false)}>Voltar</Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={!podeConfirmar}
+                    isLoading={isSubmittingEntrada}
+                    className="min-h-12 flex-1 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-6 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] sm:flex-none"
+                  >
+                    <ShieldCheck className="h-5 w-5" /> Confirmar entrada
+                  </Button>
+                </div>
+              </div>
+            </form>
+          );
+        })()}
       </Modal>
 
       {/* MODAL 2: Cadastro Rápido de Visitante */}
