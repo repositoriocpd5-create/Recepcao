@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Avatar feminino">
+  <defs>
+    <radialGradient id="fundo" cx="50%" cy="35%" r="72%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e3e8ef"/>
+    </radialGradient>
+    <linearGradient id="cabelo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a5532b"/>
+      <stop offset="1" stop-color="#6b2f17"/>
+    </linearGradient>
+    <radialGradient id="pele" cx="45%" cy="40%" r="65%">
+      <stop offset="0" stop-color="#fbdcc8"/>
+      <stop offset="1" stop-color="#e9b496"/>
+    </radialGradient>
+    <linearGradient id="jaqueta" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a9a5d"/>
+      <stop offset="1" stop-color="#36663a"/>
+    </linearGradient>
+    <linearGradient id="chapeu" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e0c59f"/>
+      <stop offset="1" stop-color="#b8956a"/>
+    </linearGradient>
+    <linearGradient id="pelucia" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbf5e9"/>
+      <stop offset="1" stop-color="#e9dcc3"/>
+    </linearGradient>
+    <clipPath id="circulo"><circle cx="60" cy="60" r="58"/></clipPath>
+  </defs>
+
+  <circle cx="60" cy="60" r="58" fill="url(#fundo)"/>
+  <g clip-path="url(#circulo)">
+    <!-- cabelo atrás, ondulado até os ombros -->
+    <path d="M60 30c-17 0-27 10-28 26-1 9-3 15-6 21 3 6 8 10 15 12 3-5 4-10 4-16V50h30v23c0 6 1 11 4 16 7-2 12-6 15-12-3-6-5-12-6-21-1-16-11-26-28-26z" fill="url(#cabelo)"/>
+    <!-- pescoço -->
+    <path d="M52 66h16v16c0 4.4-3.6 8-8 8s-8-3.6-8-8z" fill="#e3a989"/>
+    <!-- jaqueta verde -->
+    <path d="M10 122c2-23 18-37 50-37s48 14 50 37z" fill="url(#jaqueta)"/>
+    <!-- blusa clara -->
+    <path d="M48 86c3 7 7 10 12 10s9-3 12-10l3 36H45z" fill="#f6efe2"/>
+    <!-- gola de pelúcia -->
+    <path d="M47 85c-8 2-14 7-17 15 2 5 6 9 11 11 0-9 2-17 8-24z" fill="url(#pelucia)"/>
+    <path d="M73 85c8 2 14 7 17 15-2 5-6 9-11 11 0-9-2-17-8-24z" fill="url(#pelucia)"/>
+    <!-- costura e botões -->
+    <path d="M30 104c4 4 8 6 12 7M90 104c-4 4-8 6-12 7" stroke="#2f5a33" stroke-width="1" fill="none" opacity=".6"/>
+    <circle cx="40" cy="116" r="1.9" fill="#d2ab62"/>
+    <circle cx="80" cy="116" r="1.9" fill="#d2ab62"/>
+    <!-- colar -->
+    <path d="M53 87c2 5 4 7 7 7s5-2 7-7" fill="none" stroke="#d6a84c" stroke-width="1.1"/>
+    <path d="M60 94l1.8 2.4L60 98.8l-1.8-2.4z" fill="#d6a84c"/>
+    <!-- rosto (sem traços, como na referência) -->
+    <ellipse cx="60" cy="53" rx="16.5" ry="20" fill="url(#pele)"/>
+    <!-- brincos -->
+    <circle cx="43.8" cy="60" r="1.7" fill="#d6a84c"/>
+    <circle cx="76.2" cy="60" r="1.7" fill="#d6a84c"/>
+    <!-- franja lateral e mechas na frente -->
+    <path d="M43 46c4-8 10-12 18-12 7 0 13 3 16 9-8-3-16-2-23 2-4 2-8 3-11 1z" fill="url(#cabelo)"/>
+    <path d="M43.5 44c-3.5 9-3.5 20-1 31l-6.5 2c-2-12-1-24 7.5-33z" fill="url(#cabelo)"/>
+    <path d="M76.5 44c3.5 9 3.5 20 1 31l6.5 2c2-12 1-24-7.5-33z" fill="url(#cabelo)"/>
+    <!-- chapéu -->
+    <ellipse cx="60" cy="35" rx="38" ry="8.5" fill="url(#chapeu)"/>
+    <ellipse cx="60" cy="33.6" rx="36" ry="6.4" fill="#e7cfaa" opacity=".55"/>
+    <path d="M41 34c0-13 8.5-21 19-21s19 8 19 21c-6.2 2-12.5 3-19 3s-12.8-1-19-3z" fill="url(#chapeu)"/>
+    <path d="M53 15.5c2.3-1.7 4.6-2.5 7-2.5s4.7.8 7 2.5c-2.3.9-4.6 1.3-7 1.3s-4.7-.4-7-1.3z" fill="#a9845a" opacity=".55"/>
+    <path d="M41.4 29.6c6.1 1.8 12.3 2.7 18.6 2.7s12.5-.9 18.6-2.7l.4 4.2c-6.3 1.9-12.6 2.8-19 2.8s-12.7-.9-19-2.8z" fill="#6f4224"/>
+  </g>
+  <circle cx="60" cy="60" r="58" fill="none" stroke="#dbe2ec" stroke-width="2"/>
+</svg>

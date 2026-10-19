@@ -62,8 +62,9 @@ export const AppRoutes: React.FC = () => {
         <Route path="visitantes" element={<VisitantesPage />} />
         <Route path="servidores" element={<ServidoresPage />} />
         <Route path="autorizacoes" element={<AutorizacoesPage />} />
-        <Route path="agendamentos" element={<AgendamentosPage />} />
-        <Route path="relatorios" element={<RelatoriosPage />} />
+        {/* Agendamentos e Relatórios: somente administradores */}
+        <Route path="agendamentos" element={<ProtectedRoute requiredRole="admin"><AgendamentosPage /></ProtectedRoute>} />
+        <Route path="relatorios" element={<ProtectedRoute requiredRole="admin"><RelatoriosPage /></ProtectedRoute>} />
         <Route path="departamentos" element={<DepartamentosPage />} />
         <Route path="setores" element={<SetoresPage />} />
         <Route path="crachas" element={<CrachasPage />} />

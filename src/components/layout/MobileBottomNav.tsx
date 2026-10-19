@@ -18,9 +18,9 @@ export const MobileBottomNav = () => {
   const moreItems = [
     { label: 'Movimentações', path: '/movimentacoes', icon: ArrowRightLeft },
     { label: 'Autorizações', path: '/autorizacoes', icon: CheckCircle2 },
-    { label: 'Agendamentos', path: '/agendamentos', icon: Calendar },
+    ...(user?.role === 'admin' ? [{ label: 'Agendamentos', path: '/agendamentos', icon: Calendar }] : []),
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Relatórios & Auditoria', path: '/relatorios', icon: FileSpreadsheet },
+    ...(user?.role === 'admin' ? [{ label: 'Relatórios & Auditoria', path: '/relatorios', icon: FileSpreadsheet }] : []),
     { label: 'Departamentos & Setores', path: '/departamentos', icon: Building2 },
     ...(user?.role === 'admin' ? [{ label: 'Administração', path: '/administracao', icon: ShieldCheck }] : []),
     { label: 'Manual de Uso', path: '/manual', icon: BookOpen },

@@ -32,14 +32,16 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
     { name: 'Visitantes', path: '/visitantes', icon: Users },
     { name: 'Servidores', path: '/servidores', icon: Briefcase },
     { name: 'Autorizações', path: '/autorizacoes', icon: CheckCircle2 },
-    { name: 'Agendamentos', path: '/agendamentos', icon: Calendar },
+    // Agendamentos: somente administradores
+    ...(user?.role === 'admin' ? [{ name: 'Agendamentos', path: '/agendamentos', icon: Calendar }] : []),
     { name: 'Crachás', path: '/crachas', icon: BadgeCheck },
     { name: 'Manual de Uso', path: '/manual', icon: BookOpen },
   ];
 
   const managementNav = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Relatórios & Auditoria', path: '/relatorios', icon: FileSpreadsheet },
+    // Relatórios & Auditoria: somente administradores
+    ...(user?.role === 'admin' ? [{ name: 'Relatórios & Auditoria', path: '/relatorios', icon: FileSpreadsheet }] : []),
     { name: 'Departamentos & Setores', path: '/departamentos', icon: Building2 },
     ...(user?.role === 'admin'
       ? [{ name: 'Administração', path: '/administracao', icon: ShieldCheck }]

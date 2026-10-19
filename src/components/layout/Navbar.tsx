@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, LogOut, RefreshCw, Moon, Sun, PanelLeftClose, PanelLeftOpen, Menu, UserRound, X, Download } from 'lucide-react';
+import { Shield, LogOut, RefreshCw, Moon, Sun, PanelLeftClose, PanelLeftOpen, Menu, X, Download } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -107,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
           </div>
           <ThemeToggle size="xs" className="min-[380px]:hidden" />
           <ThemeToggle size="sm" className="max-[379px]:hidden" />
-          <button type="button" onClick={() => setIsAccountOpen(true)} aria-haspopup="dialog" aria-expanded={isAccountOpen} className="grid h-10 w-10 min-[380px]:h-11 min-[380px]:w-11 shrink-0 place-items-center rounded-full bg-[#e1f0ff] text-[#087ef5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#087ef5]" aria-label="Abrir conta e preferências" title="Conta e preferências"><UserRound className="h-6 w-6" /></button>
+          <button type="button" onClick={() => setIsAccountOpen(true)} aria-haspopup="dialog" aria-expanded={isAccountOpen} className="h-10 w-10 shrink-0 overflow-hidden rounded-full ring-2 ring-[#d7e6f6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ef5] min-[380px]:h-11 min-[380px]:w-11 dark:ring-slate-700" aria-label="Abrir conta e preferências" title="Conta e preferências"><img src="/avatars/avatar-feminino.svg" alt="" className="h-full w-full object-cover" draggable={false} /></button>
         </div>
       </div>
 
@@ -179,6 +179,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
           {/* User profile dropdown & logout */}
           {user && (
             <div className="flex items-center gap-3 pl-2 border-l border-slate-800">
+              <img src="/avatars/avatar-feminino.svg" alt="" className="h-9 w-9 shrink-0 rounded-full ring-2 ring-[#d7e6f6] dark:ring-slate-700" draggable={false} />
               <div className="text-right hidden sm:block" title={user.email}>
                 <div className="text-xs font-semibold text-slate-200">{user.nome_completo}</div>
                 <div className="text-[10px] text-slate-400 font-mono truncate max-w-[180px]">{user.email}</div>
@@ -211,7 +212,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
             <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-[#d7e6f6] dark:bg-slate-700" aria-hidden="true" />
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#e1f0ff] text-[#087ef5] dark:bg-blue-950/60 dark:text-sky-300"><UserRound className="h-6 w-6" /></span>
+                <img src="/avatars/avatar-feminino.svg" alt="" className="h-14 w-14 shrink-0 rounded-full ring-2 ring-[#d7e6f6] dark:ring-slate-700" draggable={false} />
                 <div className="min-w-0">
                   <h2 id="conta-titulo" className="truncate text-sm font-extrabold text-[#082b57] dark:text-slate-100">{user?.nome_completo || 'Operador SMEDU'}</h2>
                   <p className="truncate text-xs text-[#68809f] dark:text-slate-400">{user?.email}</p>
