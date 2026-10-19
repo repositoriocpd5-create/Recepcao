@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, LogOut, RefreshCw, Moon, Sun, PanelLeftClose, PanelLeftOpen, Menu, UserRound, X } from 'lucide-react';
+import { Shield, LogOut, RefreshCw, Moon, Sun, PanelLeftClose, PanelLeftOpen, Menu, UserRound, X, Download } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { UserRole } from '@/types';
 import { resetTestData } from '@/services/dataService';
 import { ThemeToggle, useTheme } from './ThemeToggle';
+import { isInstallAvailable, openInstallSheet, usePwa } from '@/pwa/pwa';
 
 interface NavbarProps {
   sidebarCollapsed: boolean;
@@ -19,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
   const { user, logout, login, isSupabaseLive, switchDemoRole } = useAuth();
   const { theme, setTheme } = useTheme();
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const pwa = usePwa();
 
   // Painel de conta: Esc fecha e a página não rola por trás.
   useEffect(() => {
@@ -239,6 +241,14 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
               </div>
               <p className="mt-2 text-[11px] text-[#68809f] dark:text-slate-500">A preferência fica salva neste aparelho.</p>
             </div>
+
+            {isInstallAvailable(pwa) && (
+              <button type="button" onClick={() => { setIsAccountOpen(false); openInstallSheet(); }} className="mt-5 flex min-h-12 w-full items-center gap-3 rounded-xl border border-[#d7e6f6] bg-[#f4f9ff] px-3 text-left text-sm font-bold text-[#005a9c] hover:bg-[#e8f3ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#087ef5] dark:border-slate-800 dark:bg-[#101625] dark:text-sky-300 dark:hover:bg-slate-800">
+                <img src="/icons/icon-192.png" alt="" className="h-8 w-8 rounded-lg" />
+                <span className="flex-1">Instalar aplicativo<span className="block text-[11px] font-medium text-[#68809f] dark:text-slate-400">Acesso rápido pela tela inicial</span></span>
+                <Download className="h-4 w-4" />
+              </button>
+            )}
 
             <button type="button" onClick={() => { setIsAccountOpen(false); logout(); }} className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#fecaca] bg-[#fef2f2] text-sm font-bold text-[#dc2626] hover:bg-[#fee2e2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#dc2626] dark:border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-300">
               <LogOut className="h-4 w-4" />Sair do sistema

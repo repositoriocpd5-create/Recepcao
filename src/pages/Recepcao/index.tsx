@@ -1460,6 +1460,9 @@ export const RecepcaoPage: React.FC = () => {
               value={matriculaInput}
               onChange={(event) => setMatriculaInput(event.target.value)}
               icon={<Search className="w-4 h-4" />}
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCapitalize="characters"
               autoFocus
             />
             <div className="flex justify-end gap-3">
@@ -1476,6 +1479,9 @@ export const RecepcaoPage: React.FC = () => {
               onChange={(event) => setCpfInput(formatCpf(event.target.value))}
               icon={<Search className="w-4 h-4" />}
               maxLength={14}
+              inputMode="numeric"
+              enterKeyHint="search"
+              autoComplete="off"
               autoFocus
             />
             <div className="flex justify-end gap-3">

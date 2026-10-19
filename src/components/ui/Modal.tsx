@@ -51,11 +51,11 @@ export const Modal: React.FC<ModalProps> = ({
 
   if (variant === 'destaque') {
     return (
-      <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4">
+      <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ paddingBottom: 'var(--keyboard-inset, 0px)' }}>
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={onClose} />
         <div
           className={cn(
-            'relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_32px_64px_-20px_rgba(10,30,70,.45)] sm:max-h-[96vh] sm:rounded-3xl dark:bg-[#121826]',
+            'relative z-10 flex max-h-[calc(92dvh-var(--keyboard-inset,0px))] w-full flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_32px_64px_-20px_rgba(10,30,70,.45)] sm:max-h-[96vh] sm:rounded-3xl dark:bg-[#121826]',
             maxWidths[maxWidth]
           )}
         >
@@ -91,7 +91,7 @@ export const Modal: React.FC<ModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ paddingBottom: 'var(--keyboard-inset, 0px)' }}>
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
@@ -101,7 +101,7 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal Dialog */}
       <div
         className={cn(
-          'relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[24px] border border-[#dce4f0] bg-white p-5 shadow-[0_24px_52px_-16px_rgba(18,44,82,.28)] sm:max-h-[96vh] sm:rounded-2xl sm:p-6 dark:border-slate-700/80 dark:bg-[#121826] dark:shadow-2xl',
+          'relative z-10 flex max-h-[calc(92dvh-var(--keyboard-inset,0px))] w-full flex-col overflow-hidden rounded-t-[24px] border border-[#dce4f0] bg-white p-5 shadow-[0_24px_52px_-16px_rgba(18,44,82,.28)] sm:max-h-[96vh] sm:rounded-2xl sm:p-6 dark:border-slate-700/80 dark:bg-[#121826] dark:shadow-2xl',
           maxWidths[maxWidth]
         )}
       >
