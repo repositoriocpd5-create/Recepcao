@@ -37,8 +37,8 @@ export const AppLayout: React.FC = () => {
         )}
 
         {/* Conteúdo principal */}
-        <main className="flex-1 overflow-x-hidden p-4 pb-28 md:pb-6 lg:px-7 lg:py-6">
-          <div className="max-w-[1240px] mx-auto">
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 pb-28 md:pb-6 lg:px-7 lg:py-6">
+          <div className="mx-auto w-full min-w-0 max-w-[1240px]">
             <Outlet />
           </div>
         </main>

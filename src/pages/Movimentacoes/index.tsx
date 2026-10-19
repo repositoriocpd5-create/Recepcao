@@ -334,8 +334,8 @@ export const MovimentacoesPage: React.FC = () => {
             Nenhuma movimentação localizada com os filtros informados.
           </div>
         ) : (
-          <div className="overflow-x-hidden">
-            <table className="w-full table-fixed text-left text-xs">
+          <div className="overflow-x-auto md:overflow-x-hidden">
+            <table className="w-full min-w-[760px] table-fixed text-left text-xs md:min-w-0">
               <thead className="bg-[#151c2d] text-slate-400 border-b border-slate-800 uppercase font-mono text-[10px]">
                 <tr>
                   {renderSortHeader('pessoa', 'Pessoa / Tipo')}

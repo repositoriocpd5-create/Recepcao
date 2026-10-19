@@ -874,7 +874,7 @@ export const RecepcaoPage: React.FC = () => {
             <span className="p-3 rounded-2xl bg-[#dcfce7] text-[#16a34a] border border-[#ccefd8] shadow-sm dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-500/30">
               <UserCheck className="w-6 h-6" />
             </span>
-            <h2 className="text-2xl font-extrabold tracking-tight text-[#102755] dark:text-slate-100">Balcão da Recepção Central</h2>
+            <h2 className="text-xl font-extrabold tracking-tight text-[#102755] sm:text-2xl dark:text-slate-100">Balcão da Recepção Central</h2>
           </div>
           <p className="text-sm text-[#627289] dark:text-slate-400 mt-1">
             Controle de fluxo presencial da Secretaria Municipal de Educação
@@ -925,21 +925,21 @@ export const RecepcaoPage: React.FC = () => {
             setIsIdentificationModalOpen(true);
           }}
           title="Identificar servidor — atalhos Alt + S ou Alt + 1"
-          className={`group relative flex min-h-[156px] min-w-0 cursor-pointer items-center gap-5 overflow-hidden rounded-[20px] border p-5 text-left transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
+          className={`group relative flex min-h-[128px] min-w-0 cursor-pointer items-center gap-3 overflow-hidden rounded-[20px] border p-4 text-left sm:gap-5 sm:p-5 transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
             identificationMethod === 'matricula'
               ? 'bg-[linear-gradient(135deg,#eff8ff_0%,#fff_66%,#e2f1ff_100%)] dark:bg-none border-[#8cc8ff] shadow-[0_18px_32px_-20px_rgba(8,119,201,.65)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
               : 'bg-white border-[#dce4f0] hover:border-[#72afe5] hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-22px_rgba(8,119,201,.65)] dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
           }`}
         >
-          <div className="relative z-10 flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-[#c5e0fa] bg-[#dcecff] text-[#1677e8] shadow-sm dark:border-blue-500/30 dark:bg-blue-950/60 dark:text-blue-400">
+          <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[#c5e0fa] sm:h-20 sm:w-20 bg-[#dcecff] text-[#1677e8] shadow-sm dark:border-blue-500/30 dark:bg-blue-950/60 dark:text-blue-400">
             <Briefcase className="w-8 h-8" />
           </div>
-          <div className="relative z-10 min-w-0 flex-1">
-            <h3 className="text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Servidor</h3>
+          <div className="relative z-10 min-w-0 flex-1 pr-10 pt-4 sm:pr-14 sm:pt-0">
+            <h3 className="text-base sm:text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Servidor</h3>
             <p className="text-sm font-medium text-[#173b70] dark:text-slate-400 mt-0.5">Identificar por matrícula</p>
-            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de servidores <kbd className="ml-1 rounded border border-[#b9d9f3] bg-white/70 px-1 font-mono text-[10px] text-[#0877d1]">Alt S / 1</kbd></p>
+            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de servidores <kbd className="ml-1 hidden sm:inline rounded border border-[#b9d9f3] bg-white/70 px-1 font-mono text-[10px] text-[#0877d1]">Alt S / 1</kbd></p>
           </div>
-          <div className={`absolute bottom-5 right-5 z-10 shrink-0 ${identificationMethod === 'matricula' ? 'top-5 text-[10px] rounded-full bg-[#dcfce7] px-2.5 py-1 text-emerald-600' : 'grid h-12 w-12 place-items-center rounded-full bg-[#087ef5] text-white shadow-md transition-transform group-hover:translate-x-1'}`}>
+          <div className={`absolute z-10 shrink-0 ${identificationMethod === 'matricula' ? 'right-3 top-3 whitespace-nowrap rounded-full bg-[#dcfce7] px-2.5 py-1 text-[10px] font-semibold text-emerald-600 sm:right-4 sm:top-4' : 'bottom-4 right-4 grid h-10 w-10 place-items-center rounded-full bg-[#087ef5] text-white shadow-md transition-transform group-hover:translate-x-1 sm:bottom-5 sm:right-5 sm:h-12 sm:w-12'}`}>
             {identificationMethod === 'matricula' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar servidor" /><span className="sr-only">Alt S</span></>}
           </div>
         </div>
@@ -953,21 +953,21 @@ export const RecepcaoPage: React.FC = () => {
             setIsIdentificationModalOpen(true);
           }}
           title="Identificar visitante — atalho Alt + V"
-          className={`group relative flex min-h-[156px] min-w-0 cursor-pointer items-center gap-5 overflow-hidden rounded-[20px] border p-5 text-left transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
+          className={`group relative flex min-h-[128px] min-w-0 cursor-pointer items-center gap-3 overflow-hidden rounded-[20px] border p-4 text-left sm:gap-5 sm:p-5 transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
             identificationMethod === 'cpf'
               ? 'bg-[linear-gradient(135deg,#effdf5_0%,#fff_66%,#dcfce7_100%)] dark:bg-none border-[#a7ebc3] shadow-[0_18px_32px_-20px_rgba(22,163,74,.48)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
               : 'bg-white border-[#dce4f0] hover:border-[#7fd6a5] hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-22px_rgba(22,163,74,.6)] dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
           }`}
         >
-          <div className="relative z-10 w-20 h-20 shrink-0 rounded-2xl bg-[#e8f8ee] border border-[#ccefd8] flex items-center justify-center text-[#16a34a] shadow-sm dark:bg-emerald-950/60 dark:border-emerald-500/30 dark:text-emerald-400">
+          <div className="relative z-10 w-14 h-14 sm:w-20 sm:h-20 shrink-0 rounded-2xl bg-[#e8f8ee] border border-[#ccefd8] flex items-center justify-center text-[#16a34a] shadow-sm dark:bg-emerald-950/60 dark:border-emerald-500/30 dark:text-emerald-400">
             <Users className="w-8 h-8" />
           </div>
-          <div className="relative z-10 min-w-0 flex-1">
-            <h3 className="text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Visitante</h3>
+          <div className="relative z-10 min-w-0 flex-1 pr-10 pt-4 sm:pr-14 sm:pt-0">
+            <h3 className="text-base sm:text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Visitante</h3>
             <p className="text-sm font-medium text-[#173b70] dark:text-slate-400 mt-0.5">Identificar por CPF</p>
-            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de visitantes <kbd className="ml-1 rounded border border-[#bfe7ce] bg-white/70 px-1 font-mono text-[10px] text-[#16964a]">Alt V</kbd></p>
+            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de visitantes <kbd className="ml-1 hidden sm:inline rounded border border-[#bfe7ce] bg-white/70 px-1 font-mono text-[10px] text-[#16964a]">Alt V</kbd></p>
           </div>
-          <div className={`absolute bottom-5 right-5 z-10 shrink-0 ${identificationMethod === 'cpf' ? 'top-5 text-[10px] rounded-full bg-[#dcfce7] px-2.5 py-1 text-emerald-600' : 'grid h-12 w-12 place-items-center rounded-full bg-[#00a65a] text-white shadow-md transition-transform group-hover:translate-x-1'}`}>
+          <div className={`absolute z-10 shrink-0 ${identificationMethod === 'cpf' ? 'right-3 top-3 whitespace-nowrap rounded-full bg-[#dcfce7] px-2.5 py-1 text-[10px] font-semibold text-emerald-600 sm:right-4 sm:top-4' : 'bottom-4 right-4 grid h-10 w-10 place-items-center rounded-full bg-[#00a65a] text-white shadow-md transition-transform group-hover:translate-x-1 sm:bottom-5 sm:right-5 sm:h-12 sm:w-12'}`}>
             {identificationMethod === 'cpf' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar visitante" /><span className="sr-only">Alt V</span></>}
           </div>
         </div>
@@ -1213,16 +1213,16 @@ export const RecepcaoPage: React.FC = () => {
           <div className="flex items-start gap-3">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#edf5ff] text-[#0877d1]"><Users className="w-5 h-5" /></span>
             <div>
-              <CardTitle className="text-[15px] font-extrabold text-[#102755]"><span>Presentes no Prédio em Tempo Real</span><Badge variant="success">{pessoasNoPredio.length} ativos</Badge></CardTitle>
+              <CardTitle className="flex-wrap text-[15px] font-extrabold text-[#102755]"><span>Presentes no Prédio em Tempo Real</span><Badge variant="success" className="whitespace-nowrap">{pessoasNoPredio.length} ativos</Badge></CardTitle>
               <CardDescription>Listagem ao vivo de servidores e visitantes com entrada autorizada e crachá ativo</CardDescription>
             </div>
           </div>
-          <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
-            <Button variant="outline" size="sm" onClick={carregarDadosIniciais} title="Atualizar lista — atalho Alt + A"><RefreshCw className="w-3.5 h-3.5" /><span>Atualizar</span><kbd className="hidden xl:inline rounded border border-current/20 px-1 font-mono text-[10px] opacity-70">Alt A</kbd></Button>
+          <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-2 sm:flex sm:w-auto sm:justify-end sm:gap-3">
+            <Button variant="outline" size="sm" className="min-h-11" onClick={carregarDadosIniciais} title="Atualizar lista — atalho Alt + A" aria-label="Atualizar lista"><RefreshCw className="w-3.5 h-3.5" /><span className="hidden min-[400px]:inline">Atualizar</span><kbd className="hidden xl:inline rounded border border-current/20 px-1 font-mono text-[10px] opacity-70">Alt A</kbd></Button>
             <Button
               variant="danger"
               size="md"
-              className="min-h-11 rounded-xl px-4 text-white shadow-[0_10px_20px_-10px_rgba(225,29,72,.65)] hover:shadow-[0_14px_24px_-10px_rgba(225,29,72,.75)]"
+              className="min-h-11 min-w-0 rounded-xl px-3 text-white shadow-[0_10px_20px_-10px_rgba(225,29,72,.65)] hover:shadow-[0_14px_24px_-10px_rgba(225,29,72,.75)] sm:px-4"
               title="Devolução rápida de crachá — atalho Alt + D"
               onClick={() => {
                 setReturnBarcodeInput('');
@@ -1231,7 +1231,7 @@ export const RecepcaoPage: React.FC = () => {
               }}
             >
               <span className="flex w-6 h-6 items-center justify-center rounded-lg bg-white/20"><Barcode className="w-4 h-4" /></span>
-              <span className="flex flex-col items-start leading-tight"><strong>Devolução rápida</strong><small className="text-[10px] font-medium opacity-80">Ler crachá e registrar saída · Alt D</small></span>
+              <span className="flex min-w-0 flex-col items-start leading-tight"><strong className="truncate">Devolução rápida</strong><small className="hidden text-[10px] font-medium opacity-80 sm:block">Ler crachá e registrar saída · Alt D</small></span>
             </Button>
           </div>
         </CardHeader>
@@ -1243,7 +1243,46 @@ export const RecepcaoPage: React.FC = () => {
             <p className="mt-1 text-xs text-[#8aa0bd]">Assim que houver registros de entrada, eles serão exibidos aqui em tempo real.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Smartphone: lista em cartões no lugar da tabela */}
+          <ul className="space-y-3 md:hidden">
+            {pessoasNoPredio.map((m) => {
+              const nome = m.servidor?.nome || m.visitante?.nome || 'Não identificado';
+              const doc = m.servidor?.matricula || m.visitante?.cpf || '-';
+              const outrosDestinos = (m.destinos?.length || 1) - 1;
+              return (
+                <li
+                  key={m.id}
+                  onClick={(event) => { if (isRowBackgroundClick(event)) setRouteMovement(m); }}
+                  className="cursor-pointer rounded-xl border border-[#dce8f5] bg-white p-3 text-xs dark:border-slate-800 dark:bg-[#101625]"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-[#102755] dark:text-slate-100 break-words">{nome}</div>
+                      <div className="text-[11px] text-[#627289] dark:text-slate-400"><span className="capitalize">{m.tipo_pessoa}</span> • {doc}</div>
+                    </div>
+                    <span className="shrink-0 rounded border border-emerald-500/20 bg-[#e8f8ee] px-2 py-0.5 font-mono font-bold text-emerald-600 dark:bg-slate-800 dark:text-emerald-400">{m.cracha_numero || 'S/C'}</span>
+                  </div>
+                  <div className="mt-2 text-[#37475e] dark:text-slate-300">
+                    <span className="font-semibold">{m.departamento_destino?.sigla || 'SMEDU'}</span> - {m.setor_destino?.nome || 'Geral'}
+                    {outrosDestinos > 0 && <span className="ml-1 font-semibold text-[#0877d1] dark:text-sky-400">+{outrosDestinos}</span>}
+                  </div>
+                  {m.motivo && <div className="mt-0.5 truncate text-[11px] text-[#627289] dark:text-slate-400">{m.motivo}</div>}
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="font-mono text-[#37475e] dark:text-slate-300">{formatTime(m.data_hora_entrada)}</span>
+                      {m.status === 'pendente_autorizacao' ? <Badge variant="warning">Aguardando</Badge> : <Badge variant="success">No Prédio</Badge>}
+                    </div>
+                    <Button size="sm" variant="danger" className="min-h-9 shrink-0" onClick={() => { setMovimentacaoParaSaida(m); setIsSaidaModalOpen(true); }}>
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Saída</span>
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#151c2d] text-slate-400 border-b border-slate-800 uppercase font-mono text-[10px]">
                 <tr>
@@ -1332,6 +1371,7 @@ export const RecepcaoPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </Card>
 

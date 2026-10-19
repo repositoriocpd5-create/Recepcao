@@ -489,8 +489,8 @@ export const DepartamentosPage: React.FC = () => {
             <Card key={dep.id} className="border-[#dce4f0] dark:border-slate-800 flex flex-col justify-between overflow-hidden shadow-xs hover:shadow-md transition-shadow">
               <div>
                 {/* Topo do Departamento */}
-                <div className="flex items-center justify-between pb-3 border-b border-[#dce4f0] dark:border-slate-800">
-                  <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#dce4f0] dark:border-slate-800">
+                  <div className="flex min-w-0 items-center gap-2.5">
                     <span className="font-mono bg-[#edf5fc] px-2.5 py-1 rounded-xl text-[#005a9c] font-black border border-[#b9d9f3] text-xs shadow-xs dark:bg-slate-800 dark:text-emerald-400 dark:border-emerald-500/20">
                       {dep.sigla}
                     </span>
