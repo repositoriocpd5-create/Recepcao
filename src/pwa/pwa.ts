@@ -27,6 +27,21 @@ const detectIos = () => {
   return /iPad|iPhone|iPod/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1);
 };
 
+export type MobileBrowser = 'samsung' | 'firefox' | 'chrome' | 'other';
+
+/** Navegador do celular, para mostrar o passo a passo certo quando não há instalação nativa. */
+export const detectMobileBrowser = (): MobileBrowser => {
+  const ua = navigator.userAgent;
+  if (/SamsungBrowser/i.test(ua)) return 'samsung';
+  if (/Firefox|FxiOS/i.test(ua)) return 'firefox';
+  if (/Chrome|CriOS|EdgA|EdgiOS/i.test(ua)) return 'chrome';
+  return 'other';
+};
+
+/** Celular ou tablet com tela de toque. */
+export const isMobileDevice = () =>
+  window.matchMedia('(pointer: coarse)').matches && Math.min(window.screen.width, window.screen.height) <= 1024;
+
 const detectStandalone = () =>
   window.matchMedia('(display-mode: standalone)').matches ||
   (navigator as Navigator & { standalone?: boolean }).standalone === true;
@@ -59,8 +74,21 @@ export const openInstallSheet = () => setState({ installSheetOpen: true });
 export const closeInstallSheet = () => setState({ installSheetOpen: false });
 export const dismissInstalledNotice = () => setState({ justInstalled: false });
 
-/** Instalação disponível neste aparelho (nativa ou manual no iPhone). */
-export const isInstallAvailable = (pwa: PwaState) => !pwa.isStandalone && (pwa.canInstall || pwa.isIos);
+/** Instalação disponível: nativa (Chrome/Edge) ou manual em qualquer celular. */
+export const isInstallAvailable = (pwa: PwaState) => !pwa.isStandalone && (pwa.canInstall || pwa.isIos || isMobileDevice());
+
+/** Aguarda o navegador liberar a instalação nativa (o Chrome pode demorar alguns segundos). */
+export const waitForInstallPrompt = (timeoutMs: number) =>
+  new Promise<boolean>((resolve) => {
+    if (deferredPrompt) return resolve(true);
+    const unsubscribe = subscribe(() => {
+      if (!state.canInstall) return;
+      unsubscribe();
+      window.clearTimeout(timer);
+      resolve(true);
+    });
+    const timer = window.setTimeout(() => { unsubscribe(); resolve(false); }, timeoutMs);
+  });
 
 /** Abre o diálogo nativo de instalação. Retorna true se o usuário aceitou. */
 export const promptInstall = async () => {

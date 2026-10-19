@@ -1,29 +1,25 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle2, Download, RefreshCw, Share, Smartphone, SquarePlus, Wifi, X, Zap } from 'lucide-react';
+import { CheckCircle2, Download, Loader2, Menu, MoreVertical, RefreshCw, Share, Smartphone, SquarePlus, Wifi, X, Zap } from 'lucide-react';
 import {
   applyUpdate,
   closeInstallSheet,
+  detectMobileBrowser,
   dismissInstalledNotice,
   isInstallAvailable,
+  isMobileDevice,
   openInstallSheet,
   promptInstall,
   usePwa,
+  waitForInstallPrompt,
 } from '@/pwa/pwa';
 
-const DISMISS_KEY = 'sme-pwa-install-dismissed-at';
-const DISMISS_DAYS = 7;
+// "Agora não" vale só para esta visita: ao abrir o sistema de novo, o convite volta.
+const DISMISS_KEY = 'sme-pwa-install-dismissed';
 
-const wasDismissedRecently = () => {
-  try {
-    const at = Number(localStorage.getItem(DISMISS_KEY));
-    return Boolean(at) && Date.now() - at < DISMISS_DAYS * 24 * 60 * 60 * 1000;
-  } catch {
-    return false;
-  }
+const wasDismissedThisVisit = () => {
+  try { return sessionStorage.getItem(DISMISS_KEY) === '1'; } catch { return false; }
 };
-
-const isPhoneOrTablet = () => window.matchMedia('(max-width: 1024px) and (pointer: coarse)').matches;
 
 const BENEFITS = [
   { Icon: Smartphone, text: 'Abre direto da tela inicial, em tela cheia' },
@@ -37,17 +33,47 @@ const IOS_STEPS = [
   { Icon: CheckCircle2, text: <>Confirme em <strong>Adicionar</strong></> },
 ];
 
+// Passo a passo quando o navegador Android não libera a instalação nativa.
+const ANDROID_STEPS = {
+  chrome: [
+    { Icon: MoreVertical, text: <>Toque no menu <strong>⋮</strong> no canto superior do navegador</> },
+    { Icon: Download, text: <>Escolha <strong>Instalar app</strong> ou <strong>Adicionar à tela inicial</strong></> },
+    { Icon: CheckCircle2, text: <>Confirme em <strong>Instalar</strong></> },
+  ],
+  samsung: [
+    { Icon: Menu, text: <>Toque no menu <strong>☰</strong> na barra inferior</> },
+    { Icon: SquarePlus, text: <>Escolha <strong>Adicionar página a</strong> → <strong>Tela inicial</strong></> },
+    { Icon: CheckCircle2, text: <>Confirme em <strong>Adicionar</strong></> },
+  ],
+  firefox: [
+    { Icon: MoreVertical, text: <>Toque no menu <strong>⋮</strong> do navegador</> },
+    { Icon: Download, text: <>Escolha <strong>Instalar</strong> ou <strong>Adicionar à tela inicial</strong></> },
+    { Icon: CheckCircle2, text: <>Confirme em <strong>Adicionar</strong></> },
+  ],
+  other: [
+    { Icon: MoreVertical, text: <>Abra o <strong>menu</strong> do navegador</> },
+    { Icon: Download, text: <>Escolha <strong>Instalar app</strong> ou <strong>Adicionar à tela inicial</strong></> },
+    { Icon: CheckCircle2, text: <>Confirme a instalação</> },
+  ],
+};
+
 // Convite de instalação (Android / iPhone), aviso de nova versão e confirmação de instalação.
 export const PwaPrompts = () => {
   const pwa = usePwa();
   const [isInstalling, setIsInstalling] = useState(false);
+  const [showManualSteps, setShowManualSteps] = useState(false);
 
-  // Abre o convite automaticamente no celular, uma vez a cada 7 dias se for dispensado.
+  // Ao abrir o sistema no celular (fora do app instalado), o convite aparece em seguida.
   useEffect(() => {
-    if (!isInstallAvailable(pwa) || pwa.installSheetOpen || !isPhoneOrTablet() || wasDismissedRecently()) return;
-    const timer = window.setTimeout(openInstallSheet, 1200);
+    if (pwa.isStandalone || !isMobileDevice() || wasDismissedThisVisit()) return;
+    const timer = window.setTimeout(openInstallSheet, 900);
     return () => window.clearTimeout(timer);
-  }, [pwa.canInstall, pwa.isIos, pwa.isStandalone]);
+  }, [pwa.isStandalone]);
+
+  // Se a instalação nativa ficar disponível com o passo a passo aberto, volta para o botão "Instalar".
+  useEffect(() => {
+    if (pwa.canInstall) setShowManualSteps(false);
+  }, [pwa.canInstall]);
 
   useEffect(() => {
     if (!pwa.justInstalled) return;
@@ -63,21 +89,29 @@ export const PwaPrompts = () => {
   }, [pwa.installSheetOpen]);
 
   const dismiss = () => {
-    try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch {}
+    try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch {}
+    setShowManualSteps(false);
     closeInstallSheet();
   };
 
   const handleInstall = async () => {
     setIsInstalling(true);
     try {
+      // O Chrome pode levar alguns segundos para liberar a instalação nativa.
+      const nativeReady = pwa.canInstall || (await waitForInstallPrompt(3000));
+      if (!nativeReady) {
+        setShowManualSteps(true);
+        return;
+      }
       const accepted = await promptInstall();
-      if (!accepted) dismiss();
+      if (accepted) closeInstallSheet();
+      else dismiss();
     } finally {
       setIsInstalling(false);
     }
   };
 
-  const showIosSteps = pwa.isIos && !pwa.canInstall;
+  const steps = pwa.isIos && !pwa.canInstall ? IOS_STEPS : showManualSteps ? ANDROID_STEPS[detectMobileBrowser()] : null;
 
   return createPortal(
     <>
@@ -96,9 +130,10 @@ export const PwaPrompts = () => {
               </p>
             </div>
 
-            {showIosSteps ? (
-              <ol className="mt-5 space-y-2">
-                {IOS_STEPS.map(({ Icon, text }, index) => (
+            {steps ? (
+              <>
+              <ol className="mt-5 space-y-2" aria-label="Como instalar">
+                {steps.map(({ Icon, text }, index) => (
                   <li key={index} className="flex items-center gap-3 rounded-2xl border border-[#e3ecf7] bg-[#f6faff] px-3 py-2.5 text-sm dark:border-slate-800 dark:bg-[#101625]">
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#005a9c] text-xs font-bold text-white">{index + 1}</span>
                     <span className="flex-1 text-[#37475e] dark:text-slate-300">{text}</span>
@@ -106,6 +141,8 @@ export const PwaPrompts = () => {
                   </li>
                 ))}
               </ol>
+              <p className="mt-3 text-center text-[11px] text-[#68809f] dark:text-slate-500">Se o app já estiver instalado, abra pelo ícone <strong>SMEDU Recepção</strong> na tela inicial.</p>
+              </>
             ) : (
               <ul className="mt-5 space-y-2">
                 {BENEFITS.map(({ Icon, text }) => (
@@ -121,13 +158,13 @@ export const PwaPrompts = () => {
               <button type="button" onClick={dismiss} className="min-h-12 rounded-xl border border-[#d7e6f6] text-sm font-bold text-[#526d91] hover:bg-[#f2f7ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#087ef5] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                 Agora não
               </button>
-              {showIosSteps ? (
+              {steps ? (
                 <button type="button" onClick={dismiss} className="min-h-12 rounded-xl bg-[#005a9c] text-sm font-bold text-white shadow-[0_12px_24px_-12px_rgba(0,90,156,.9)] hover:bg-[#0877c9] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ef5]">
                   Entendi
                 </button>
               ) : (
                 <button type="button" onClick={handleInstall} disabled={isInstalling} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#005a9c] text-sm font-bold text-white shadow-[0_12px_24px_-12px_rgba(0,90,156,.9)] hover:bg-[#0877c9] disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ef5]">
-                  <Download className="h-4 w-4" />Instalar
+                  {isInstalling ? <><Loader2 className="h-4 w-4 animate-spin" />Preparando…</> : <><Download className="h-4 w-4" />Instalar</>}
                 </button>
               )}
             </div>
