@@ -416,15 +416,19 @@ export const GUIAS: Guia[] = [
     restricao: 'Disponível apenas para administradores.',
     passos: [
       { titulo: 'Confira os operadores', texto: 'Em Operadores Homologados & Controle de Acesso, veja nome, e-mail institucional e Papel (Role).' },
-      { titulo: 'Teste um perfil', texto: 'Use “Simular este Perfil” para ver o sistema como recepcionista ou gestor.' },
       {
-        titulo: 'Cuidado com a base de testes',
-        texto: '“Restaurar Base de Testes (Seed)” substitui os dados de teste.',
-        nota: { tom: 'aviso', texto: 'Não use em produção.' },
+        titulo: 'Cadastre um operador',
+        texto: 'Clique em “Novo Usuário”, informe nome, cargo, e-mail institucional, uma senha de pelo menos 8 caracteres e o Papel (Role).',
+        nota: { tom: 'info', texto: 'O acesso é criado direto no Supabase: o operador já pode entrar com o e-mail e a senha cadastrados.' },
       },
+      { titulo: 'Edite ou suspenda', texto: 'Use o lápis para alterar dados, papel ou senha. Clique em “Ativo” para suspender ou liberar o acesso.' },
+      { titulo: 'Teste um perfil', texto: 'Use “Simular este Perfil” para ver o sistema como recepcionista ou gestor.' },
     ],
-    concluido: 'O papel ativo aparece como “Ativo Atualmente”.',
-    problemas: [{ problema: 'Usuário novo sem acesso', solucao: 'O perfil é criado no primeiro acesso como recepcionista. Ajuste o papel no Supabase.' }],
+    concluido: 'O operador aparece na lista e em Authentication → Users no Supabase.',
+    problemas: [
+      { problema: 'Aviso de função não publicada', solucao: 'A Edge Function admin-manage-user precisa estar publicada no Supabase (veja o README).' },
+      { problema: '“Este e-mail já está cadastrado”', solucao: 'O e-mail já existe no Supabase. Edite o operador existente em vez de criar outro.' },
+    ],
     palavrasChave: ['administracao', 'permissao', 'perfil', 'operador', 'usuario', 'role', 'acesso'],
   },
 ];

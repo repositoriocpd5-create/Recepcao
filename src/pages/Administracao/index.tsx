@@ -3,7 +3,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   ShieldCheck,
   Users,
-  RefreshCw,
   AlertTriangle,
   CheckCircle2,
   UserPlus,
@@ -23,7 +22,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
-import { resetTestData, dataService } from '@/services/dataService';
+import { dataService } from '@/services/dataService';
 import { DEMO_USERS } from '@/services/mockData';
 import { UserProfile, UserRole } from '@/types';
 import { cn } from '@/lib/utils';
@@ -76,7 +75,6 @@ const ROLES_OPTIONS: UserRole[] = ['admin', 'gestor', 'recepcionista', 'atendent
 
 export const AdministracaoPage: React.FC = () => {
   const { user, switchDemoRole, updateUserProfile, isSupabaseLive } = useAuth();
-  const [resetSuccess, setResetSuccess] = useState(false);
   const [usuarios, setUsuarios] = useState<UserProfile[]>(() => (isSupabaseLive ? [] : loadUsers()));
   const [carregandoUsuarios, setCarregandoUsuarios] = useState(isSupabaseLive);
   const [isSaving, setIsSaving] = useState(false);
@@ -118,13 +116,6 @@ export const AdministracaoPage: React.FC = () => {
     setTimeout(() => setToast(null), 3500);
   }
 
-  const handleResetData = () => {
-    if (confirm('Atenção: Isso redefinirá todas as movimentações, visitantes e autorizações para os dados iniciais do seed. Continuar?')) {
-      resetTestData();
-      setResetSuccess(true);
-      setTimeout(() => { window.location.reload(); }, 1000);
-    }
-  };
 
   function abrirNovoUsuario() {
     setEditingUser(null);
@@ -293,19 +284,7 @@ export const AdministracaoPage: React.FC = () => {
           </div>
           <p className="text-xs text-slate-400 mt-1">Controle de operadores, papéis e permissões do sistema</p>
         </div>
-
-        <Button variant="danger" size="sm" onClick={handleResetData}>
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Restaurar Base de Testes (Seed)</span>
-        </Button>
       </div>
-
-      {resetSuccess && (
-        <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span>Dados de teste restaurados com sucesso para o estado original! Reiniciando...</span>
-        </div>
-      )}
 
       {/* ─── GESTÃO DE USUÁRIOS DO SISTEMA ─── */}
       <Card className="border-slate-800 overflow-hidden">
