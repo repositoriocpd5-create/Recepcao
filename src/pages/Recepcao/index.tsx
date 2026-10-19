@@ -59,6 +59,7 @@ import { biometricProvider, isBiometricAgentConfigured, DeviceStatus, Identifica
 import { generateInstitutionalPdf } from '@/services/pdfService';
 import { ReceptionClock } from '@/components/recepcao/ReceptionClock';
 import { BarcodeCameraScanner } from '@/components/recepcao/BarcodeCameraScanner';
+import { RoteiroDestinosModal, isRowBackgroundClick } from '@/components/movimentacoes/RoteiroDestinosModal';
 
 interface FichaPessoaIdentificadaProps {
   nome: string;
@@ -178,6 +179,7 @@ export const RecepcaoPage: React.FC = () => {
   const [isNovoServidorModalOpen, setIsNovoServidorModalOpen] = useState(false);
   const [isSaidaModalOpen, setIsSaidaModalOpen] = useState(false);
   const [movimentacaoParaSaida, setMovimentacaoParaSaida] = useState<Movimentacao | null>(null);
+  const [routeMovement, setRouteMovement] = useState<Movimentacao | null>(null);
 
   // Formulário de Registro de Entrada
   const [formDestinoDepId, setFormDestinoDepId] = useState('');
@@ -1262,7 +1264,12 @@ export const RecepcaoPage: React.FC = () => {
                   const setor = m.setor_destino?.nome || 'Geral';
 
                   return (
-                    <tr key={m.id} className="hover:bg-slate-800/30 transition-colors">
+                    <tr
+                      key={m.id}
+                      onClick={(event) => { if (isRowBackgroundClick(event)) setRouteMovement(m); }}
+                      className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                      title="Ver setores/departamentos do roteiro"
+                    >
                       <td className="py-3 px-4">
                         <div className="font-semibold text-slate-100">{nome}</div>
                         <div className="text-slate-400 text-[11px] flex items-center gap-1">
@@ -1342,6 +1349,14 @@ export const RecepcaoPage: React.FC = () => {
           setCameraTarget(null);
         }}
       />
+      <RoteiroDestinosModal
+        movimentacao={routeMovement}
+        onClose={() => setRouteMovement(null)}
+        departamentos={departamentos}
+        setores={setores}
+        servidores={todosServidores}
+      />
+
       <Modal
         isOpen={isBarcodeReturnModalOpen}
         onClose={() => { if (!cameraTarget && !isReturningBadge) setIsBarcodeReturnModalOpen(false); }}

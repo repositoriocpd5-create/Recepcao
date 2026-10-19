@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
+import { RoteiroDestinosModal, isRowBackgroundClick } from '@/components/movimentacoes/RoteiroDestinosModal';
 import { dataService } from '@/services/dataService';
 import { generateInstitutionalPdf } from '@/services/pdfService';
 import { Departamento, Movimentacao, MovimentacaoStatus, Servidor, Setor } from '@/types';
@@ -55,6 +56,7 @@ export const MovimentacoesPage: React.FC = () => {
   const [saidaObs, setSaidaObs] = useState('');
   const [isSubmittingSaida, setIsSubmittingSaida] = useState(false);
   const [selectedVisitorMovement, setSelectedVisitorMovement] = useState<Movimentacao | null>(null);
+  const [routeMovement, setRouteMovement] = useState<Movimentacao | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const formatarTempoPermanencia = (entrada: string, saida?: string | null) => {
@@ -232,8 +234,7 @@ export const MovimentacoesPage: React.FC = () => {
           item.tipo_pessoa,
           item.servidor?.matricula || item.visitante?.cpf || '—',
           item.cracha_numero || 'S/C',
-          `${item.departamento_destino?.sigla || 'SMEDU'} - ${item.setor_destino?.nome || 'Geral'}`,
-          formatDateTime(item.data_hora_entrada),
+          `${item.departamento_destino?.sigla || 'SMEDU'} - ${item.setor_destino?.nome || 'Geral'}`,          formatDateTime(item.data_hora_entrada),
           item.data_hora_saida ? formatDateTime(item.data_hora_saida) : 'Em aberto',
           formatarTempoPermanencia(item.data_hora_entrada, item.data_hora_saida),
           item.status === 'no_predio' ? 'No prédio' : item.status === 'pendente_autorizacao' ? 'Pendente' : 'Finalizado',
@@ -357,7 +358,12 @@ export const MovimentacoesPage: React.FC = () => {
                   const setor = m.setor_destino?.nome || 'Geral';
 
                   return (
-                    <tr key={m.id} className="hover:bg-slate-800/20 transition-colors">
+                    <tr
+                      key={m.id}
+                      onClick={(event) => { if (isRowBackgroundClick(event)) setRouteMovement(m); }}
+                      className="hover:bg-slate-800/20 transition-colors cursor-pointer"
+                      title="Ver setores/departamentos do roteiro"
+                    >
                       <td className="py-3 px-4 font-semibold text-slate-100">
                         {m.tipo_pessoa === 'visitante' ? (
                           <button
@@ -501,6 +507,14 @@ export const MovimentacoesPage: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      <RoteiroDestinosModal
+        movimentacao={routeMovement}
+        onClose={() => setRouteMovement(null)}
+        departamentos={departamentos}
+        setores={setores}
+        servidores={servidores}
+      />
 
       <Modal
         isOpen={Boolean(editingMovement)}

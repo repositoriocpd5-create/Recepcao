@@ -120,6 +120,7 @@ export interface DestinoVisita {
   departamento_destino_id: string;
   setor_destino_id: string;
   servidor_destino_id?: string;
+  ordem?: number;
   departamento_destino?: Departamento;
   setor_destino?: Setor;
   servidor_destino?: Servidor;
