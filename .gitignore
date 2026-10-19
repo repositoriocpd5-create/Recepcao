@@ -34,3 +34,6 @@ dist-ssr
 # Planilhas e dados locais
 *.xls
 *.xlsx
+
+# Supabase CLI (arquivos temporários locais)
+supabase/.temp/
