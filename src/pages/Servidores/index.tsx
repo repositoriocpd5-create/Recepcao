@@ -73,7 +73,7 @@ export const ServidoresPage: React.FC = () => {
     setEditId(s.id);
     setNome(s.nome);
     setMatricula(s.matricula);
-    setCargo(s.cargo);
+    setCargo((s.cargo || '').trim());
     setLotacao(s.lotacao || '');
     setDepId(s.departamento_id || '');
     setSetorId(s.setor_id || '');
@@ -134,6 +134,14 @@ export const ServidoresPage: React.FC = () => {
     new Set([
       ...lotacoesCadastradas,
       ...(lotacao.trim() ? [lotacao.trim()] : []),
+    ])
+  ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  // Cargos já cadastrados no quadro de servidores (inclui o cargo atual na edição)
+  const cargosSelectOptions = Array.from(
+    new Set([
+      ...servidores.map((servidor) => (servidor.cargo || '').trim()).filter(Boolean),
+      ...(cargo.trim() ? [cargo.trim()] : []),
     ])
   ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
@@ -295,7 +303,16 @@ export const ServidoresPage: React.FC = () => {
             <Input label="Nome *" value={nome} onChange={(e) => setNome(e.target.value)} required />
           </div>
 
-          <Input label="Cargo Oficial *" value={cargo} onChange={(e) => setCargo(e.target.value)} required />
+          <Select
+            label="Cargo / Função *"
+            value={cargo}
+            onChange={(e) => setCargo(e.target.value)}
+            options={[
+              { value: '', label: 'Selecione o cargo / função cadastrado...' },
+              ...cargosSelectOptions.map((item) => ({ value: item, label: item })),
+            ]}
+            required
+          />
           <Select
             label="Lotação *"
             value={lotacao}

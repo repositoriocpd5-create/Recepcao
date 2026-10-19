@@ -229,7 +229,7 @@ export const GUIAS: Guia[] = [
       },
       {
         titulo: 'Cadastre um servidor',
-        texto: 'Clique em “Cadastrar Servidor” e informe Matrícula Institucional, Nome, Cargo Oficial, Lotação e Departamento.',
+        texto: 'Clique em “Cadastrar Servidor” e informe Matrícula Institucional, Nome, Cargo / Função, Lotação e Departamento.',
         nota: { tom: 'aviso', texto: 'Somente gestores e administradores podem salvar servidores.' },
       },
     ],

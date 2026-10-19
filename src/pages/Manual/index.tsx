@@ -269,7 +269,7 @@ export const ManualPage: React.FC = () => {
             <p className="text-sm text-[#52647d] dark:text-slate-400">Escolha seu perfil para encontrar as orientações da sua rotina.</p>
           </div>
         </div>
-        <div role="radiogroup" aria-label="Perfil para consulta" className="grid shrink-0 grid-cols-1 gap-1.5 rounded-2xl border border-[#dde7f3] p-1.5 sm:grid-cols-3 lg:w-[590px] dark:border-slate-800">
+        <div role="radiogroup" aria-label="Perfil para consulta" className="grid min-w-0 grid-cols-1 gap-1.5 rounded-2xl border border-[#dde7f3] p-1.5 sm:grid-cols-3 lg:max-w-[640px] lg:flex-1 dark:border-slate-800">
           {PERFIS.map((item) => {
             const Icone = ICONE_PERFIL[item.id];
             const ativo = perfil === item.id;
@@ -281,15 +281,15 @@ export const ManualPage: React.FC = () => {
                 aria-checked={ativo}
                 onClick={() => trocarPerfil(item.id)}
                 className={cn(
-                  'flex min-h-14 items-center gap-3 rounded-xl px-3.5 py-2 text-left transition-colors',
+                  'flex min-h-14 min-w-0 items-center gap-3 rounded-xl px-3.5 py-2 text-left transition-colors',
                   ativo ? 'bg-[#0b5ed7] text-white shadow-[0_10px_20px_-12px_rgba(11,94,215,.9)]' : 'text-[#0d1f45] hover:bg-[#f2f7ff] dark:text-slate-200 dark:hover:bg-slate-800',
                   foco
                 )}
               >
                 <Icone className={cn('h-5 w-5 shrink-0', ativo ? 'text-white' : 'text-[#52647d] dark:text-slate-400')} />
-                <span>
+                <span className="min-w-0">
                   <span className="block text-sm font-bold">{item.nome}</span>
-                  <span className={cn('block text-xs lg:whitespace-nowrap', ativo ? 'text-blue-100' : 'text-[#7a8ba3]')}>{item.resumo}</span>
+                  <span className={cn('block text-xs leading-snug', ativo ? 'text-blue-100' : 'text-[#7a8ba3]')}>{item.resumo}</span>
                 </span>
               </button>
             );
