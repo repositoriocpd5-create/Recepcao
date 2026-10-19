@@ -27,13 +27,24 @@ class HttpError extends Error {
 
 const texto = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
+// Chave secreta do projeto: novas chaves (SUPABASE_SECRET_KEYS, "sb_secret_...") ou a service_role antiga.
+const chaveSecreta = () => {
+  try {
+    const novas = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}") as Record<string, string>;
+    const chave = novas.default ?? Object.values(novas)[0];
+    if (chave) return chave;
+  } catch { /* variável ausente ou em outro formato */ }
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
   try {
     const url = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const serviceKey = chaveSecreta();
+    if (!url || !serviceKey) throw new HttpError(500, "Função sem acesso às chaves do projeto (SUPABASE_URL / chave secreta).");
     const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
     // 1) Quem está chamando precisa estar logado e ser admin ativo.
