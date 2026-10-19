@@ -134,6 +134,15 @@ const invokeAdminUsuarios = async <T = unknown>(action: string, payload: Record<
   const { data, error } = await supabase.functions.invoke(ADMIN_USERS_FUNCTION, { body: { action, payload } });
   if (!error) return data as T;
 
+  // Função inexistente: o navegador bloqueia a chamada (CORS) e o supabase-js só informa "Failed to send a request".
+  if (error.name === 'FunctionsFetchError' || /failed to send a request/i.test(error.message)) {
+    throw new Error(
+      navigator.onLine
+        ? `Não foi possível acessar a função "${ADMIN_USERS_FUNCTION}" no Supabase. Ela ainda não foi publicada — publique-a no painel do Supabase (Edge Functions) e tente novamente.`
+        : 'Sem conexão com a internet. Verifique a rede e tente novamente.',
+    );
+  }
+
   const response = (error as { context?: Response }).context;
   if (response instanceof Response) {
     if (response.status === 404) {
