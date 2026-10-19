@@ -1,102 +1,160 @@
 // Supabase Edge Function: admin-manage-user
-// Executa operações administrativas privilegiadas sem expor a service_role key no frontend
+// Cria, edita e remove operadores no Supabase Auth + public.profiles.
+// Usa a service_role somente no servidor; o navegador nunca recebe essa chave.
+// Apenas usuários com profiles.role = 'admin' (e ativos) podem chamar.
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+const ROLES = ["admin", "gestor", "recepcionista", "atendente"];
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// "Banimento" longo = conta suspensa (não consegue entrar); "none" reativa.
+const BAN_SUSPENSO = "876000h";
+
+class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
   }
+}
+
+const texto = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
-        },
-      }
-    );
+    const url = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-    // Verificar se o usuário que está chamando a função é admin
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser();
+    // 1) Quem está chamando precisa estar logado e ser admin ativo.
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    if (!token) throw new HttpError(401, "Sessão não informada. Entre novamente no sistema.");
+    const { data: authData, error: authError } = await admin.auth.getUser(token);
+    const caller = authData?.user;
+    if (authError || !caller) throw new HttpError(401, "Sessão expirada. Entre novamente no sistema.");
 
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const { data: callerProfile } = await admin.from("profiles").select("role, ativo").eq("id", caller.id).maybeSingle();
+    if (callerProfile?.role !== "admin" || callerProfile.ativo === false) {
+      throw new HttpError(403, "Apenas administradores podem gerenciar usuários.");
     }
 
-    const { data: profile } = await supabaseClient
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      return new Response(
-        JSON.stringify({ error: "Apenas administradores podem executar esta operação" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    let body: { action?: string; payload?: Record<string, unknown> };
+    try {
+      body = await req.json();
+    } catch {
+      throw new HttpError(400, "Requisição inválida.");
     }
+    const { action, payload = {} } = body;
 
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    const { action, payload } = await req.json();
-
+    // 2) Ações
     if (action === "create_operator") {
-      const { email, password, nome_completo, role, cargo } = payload;
-      
-      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+      const email = texto(payload.email).toLowerCase();
+      const password = typeof payload.password === "string" ? payload.password : "";
+      const nome_completo = texto(payload.nome_completo);
+      const cargo = texto(payload.cargo) || "Recepcionista";
+      const role = texto(payload.role) || "recepcionista";
+      const ativo = payload.ativo !== false;
+
+      if (!nome_completo) throw new HttpError(400, "Informe o nome completo.");
+      if (!EMAIL_REGEX.test(email)) throw new HttpError(400, "Informe um e-mail institucional válido.");
+      if (password.length < 8) throw new HttpError(400, "A senha precisa ter pelo menos 8 caracteres.");
+      if (!ROLES.includes(role)) throw new HttpError(400, "Papel (role) inválido.");
+
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
+        user_metadata: { nome_completo, role },
       });
+      if (createError || !created.user) {
+        const jaExiste = createError?.status === 422 || /already|registered|exists/i.test(createError?.message ?? "");
+        throw new HttpError(jaExiste ? 409 : 400, jaExiste
+          ? "Este e-mail já está cadastrado no Supabase."
+          : `Não foi possível criar o usuário: ${createError?.message ?? "erro desconhecido"}`);
+      }
 
-      if (createError) throw createError;
-
-      const { data: newProfile, error: profileError } = await adminClient
+      const id = created.user.id;
+      // O gatilho on_auth_user_created já cria o perfil; aqui gravamos cargo/papel/situação definitivos.
+      const { data: profile, error: profileError } = await admin
         .from("profiles")
-        .insert({
-          id: newUser.user.id,
-          email,
-          nome_completo,
-          role: role || "recepcionista",
-          cargo: cargo || "Recepcionista",
-        })
+        .upsert({ id, email, nome_completo, cargo, role, ativo, updated_at: new Date().toISOString() }, { onConflict: "id" })
         .select()
         .single();
+      if (profileError) {
+        await admin.auth.admin.deleteUser(id); // não deixa usuário sem perfil
+        throw new HttpError(500, `Usuário não criado: falha ao gravar o perfil (${profileError.message}).`);
+      }
+      if (!ativo) await admin.auth.admin.updateUserById(id, { ban_duration: BAN_SUSPENSO });
 
-      if (profileError) throw profileError;
-
-      return new Response(JSON.stringify({ user: newUser.user, profile: newProfile }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      return json({ profile }, 201);
     }
 
-    return new Response(JSON.stringify({ error: "Ação não suportada" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    if (action === "update_operator") {
+      const id = texto(payload.id);
+      if (!id) throw new HttpError(400, "Usuário não informado.");
+
+      const email = texto(payload.email).toLowerCase();
+      const password = typeof payload.password === "string" ? payload.password : "";
+      const nome_completo = texto(payload.nome_completo);
+      const cargo = texto(payload.cargo);
+      const role = texto(payload.role);
+      const ativo = typeof payload.ativo === "boolean" ? payload.ativo : undefined;
+
+      if (email && !EMAIL_REGEX.test(email)) throw new HttpError(400, "Informe um e-mail institucional válido.");
+      if (password && password.length < 8) throw new HttpError(400, "A nova senha precisa ter pelo menos 8 caracteres.");
+      if (role && !ROLES.includes(role)) throw new HttpError(400, "Papel (role) inválido.");
+      if (id === caller.id && ((role && role !== "admin") || ativo === false)) {
+        throw new HttpError(400, "Você não pode remover o próprio acesso de administrador nem desativar a própria conta.");
+      }
+
+      const authUpdate: Record<string, unknown> = {};
+      if (email) { authUpdate.email = email; authUpdate.email_confirm = true; }
+      if (password) authUpdate.password = password;
+      if (ativo !== undefined) authUpdate.ban_duration = ativo ? "none" : BAN_SUSPENSO;
+      if (nome_completo || role) authUpdate.user_metadata = { ...(nome_completo && { nome_completo }), ...(role && { role }) };
+
+      if (Object.keys(authUpdate).length) {
+        const { error } = await admin.auth.admin.updateUserById(id, authUpdate);
+        if (error) {
+          const jaExiste = /already|registered|exists/i.test(error.message);
+          throw new HttpError(jaExiste ? 409 : 400, jaExiste ? "Este e-mail já está em uso por outro usuário." : `Não foi possível atualizar: ${error.message}`);
+        }
+      }
+
+      const profileUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (email) profileUpdate.email = email;
+      if (nome_completo) profileUpdate.nome_completo = nome_completo;
+      if (cargo) profileUpdate.cargo = cargo;
+      if (role) profileUpdate.role = role;
+      if (ativo !== undefined) profileUpdate.ativo = ativo;
+
+      const { data: profile, error: profileError } = await admin.from("profiles").update(profileUpdate).eq("id", id).select().single();
+      if (profileError) throw new HttpError(500, `Falha ao atualizar o perfil: ${profileError.message}`);
+      return json({ profile });
+    }
+
+    if (action === "delete_operator") {
+      const id = texto(payload.id);
+      if (!id) throw new HttpError(400, "Usuário não informado.");
+      if (id === caller.id) throw new HttpError(400, "Você não pode remover o seu próprio usuário.");
+      const { error } = await admin.auth.admin.deleteUser(id); // profiles é removido em cascata
+      if (error) throw new HttpError(400, `Não foi possível remover: ${error.message}`);
+      return json({ ok: true });
+    }
+
+    throw new HttpError(400, "Ação não suportada.");
+  } catch (error) {
+    if (error instanceof HttpError) return json({ error: error.message }, error.status);
+    return json({ error: error instanceof Error ? error.message : "Erro inesperado." }, 500);
   }
 });

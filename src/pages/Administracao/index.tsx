@@ -74,26 +74,28 @@ const ROLE_CONFIG: Record<
 
 const ROLES_OPTIONS: UserRole[] = ['admin', 'gestor', 'recepcionista', 'atendente'];
 
-function gerarId() {
-  return `u-custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
 export const AdministracaoPage: React.FC = () => {
-  const { user, switchDemoRole, updateUserProfile } = useAuth();
+  const { user, switchDemoRole, updateUserProfile, isSupabaseLive } = useAuth();
   const [resetSuccess, setResetSuccess] = useState(false);
-  const [usuarios, setUsuarios] = useState<UserProfile[]>(loadUsers);
+  const [usuarios, setUsuarios] = useState<UserProfile[]>(() => (isSupabaseLive ? [] : loadUsers()));
+  const [carregandoUsuarios, setCarregandoUsuarios] = useState(isSupabaseLive);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const carregarUsuarios = async () => {
+    setCarregandoUsuarios(true);
+    try {
+      const lista = await dataService.getUsuariosSistema();
+      setUsuarios(lista);
+      if (!isSupabaseLive) saveUsers(lista);
+    } catch (err: any) {
+      exibirToast(err.message || 'Não foi possível carregar os usuários.', 'erro');
+    } finally {
+      setCarregandoUsuarios(false);
+    }
+  };
 
   useEffect(() => {
-    let ativo = true;
-    dataService.getUsuariosSistema().then((res) => {
-      if (ativo && res && res.length > 0) {
-        setUsuarios(res);
-        saveUsers(res);
-      }
-    });
-    return () => {
-      ativo = false;
-    };
+    void carregarUsuarios();
   }, []);
 
   // Modal de Novo / Editar usuário
@@ -148,8 +150,9 @@ export const AdministracaoPage: React.FC = () => {
     setIsModalOpen(true);
   }
 
-  function handleSalvarUsuario(e: React.FormEvent) {
+  async function handleSalvarUsuario(e: React.FormEvent) {
     e.preventDefault();
+    setFormErro('');
     if (!formNome.trim() || !formEmail.trim() || !formCargo.trim()) {
       setFormErro('Preencha todos os campos obrigatórios.');
       return;
@@ -158,60 +161,61 @@ export const AdministracaoPage: React.FC = () => {
       setFormErro('Defina uma senha para o novo usuário.');
       return;
     }
+    if (formSenha && formSenha.length < 8) {
+      setFormErro('A senha precisa ter pelo menos 8 caracteres.');
+      return;
+    }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formEmail)) {
+    if (!emailRegex.test(formEmail.trim())) {
       setFormErro('Informe um e-mail institucional válido.');
       return;
     }
     const emailDuplicado = usuarios.some(
-      (u) => u.email.toLowerCase() === formEmail.toLowerCase() && u.id !== editingUser?.id
+      (u) => u.email.toLowerCase() === formEmail.trim().toLowerCase() && u.id !== editingUser?.id
     );
     if (emailDuplicado) {
       setFormErro('Este e-mail já está cadastrado no sistema.');
       return;
     }
-
-    let userSalvo: UserProfile;
-    let updated: UserProfile[];
-
-    if (editingUser) {
-      userSalvo = {
-        ...editingUser,
-        nome_completo: formNome.trim(),
-        email: formEmail.trim(),
-        cargo: formCargo.trim(),
-        role: formRole,
-        ativo: formAtivo,
-      };
-      updated = usuarios.map((u) => (u.id === editingUser.id ? userSalvo : u));
-      exibirToast(`Usuário "${formNome}" atualizado com sucesso!`);
-    } else {
-      userSalvo = {
-        id: gerarId(),
-        nome_completo: formNome.trim(),
-        email: formEmail.trim(),
-        cargo: formCargo.trim(),
-        role: formRole,
-        ativo: formAtivo,
-        created_at: new Date().toISOString(),
-      };
-      updated = [...usuarios, userSalvo];
-      exibirToast(`Usuário "${formNome}" adicionado com sucesso!`);
+    if (editingUser && editingUser.id === user?.id && (formRole !== 'admin' || !formAtivo)) {
+      setFormErro('Você não pode remover o próprio acesso de administrador nem desativar a própria conta.');
+      return;
     }
 
-    saveUsers(updated);
+    const dados = {
+      nome_completo: formNome.trim(),
+      email: formEmail.trim().toLowerCase(),
+      cargo: formCargo.trim(),
+      role: formRole,
+      ativo: formAtivo,
+    };
+
+    setIsSaving(true);
+    let userSalvo: UserProfile;
+    try {
+      userSalvo = editingUser
+        ? await dataService.salvarUsuarioSistema({ ...editingUser, ...dados }, formSenha || undefined)
+        : await dataService.criarUsuarioSistema(dados, formSenha);
+    } catch (err: any) {
+      setFormErro(err.message || 'Não foi possível salvar o usuário.');
+      return;
+    } finally {
+      setIsSaving(false);
+    }
+
+    const updated = editingUser
+      ? usuarios.map((u) => (u.id === editingUser.id ? userSalvo : u))
+      : [...usuarios, userSalvo];
+    if (!isSupabaseLive) saveUsers(updated);
     setUsuarios(updated);
     setIsModalOpen(false);
-
-    // Persiste no backend / Supabase
-    dataService.salvarUsuarioSistema(userSalvo);
+    exibirToast(editingUser ? `Usuário "${userSalvo.nome_completo}" atualizado com sucesso!` : `Usuário "${userSalvo.nome_completo}" cadastrado no Supabase com acesso liberado!`);
 
     // Sincroniza a sessão ativa caso o operador editado seja o usuário logado
-    if (user && (user.id === userSalvo.id || user.role === userSalvo.role || user.email.toLowerCase() === (editingUser?.email || '').toLowerCase())) {
+    if (user && user.id === userSalvo.id) {
       updateUserProfile(userSalvo);
     }
 
-    // Registra log de auditoria da alteração
     dataService.registrarLogAuditoria({
       usuario_email: user?.email || userSalvo.email,
       acao: editingUser ? 'ATUALIZAR_USUARIO' : 'CRIAR_USUARIO',
@@ -223,20 +227,26 @@ export const AdministracaoPage: React.FC = () => {
         cargo: userSalvo.cargo,
         role: userSalvo.role,
         ativo: userSalvo.ativo,
+        senha_alterada: Boolean(editingUser && formSenha),
       },
     });
   }
 
-  function handleExcluirUsuario(u: UserProfile) {
+  async function handleExcluirUsuario(u: UserProfile) {
     if (u.id === user?.id) {
       exibirToast('Você não pode remover o seu próprio usuário.', 'erro');
       return;
     }
-    if (!confirm(`Remover o usuário "${u.nome_completo}"? Esta ação não pode ser desfeita.`)) return;
+    if (!confirm(`Remover o usuário "${u.nome_completo}"? O acesso dele ao sistema será apagado do Supabase e não pode ser desfeito.`)) return;
+    try {
+      await dataService.excluirUsuarioSistema(u.id);
+    } catch (err: any) {
+      exibirToast(err.message || 'Não foi possível remover o usuário.', 'erro');
+      return;
+    }
     const updated = usuarios.filter((x) => x.id !== u.id);
-    saveUsers(updated);
+    if (!isSupabaseLive) saveUsers(updated);
     setUsuarios(updated);
-    dataService.excluirUsuarioSistema(u.id);
 
     dataService.registrarLogAuditoria({
       usuario_email: user?.email || 'admin@sme.gov.br',
@@ -249,16 +259,21 @@ export const AdministracaoPage: React.FC = () => {
     exibirToast(`Usuário "${u.nome_completo}" removido.`);
   }
 
-  function handleToggleAtivo(u: UserProfile) {
-    const userModificado: UserProfile = { ...u, ativo: !u.ativo };
-    const updated = usuarios.map((x) => (x.id === u.id ? userModificado : x));
-    saveUsers(updated);
-    setUsuarios(updated);
-    dataService.salvarUsuarioSistema(userModificado);
-
-    if (user && (user.id === u.id || user.role === u.role)) {
-      updateUserProfile(userModificado);
+  async function handleToggleAtivo(u: UserProfile) {
+    if (u.id === user?.id) {
+      exibirToast('Você não pode desativar a sua própria conta.', 'erro');
+      return;
     }
+    let userModificado: UserProfile;
+    try {
+      userModificado = await dataService.salvarUsuarioSistema({ ...u, ativo: !u.ativo });
+    } catch (err: any) {
+      exibirToast(err.message || 'Não foi possível alterar a situação do usuário.', 'erro');
+      return;
+    }
+    const updated = usuarios.map((x) => (x.id === u.id ? userModificado : x));
+    if (!isSupabaseLive) saveUsers(updated);
+    setUsuarios(updated);
 
     exibirToast(`Usuário "${u.nome_completo}" ${userModificado.ativo ? 'ativado' : 'desativado'}.`);
   }
@@ -345,6 +360,9 @@ export const AdministracaoPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
+              {carregandoUsuarios && usuarios.length === 0 && (
+                <tr><td colSpan={6} className="py-8 text-center text-slate-400">Carregando usuários do Supabase...</td></tr>
+              )}
               {usuarios.map((u) => {
                 const rc = ROLE_CONFIG[u.role];
                 const isCurrentUser = user?.role === u.role;
@@ -501,14 +519,15 @@ export const AdministracaoPage: React.FC = () => {
             required
           />
 
-          {!editingUser && (
+          {(
             <div className="relative">
               <Input
-                label="Senha de Acesso *"
+                label={editingUser ? 'Nova senha (opcional)' : 'Senha de Acesso *'}
                 value={formSenha}
                 onChange={(e) => setFormSenha(e.target.value)}
                 type={showSenha ? 'text' : 'password'}
-                placeholder="Mínimo 8 caracteres"
+                placeholder={editingUser ? 'Deixe em branco para manter a senha atual' : 'Mínimo 8 caracteres'}
+                autoComplete="new-password"
               />
               <button
                 type="button"
@@ -605,7 +624,7 @@ export const AdministracaoPage: React.FC = () => {
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" variant="primary">
+            <Button type="submit" variant="primary" isLoading={isSaving}>
               {editingUser ? 'Salvar Alterações' : 'Adicionar Usuário'}
             </Button>
           </div>

@@ -126,6 +126,41 @@ export const isValidCpf = (value: string): boolean => {
   return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]);
 };
 
+// ─── Gestão de operadores (Supabase Auth via Edge Function) ───
+const ADMIN_USERS_FUNCTION = 'admin-manage-user';
+
+/** Chama a Edge Function de administração de usuários e devolve mensagens claras de erro. */
+const invokeAdminUsuarios = async <T = unknown>(action: string, payload: Record<string, unknown>): Promise<T> => {
+  const { data, error } = await supabase.functions.invoke(ADMIN_USERS_FUNCTION, { body: { action, payload } });
+  if (!error) return data as T;
+
+  const response = (error as { context?: Response }).context;
+  if (response instanceof Response) {
+    if (response.status === 404) {
+      throw new Error(`A função "${ADMIN_USERS_FUNCTION}" ainda não foi publicada no Supabase. Publique-a para cadastrar usuários (veja o README).`);
+    }
+    try {
+      const body = await response.clone().json();
+      if (body?.error) throw new Error(body.error);
+    } catch (parsed) {
+      if (parsed instanceof Error && parsed.message) throw parsed;
+    }
+  }
+  throw new Error(error.message || 'Não foi possível concluir a operação no Supabase.');
+};
+
+const salvarUsuarioLocal = (u: UserProfile) => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.USUARIOS);
+    const users: UserProfile[] = raw ? JSON.parse(raw) : DEMO_USERS.map((x) => ({ ...x }));
+    const existe = users.some((item) => item.id === u.id);
+    const atualizados = existe ? users.map((item) => (item.id === u.id ? { ...item, ...u } : item)) : [...users, u];
+    localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(atualizados));
+  } catch (err) {
+    console.error('Erro ao salvar usuário no localStorage:', err);
+  }
+};
+
 export const dataService = {
   async validarCredencialQr(token: string): Promise<{
     valida: boolean;
@@ -1152,17 +1187,9 @@ export const dataService = {
   // 13. Gestão e Sincronização de Operadores / Usuários do Sistema
   async getUsuariosSistema(): Promise<UserProfile[]> {
     if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('nome_completo');
-        if (!error && data && data.length > 0) {
-          return data as UserProfile[];
-        }
-      } catch (err) {
-        console.warn('Erro ao carregar perfis do Supabase, utilizando armazenamento local:', err);
-      }
+      // Com Supabase, a lista oficial é sempre a do banco (nunca a cópia local do navegador).
+      const { data, error } = await supabase.from('profiles').select('*').order('nome_completo');
+      return requireLiveResult(data, error, 'Não foi possível carregar os usuários') as UserProfile[];
     }
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.USUARIOS);
@@ -1171,55 +1198,46 @@ export const dataService = {
     return DEMO_USERS.map((u) => ({ ...u }));
   },
 
-  async salvarUsuarioSistema(u: UserProfile): Promise<void> {
+  /**
+   * Cria o operador no Supabase Auth + profiles pela Edge Function admin-manage-user
+   * (a service_role fica só no servidor). Sem Supabase, grava no modo demonstração.
+   */
+  async criarUsuarioSistema(u: Omit<UserProfile, 'id'>, senha: string): Promise<UserProfile> {
     if (isSupabaseConfigured) {
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .update({
-            email: u.email,
-            nome_completo: u.nome_completo,
-            cargo: u.cargo,
-            role: u.role,
-            ativo: u.ativo,
-          })
-          .eq('id', u.id);
-        if (error) console.warn('Aviso ao atualizar perfil no Supabase:', error);
-      } catch (err) {
-        console.warn('Erro ao salvar perfil no Supabase:', err);
-      }
+      const { profile } = await invokeAdminUsuarios<{ profile: UserProfile }>('create_operator', {
+        email: u.email, password: senha, nome_completo: u.nome_completo, cargo: u.cargo, role: u.role, ativo: u.ativo,
+      });
+      return profile;
     }
-
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.USUARIOS);
-      const users: UserProfile[] = raw ? JSON.parse(raw) : DEMO_USERS.map((x) => ({ ...x }));
-      const idx = users.findIndex((item) => item.id === u.id);
-      let updated: UserProfile[];
-      if (idx >= 0) {
-        updated = users.map((item) => (item.id === u.id ? { ...item, ...u } : item));
-      } else {
-        updated = [...users, u];
-      }
-      localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(updated));
-    } catch (err) {
-      console.error('Erro ao salvar usuário no localStorage:', err);
-    }
+    const novo: UserProfile = { ...u, id: `u-custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, created_at: new Date().toISOString() };
+    salvarUsuarioLocal(novo);
+    return novo;
   },
 
+  /** Atualiza dados, papel, situação e (opcionalmente) senha/e-mail no Auth e no perfil. */
+  async salvarUsuarioSistema(u: UserProfile, novaSenha?: string): Promise<UserProfile> {
+    if (isSupabaseConfigured) {
+      const { profile } = await invokeAdminUsuarios<{ profile: UserProfile }>('update_operator', {
+        id: u.id, email: u.email, nome_completo: u.nome_completo, cargo: u.cargo, role: u.role, ativo: u.ativo,
+        ...(novaSenha ? { password: novaSenha } : {}),
+      });
+      return profile;
+    }
+    salvarUsuarioLocal(u);
+    return u;
+  },
+
+  /** Remove o operador do Auth (o perfil é apagado em cascata). */
   async excluirUsuarioSistema(id: string): Promise<void> {
     if (isSupabaseConfigured) {
-      try {
-        await supabase.from('profiles').delete().eq('id', id);
-      } catch (err) {
-        console.warn('Erro ao excluir perfil no Supabase:', err);
-      }
+      await invokeAdminUsuarios('delete_operator', { id });
+      return;
     }
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.USUARIOS);
       if (raw) {
         const users = JSON.parse(raw) as UserProfile[];
-        const filtered = users.filter((u) => u.id !== id);
-        localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(filtered));
+        localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(users.filter((item) => item.id !== id)));
       }
     } catch {}
   },
