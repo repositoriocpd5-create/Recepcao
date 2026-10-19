@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1422" />
     <title>SMEDU Recepção — Sistema de Gestão de Acesso e Atendimento</title>
     <meta name="description" content="Sistema oficial de controle de recepção, identificação de servidores, visitantes, autorizações e fluxo de acesso da Secretaria Municipal de Educação." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,6 +16,7 @@
         if (theme === 'light') {
           document.documentElement.classList.remove('dark');
           document.documentElement.dataset.theme = 'light';
+          document.querySelector('meta[name="theme-color"]').content = '#ffffff';
         }
       })();
     </script>
