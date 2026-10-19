@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +15,14 @@ export interface ModalProps {
   variant?: 'padrao' | 'destaque';
 }
 
+// Pilha de modais abertos: só o do topo responde ao Esc, e a rolagem da página
+// fica travada enquanto houver algum modal aberto.
+const openModals: string[] = [];
+
+const syncBodyScroll = () => {
+  document.body.style.overflow = openModals.length ? 'hidden' : '';
+};
+
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
@@ -24,19 +33,25 @@ export const Modal: React.FC<ModalProps> = ({
   maxWidth = 'lg',
   variant = 'padrao',
 }) => {
+  const modalId = useId();
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
+    if (!isOpen) return;
+    openModals.push(modalId);
+    syncBodyScroll();
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) onClose();
+      if (e.key === 'Escape' && openModals[openModals.length - 1] === modalId) onCloseRef.current();
     };
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    }
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.body.style.overflow = 'unset';
+      const index = openModals.lastIndexOf(modalId);
+      if (index >= 0) openModals.splice(index, 1);
+      syncBodyScroll();
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, modalId]);
 
   if (!isOpen) return null;
 
@@ -50,8 +65,8 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   if (variant === 'destaque') {
-    return (
-      <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ paddingBottom: 'var(--keyboard-inset, 0px)' }}>
+    return createPortal(
+      <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ paddingBottom: 'var(--keyboard-inset, 0px)' }}>
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={onClose} />
         <div
           className={cn(
@@ -75,6 +90,7 @@ export const Modal: React.FC<ModalProps> = ({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={onClose}
                 className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20"
                 aria-label="Fechar janela"
@@ -86,12 +102,13 @@ export const Modal: React.FC<ModalProps> = ({
 
           <div className="relative -mt-4 flex-1 overflow-y-auto rounded-t-3xl bg-white dark:bg-[#121826]">{children}</div>
         </div>
-      </div>
+      </div>,
+      document.body,
     );
   }
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ paddingBottom: 'var(--keyboard-inset, 0px)' }}>
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ paddingBottom: 'var(--keyboard-inset, 0px)' }}>
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
@@ -118,6 +135,7 @@ export const Modal: React.FC<ModalProps> = ({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="grid h-11 w-11 place-items-center rounded-xl text-[#627289] transition-colors hover:bg-[#edf5fc] hover:text-[#005a9c] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
             aria-label="Fechar janela"
@@ -128,6 +146,7 @@ export const Modal: React.FC<ModalProps> = ({
 
         <div className="py-4 overflow-y-auto flex-1 sm:py-3">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
