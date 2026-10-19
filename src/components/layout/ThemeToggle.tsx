@@ -44,11 +44,12 @@ export const useTheme = () => {
 };
 
 interface ThemeToggleProps {
-  size?: 'sm' | 'lg';
+  size?: 'xs' | 'sm' | 'lg';
   className?: string;
 }
 
 const SIZES = {
+  xs: { track: 'h-7 w-14', knob: 'h-5 w-5', shift: 'translate-x-7', icon: 'h-3 w-3', knobIcon: 'h-3.5 w-3.5' },
   sm: { track: 'h-8 w-16', knob: 'h-6 w-6', shift: 'translate-x-8', icon: 'h-3.5 w-3.5', knobIcon: 'h-4 w-4' },
   lg: { track: 'h-11 w-[84px]', knob: 'h-9 w-9', shift: 'translate-x-10', icon: 'h-4 w-4', knobIcon: 'h-5 w-5' },
 };

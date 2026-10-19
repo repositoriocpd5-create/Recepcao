@@ -74,19 +74,19 @@ export const Modal: React.FC<ModalProps> = ({
             maxWidths[maxWidth]
           )}
         >
-          <div className="relative overflow-hidden bg-gradient-to-r from-[#081a40] via-[#0c2558] to-[#123a86] px-5 pb-9 pt-6 sm:px-7 sm:pb-11 sm:pt-8">
+          <div className="relative overflow-hidden bg-gradient-to-r from-[#081a40] via-[#0c2558] to-[#123a86] px-4 pb-7 pt-4 sm:px-7 sm:pb-11 sm:pt-8">
             <div aria-hidden className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full border border-sky-300/15" />
             <div aria-hidden className="pointer-events-none absolute -right-8 -top-48 h-96 w-96 rounded-full border border-sky-300/10" />
             <div className="relative flex items-start justify-between gap-4">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
                 {icon && (
-                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white sm:h-14 sm:w-14">
                     {icon}
                   </div>
                 )}
                 <div>
-                  <h2 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">{title}</h2>
-                  {description && <p className="mt-0.5 text-sm text-sky-200/90 sm:text-base">{description}</p>}
+                  <h2 className="text-lg font-extrabold tracking-tight text-white sm:text-2xl">{title}</h2>
+                  {description && <p className="mt-0.5 text-xs text-sky-200/90 sm:text-base">{description}</p>}
                 </div>
               </div>
               <button

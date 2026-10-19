@@ -98,15 +98,16 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#dce4f0] px-4 lg:px-8 py-3 shadow-[0_2px_10px_rgba(18,44,82,.04)] dark:bg-[#0f1422]/95 dark:border-slate-800/80 dark:shadow-none">
       <div className="md:hidden">
-        <div className="flex items-center gap-2 min-[380px]:gap-3">
-          <button type="button" onClick={onOpenMobileMenu} className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[#d7e6f6] bg-white text-[#087ef5] shadow-sm" aria-label="Abrir menu de navegação"><Menu className="h-6 w-6" /></button>
-          <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[#b9d9f3] bg-white shadow-sm max-[379px]:hidden"><img src="/assets/brasao_itaguai.png" alt="Brasão do Município de Itaguaí" className="h-9 w-9 object-contain" /></div>
+        <div className="flex items-center gap-1.5 min-[380px]:gap-3">
+          <button type="button" onClick={onOpenMobileMenu} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl min-[380px]:h-11 min-[380px]:w-11 min-[380px]:rounded-2xl border border-[#d7e6f6] bg-white text-[#087ef5] shadow-sm" aria-label="Abrir menu de navegação"><Menu className="h-6 w-6" /></button>
+          <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-[#b9d9f3] bg-white shadow-sm min-[380px]:h-11 min-[380px]:w-11 min-[380px]:rounded-2xl"><img src="/assets/brasao_itaguai.png" alt="Brasão do Município de Itaguaí" className="h-8 w-8 object-contain min-[380px]:h-9 min-[380px]:w-9" /></div>
           <div className="min-w-0 flex-1 leading-tight">
-            <div className="flex items-start gap-1.5"><h1 className="text-[13px] font-extrabold leading-[1.05] tracking-wide text-[#082b57]">SECRETARIA MUNICIPAL<br />DE EDUCAÇÃO</h1><span className="mt-0.5 hidden rounded border border-[#b9d9f3] bg-[#edf5ff] px-1.5 py-0.5 text-[9px] font-bold text-[#087ef5] min-[420px]:inline">SMEDU</span></div>
-            <p className="mt-1 truncate text-[11px] text-[#68809f]">Sistema de Recepção e Controle de Acesso</p>
+            <div className="flex items-start gap-1.5"><h1 className="text-[11px] font-extrabold leading-[1.05] tracking-wide text-[#082b57] min-[380px]:text-[13px]">SECRETARIA MUNICIPAL<br />DE EDUCAÇÃO</h1><span className="mt-0.5 hidden rounded border border-[#b9d9f3] bg-[#edf5ff] px-1.5 py-0.5 text-[9px] font-bold text-[#087ef5] min-[420px]:inline">SMEDU</span></div>
+            <p className="mt-1 truncate text-[10px] text-[#68809f] min-[380px]:text-[11px]">Sistema de Recepção e Controle de Acesso</p>
           </div>
-          <ThemeToggle size="sm" />
-          <button type="button" onClick={() => setIsAccountOpen(true)} aria-haspopup="dialog" aria-expanded={isAccountOpen} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#e1f0ff] text-[#087ef5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#087ef5]" aria-label="Abrir conta e preferências" title="Conta e preferências"><UserRound className="h-6 w-6" /></button>
+          <ThemeToggle size="xs" className="min-[380px]:hidden" />
+          <ThemeToggle size="sm" className="max-[379px]:hidden" />
+          <button type="button" onClick={() => setIsAccountOpen(true)} aria-haspopup="dialog" aria-expanded={isAccountOpen} className="grid h-10 w-10 min-[380px]:h-11 min-[380px]:w-11 shrink-0 place-items-center rounded-full bg-[#e1f0ff] text-[#087ef5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#087ef5]" aria-label="Abrir conta e preferências" title="Conta e preferências"><UserRound className="h-6 w-6" /></button>
         </div>
       </div>
 

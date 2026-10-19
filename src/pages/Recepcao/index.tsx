@@ -71,48 +71,49 @@ interface FichaPessoaIdentificadaProps {
 }
 
 // Conteúdo do modal "Pessoa identificada" (servidor ou visitante).
+// No celular: dados em lista compacta e barra de ações fixa no rodapé (sempre visível).
 export const FichaPessoaIdentificada: React.FC<FichaPessoaIdentificadaProps> = ({ nome, documentos, status, dados, extra, acoes }) => (
   <>
-    <div className="space-y-6 px-5 pb-6 pt-6 sm:px-7">
-      <div className="flex flex-col gap-4 rounded-2xl border border-[#dce6f3] bg-white p-5 shadow-[0_10px_30px_-18px_rgba(18,44,82,.35)] sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-900/60">
-        <div className="flex min-w-0 items-center gap-5">
-          <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-4xl font-extrabold text-white shadow-[0_0_0_4px_#e6f1fd] dark:shadow-[0_0_0_4px_rgba(30,64,120,.5)]">
+    <div className="space-y-4 px-4 pb-4 pt-5 sm:space-y-6 sm:px-7 sm:pb-6 sm:pt-6">
+      <div className="flex flex-col gap-3 rounded-2xl border border-[#dce6f3] bg-white p-3.5 shadow-[0_10px_30px_-18px_rgba(18,44,82,.35)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-5">
+          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-2xl font-extrabold text-white shadow-[0_0_0_4px_#e6f1fd] sm:h-20 sm:w-20 sm:text-4xl dark:shadow-[0_0_0_4px_rgba(30,64,120,.5)]">
             {nome.charAt(0)}
           </div>
           <div className="min-w-0">
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#627289] dark:text-slate-400">Identificação</span>
-            <h4 className="truncate text-2xl font-extrabold leading-tight text-[#0d1f45] dark:text-slate-100">{nome}</h4>
-            <p className="mt-0.5 text-base text-[#627289] dark:text-slate-400">{documentos}</p>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#627289] sm:text-xs dark:text-slate-400">Identificação</span>
+            <h4 className="line-clamp-2 break-words text-lg font-extrabold leading-tight text-[#0d1f45] sm:truncate sm:text-2xl dark:text-slate-100" title={nome}>{nome}</h4>
+            <p className="mt-0.5 text-xs text-[#627289] sm:text-base dark:text-slate-400">{documentos}</p>
           </div>
         </div>
         <span className={cn(
-          'inline-flex shrink-0 items-center gap-2 self-start rounded-full border px-4 py-2 text-sm font-semibold sm:self-center',
+          'inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border px-3 py-1 text-xs font-semibold sm:gap-2 sm:self-center sm:px-4 sm:py-2 sm:text-sm',
           status.tom === 'sucesso'
             ? 'border-[#bfe8cd] bg-[#eefbf2] text-[#15803d] dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300'
             : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300'
         )}>
-          {status.tom === 'sucesso' ? <CheckCircle2 className="h-5 w-5 fill-[#16a34a] text-white" /> : <Clock className="h-5 w-5" />}
+          {status.tom === 'sucesso' ? <CheckCircle2 className="h-4 w-4 fill-[#16a34a] text-white sm:h-5 sm:w-5" /> : <Clock className="h-4 w-4 sm:h-5 sm:w-5" />}
           {status.texto}
         </span>
       </div>
 
-      <div className="space-y-3">
-        <h3 className="text-lg font-extrabold text-[#0d1f45] dark:text-slate-100">Dados cadastrais</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="space-y-2 sm:space-y-3">
+        <h3 className="text-sm font-extrabold text-[#0d1f45] sm:text-lg dark:text-slate-100">Dados cadastrais</h3>
+        <dl className="divide-y divide-[#e3eaf4] overflow-hidden rounded-2xl border border-[#dce6f3] bg-[#fbfdff] sm:grid sm:grid-cols-3 sm:gap-3 sm:divide-y-0 sm:overflow-visible sm:rounded-none sm:border-0 sm:bg-transparent dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900 sm:dark:bg-transparent">
           {dados.map((item) => (
-            <div key={item.rotulo} className="flex gap-3.5 rounded-2xl border border-[#dce6f3] bg-[#fbfdff] p-4 dark:border-slate-800 dark:bg-slate-900">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e9f2fd] text-[#0b5ed7] dark:bg-slate-800 dark:text-sky-300">{item.icone}</div>
-              <div className="min-w-0">
-                <span className="block text-xs text-[#627289] dark:text-slate-400">{item.rotulo}</span>
-                <span className="block break-words text-base font-bold leading-snug text-[#0d1f45] dark:text-slate-100">{item.valor}</span>
+            <div key={item.rotulo} className="flex items-center gap-3 px-3.5 py-2.5 sm:items-start sm:gap-3.5 sm:rounded-2xl sm:border sm:border-[#dce6f3] sm:bg-[#fbfdff] sm:p-4 sm:dark:border-slate-800 sm:dark:bg-slate-900">
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#e9f2fd] text-[#0b5ed7] sm:h-11 sm:w-11 sm:rounded-xl dark:bg-slate-800 dark:text-sky-300 [&>svg]:h-4 [&>svg]:w-4 sm:[&>svg]:h-5 sm:[&>svg]:w-5">{item.icone}</div>
+              <div className="flex min-w-0 flex-1 items-baseline justify-between gap-3 sm:block">
+                <dt className="shrink-0 text-[11px] text-[#627289] sm:block sm:text-xs dark:text-slate-400">{item.rotulo}</dt>
+                <dd className="min-w-0 break-words text-right text-sm font-bold leading-snug text-[#0d1f45] sm:text-left sm:text-base dark:text-slate-100">{item.valor}</dd>
               </div>
             </div>
           ))}
-        </div>
+        </dl>
       </div>
       {extra}
     </div>
-    <div className="flex justify-end gap-3 border-t border-[#e3eaf4] px-5 py-5 sm:px-7 dark:border-slate-800">{acoes}</div>
+    <div className="sticky bottom-0 z-10 flex gap-2 border-t border-[#e3eaf4] bg-white/95 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:justify-end sm:gap-3 sm:px-7 sm:py-5 dark:border-slate-800 dark:bg-[#121826]/95 [&>*:last-child]:flex-1 sm:[&>*:last-child]:flex-none">{acoes}</div>
   </>
 );
 
@@ -1591,11 +1592,11 @@ export const RecepcaoPage: React.FC = () => {
               { icone: <Phone className="w-5 h-5" />, rotulo: 'Contato', valor: servidorResultado.servidor.telefone || servidorResultado.servidor.email || 'Não informado' },
             ]}
             acoes={<>
-              <Button variant="outline" className="min-h-12 rounded-xl px-7" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
+              <Button variant="outline" className="min-h-12 rounded-xl px-4 sm:px-7" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
               {servidorResultado.no_predio && servidorResultado.movimentacao_atual ? (
-                <Button variant="danger" className="min-h-12 rounded-xl px-7" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(servidorResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
+                <Button variant="danger" className="min-h-12 rounded-xl px-4 sm:px-7" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(servidorResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
               ) : (
-                <Button variant="primary" className="min-h-12 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-7 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] hover:from-[#2a7fff] hover:to-[#0b52d6]" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}>Iniciar registro de entrada <ArrowRight className="w-5 h-5" /></Button>
+                <Button variant="primary" className="min-h-12 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-4 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] hover:from-[#2a7fff] hover:to-[#0b52d6] sm:px-7" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}><span className="sm:hidden">Iniciar entrada</span><span className="hidden sm:inline">Iniciar registro de entrada</span> <ArrowRight className="w-5 h-5" /></Button>
               )}
             </>}
           />
@@ -1618,11 +1619,11 @@ export const RecepcaoPage: React.FC = () => {
               </div>
             )}
             acoes={<>
-              <Button variant="outline" className="min-h-12 rounded-xl px-7" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
+              <Button variant="outline" className="min-h-12 rounded-xl px-4 sm:px-7" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
               {visitanteResultado.no_predio && visitanteResultado.movimentacao_atual ? (
-                <Button variant="danger" className="min-h-12 rounded-xl px-7" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(visitanteResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
+                <Button variant="danger" className="min-h-12 rounded-xl px-4 sm:px-7" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(visitanteResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
               ) : (
-                <Button variant="primary" className="min-h-12 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-7 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] hover:from-[#2a7fff] hover:to-[#0b52d6]" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}>Iniciar registro de entrada <ArrowRight className="w-5 h-5" /></Button>
+                <Button variant="primary" className="min-h-12 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-4 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] hover:from-[#2a7fff] hover:to-[#0b52d6] sm:px-7" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}><span className="sm:hidden">Iniciar entrada</span><span className="hidden sm:inline">Iniciar registro de entrada</span> <ArrowRight className="w-5 h-5" /></Button>
               )}
             </>}
           />
