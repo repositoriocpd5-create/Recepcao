@@ -132,7 +132,7 @@ export const GUIAS: Guia[] = [
     antesDeComecar: [
       'Tenha em mãos a matrícula (servidor) ou o CPF (visitante).',
       'Separe um crachá com situação “Disponível”.',
-      'Atalhos: Alt + S (servidor) e Alt + V (visitante).',
+      'Atalhos: F1 (servidor) e F2 (visitante).',
     ],
     ondeAcessar: { rotulo: 'Recepção (Atendimento)', rota: '/recepcao' },
     passos: [

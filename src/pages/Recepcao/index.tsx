@@ -834,17 +834,23 @@ export const RecepcaoPage: React.FC = () => {
     const handleKeyboardShortcut = (event: KeyboardEvent) => {
       const element = event.target as HTMLElement | null;
       const isTyping = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement || element?.isContentEditable;
+      const key = event.code;
+
+      // F1 (servidor) e F2 (visitante): bloqueia sempre a ação padrão do navegador (F1 abre a ajuda).
+      if ((key === 'F1' || key === 'F2') && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        event.preventDefault();
+        if (isTyping) return;
+        const isServidor = key === 'F1';
+        setActiveTab(isServidor ? 'servidor' : 'visitante');
+        setIdentificationMethod(isServidor ? 'matricula' : 'cpf');
+        setSearchFeedback({ type: null, message: '' });
+        setIsIdentificationModalOpen(true);
+        return;
+      }
+
       if (isTyping || !event.altKey || event.ctrlKey || event.metaKey) return;
 
-      const key = event.code;
-      // Alguns navegadores/teclados interceptam Alt+S; Alt+1 é o atalho alternativo equivalente.
-      if (key === 'KeyS' || key === 'Digit1' || event.key.toLocaleLowerCase('pt-BR') === 's') {
-        event.preventDefault();
-        setActiveTab('servidor'); setIdentificationMethod('matricula'); setSearchFeedback({ type: null, message: '' }); setIsIdentificationModalOpen(true);
-      } else if (key === 'KeyV') {
-        event.preventDefault();
-        setActiveTab('visitante'); setIdentificationMethod('cpf'); setSearchFeedback({ type: null, message: '' }); setIsIdentificationModalOpen(true);
-      } else if (key === 'KeyD') {
+      if (key === 'KeyD') {
         event.preventDefault();
         setReturnBarcodeInput(''); setReturnBarcodeFeedback(null); setIsBarcodeReturnModalOpen(true);
       } else if (key === 'KeyA') {
@@ -924,7 +930,7 @@ export const RecepcaoPage: React.FC = () => {
             setSearchFeedback({ type: null, message: '' });
             setIsIdentificationModalOpen(true);
           }}
-          title="Identificar servidor — atalhos Alt + S ou Alt + 1"
+          title="Identificar servidor — atalho F1"
           className={`group relative flex min-h-[128px] min-w-0 cursor-pointer items-center gap-3 overflow-hidden rounded-[20px] border p-4 text-left sm:gap-5 sm:p-5 transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
             identificationMethod === 'matricula'
               ? 'bg-[linear-gradient(135deg,#eff8ff_0%,#fff_66%,#e2f1ff_100%)] dark:bg-none border-[#8cc8ff] shadow-[0_18px_32px_-20px_rgba(8,119,201,.65)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
@@ -937,10 +943,10 @@ export const RecepcaoPage: React.FC = () => {
           <div className="relative z-10 min-w-0 flex-1 pr-10 pt-4 sm:pr-14 sm:pt-0">
             <h3 className="text-base sm:text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Servidor</h3>
             <p className="text-sm font-medium text-[#173b70] dark:text-slate-400 mt-0.5">Identificar por matrícula</p>
-            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de servidores <kbd className="ml-1 hidden sm:inline rounded border border-[#b9d9f3] bg-white/70 px-1 font-mono text-[10px] text-[#0877d1]">Alt S / 1</kbd></p>
+            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de servidores <kbd className="ml-1 hidden sm:inline rounded border border-[#b9d9f3] bg-white/70 px-1 font-mono text-[10px] text-[#0877d1]">F1</kbd></p>
           </div>
           <div className={`absolute z-10 shrink-0 ${identificationMethod === 'matricula' ? 'right-3 top-3 whitespace-nowrap rounded-full bg-[#dcfce7] px-2.5 py-1 text-[10px] font-semibold text-emerald-600 sm:right-4 sm:top-4' : 'bottom-4 right-4 grid h-10 w-10 place-items-center rounded-full bg-[#087ef5] text-white shadow-md transition-transform group-hover:translate-x-1 sm:bottom-5 sm:right-5 sm:h-12 sm:w-12'}`}>
-            {identificationMethod === 'matricula' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar servidor" /><span className="sr-only">Alt S</span></>}
+            {identificationMethod === 'matricula' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar servidor" /><span className="sr-only">F1</span></>}
           </div>
         </div>
 
@@ -952,7 +958,7 @@ export const RecepcaoPage: React.FC = () => {
             setSearchFeedback({ type: null, message: '' });
             setIsIdentificationModalOpen(true);
           }}
-          title="Identificar visitante — atalho Alt + V"
+          title="Identificar visitante — atalho F2"
           className={`group relative flex min-h-[128px] min-w-0 cursor-pointer items-center gap-3 overflow-hidden rounded-[20px] border p-4 text-left sm:gap-5 sm:p-5 transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
             identificationMethod === 'cpf'
               ? 'bg-[linear-gradient(135deg,#effdf5_0%,#fff_66%,#dcfce7_100%)] dark:bg-none border-[#a7ebc3] shadow-[0_18px_32px_-20px_rgba(22,163,74,.48)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
@@ -965,10 +971,10 @@ export const RecepcaoPage: React.FC = () => {
           <div className="relative z-10 min-w-0 flex-1 pr-10 pt-4 sm:pr-14 sm:pt-0">
             <h3 className="text-base sm:text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Visitante</h3>
             <p className="text-sm font-medium text-[#173b70] dark:text-slate-400 mt-0.5">Identificar por CPF</p>
-            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de visitantes <kbd className="ml-1 hidden sm:inline rounded border border-[#bfe7ce] bg-white/70 px-1 font-mono text-[10px] text-[#16964a]">Alt V</kbd></p>
+            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de visitantes <kbd className="ml-1 hidden sm:inline rounded border border-[#bfe7ce] bg-white/70 px-1 font-mono text-[10px] text-[#16964a]">F2</kbd></p>
           </div>
           <div className={`absolute z-10 shrink-0 ${identificationMethod === 'cpf' ? 'right-3 top-3 whitespace-nowrap rounded-full bg-[#dcfce7] px-2.5 py-1 text-[10px] font-semibold text-emerald-600 sm:right-4 sm:top-4' : 'bottom-4 right-4 grid h-10 w-10 place-items-center rounded-full bg-[#00a65a] text-white shadow-md transition-transform group-hover:translate-x-1 sm:bottom-5 sm:right-5 sm:h-12 sm:w-12'}`}>
-            {identificationMethod === 'cpf' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar visitante" /><span className="sr-only">Alt V</span></>}
+            {identificationMethod === 'cpf' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar visitante" /><span className="sr-only">F2</span></>}
           </div>
         </div>
       </div>
@@ -979,7 +985,7 @@ export const RecepcaoPage: React.FC = () => {
             <form onSubmit={handleConsultarMatricula} className="hidden">
               <div className="flex-1">
                 <Input
-                  placeholder="Ex: SME-100201 ou SME-200781"
+                  placeholder="Ex.: 38.000 ou 38000"
                   value={matriculaInput}
                   onChange={(e) => setMatriculaInput(e.target.value)}
                   icon={<Search className="w-4 h-4" />}
@@ -1450,7 +1456,7 @@ export const RecepcaoPage: React.FC = () => {
           <form onSubmit={handleConsultarMatricula} className="space-y-4">
             <Input
               label="Matrícula"
-              placeholder="Ex.: SME-100201 ou SME-200781"
+              placeholder="Ex.: 38.000 ou 38000"
               value={matriculaInput}
               onChange={(event) => setMatriculaInput(event.target.value)}
               icon={<Search className="w-4 h-4" />}
@@ -1625,7 +1631,7 @@ export const RecepcaoPage: React.FC = () => {
         maxWidth="sm"
       >
         <div className="space-y-2">
-          {[['Alt + S ou Alt + 1', 'Identificar servidor'], ['Alt + V', 'Identificar visitante'], ['Alt + D', 'Abrir devolução rápida'], ['Alt + A', 'Atualizar dados'], ['Alt + P', 'Gerar PDF'], ['Esc', 'Fechar o modal atual']].map(([shortcut, action]) => (
+          {[['F1', 'Identificar servidor'], ['F2', 'Identificar visitante'], ['Alt + D', 'Abrir devolução rápida'], ['Alt + A', 'Atualizar dados'], ['Alt + P', 'Gerar PDF'], ['Esc', 'Fechar o modal atual']].map(([shortcut, action]) => (
             <div key={shortcut} className="flex items-center justify-between rounded-xl border border-[#dce4f0] bg-[#f8fbff] px-3 py-2.5 text-sm dark:border-slate-800 dark:bg-slate-900">
               <span className="text-[#37475e] dark:text-slate-200">{action}</span>
               <kbd className="rounded-md border border-[#b9d9f3] bg-white px-2 py-1 font-mono text-xs font-semibold text-[#0877d1] dark:bg-slate-800 dark:border-slate-700">{shortcut}</kbd>

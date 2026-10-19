@@ -460,7 +460,18 @@ export const dataService = {
     operador?: UserProfile | null
   ): Promise<ConsultaServidorResultado> {
     const limpa = matricula.trim().toLowerCase();
+    const resultado = await this.consultarMatriculaExata(limpa, operador);
 
+    // Aceita matrícula digitada com ponto de milhar (38.000 → 38000) quando não há cadastro com o ponto.
+    const semPontos = limpa.replace(/\./g, '');
+    if (resultado.encontrado || !semPontos || semPontos === limpa) return resultado;
+    return this.consultarMatriculaExata(semPontos, operador);
+  },
+
+  async consultarMatriculaExata(
+    limpa: string,
+    operador?: UserProfile | null
+  ): Promise<ConsultaServidorResultado> {
     if (isSupabaseConfigured) {
       const { data, error } = await supabase.rpc('rpc_consultar_servidor', {
         p_matricula: limpa,
