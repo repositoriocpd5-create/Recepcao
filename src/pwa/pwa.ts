@@ -153,6 +153,28 @@ const trackWaiting = (registration: ServiceWorkerRegistration) => {
   });
 };
 
+// Lembra, neste navegador, que o app foi instalado: o convite não abre mais sozinho.
+const INSTALLED_KEY = 'sme-pwa-installed';
+
+export const markInstalled = () => {
+  try { localStorage.setItem(INSTALLED_KEY, '1'); } catch {}
+};
+
+/** O app já foi instalado a partir deste navegador (ou o Chrome confirma que está instalado). */
+export const wasInstalled = async (): Promise<boolean> => {
+  try { if (localStorage.getItem(INSTALLED_KEY) === '1') return true; } catch {}
+  // Chrome/Android: informa PWAs instalados listados em related_applications do manifest.
+  const nav = navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> };
+  if (!nav.getInstalledRelatedApps) return false;
+  try {
+    const apps = await nav.getInstalledRelatedApps();
+    if (apps.length) markInstalled();
+    return apps.length > 0;
+  } catch {
+    return false;
+  }
+};
+
 let initialized = false;
 
 export const initPwa = () => {
@@ -166,6 +188,7 @@ export const initPwa = () => {
   });
 
   window.addEventListener('appinstalled', () => {
+    markInstalled();
     deferredPrompt = null;
     setState({ canInstall: false, justInstalled: true, installSheetOpen: false });
   });

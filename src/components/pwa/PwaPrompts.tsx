@@ -10,10 +10,12 @@ import {
   iosBrowserCanInstall,
   isInstallAvailable,
   isMobileDevice,
+  markInstalled,
   openInstallSheet,
   promptInstall,
   usePwa,
   waitForInstallPrompt,
+  wasInstalled,
 } from '@/pwa/pwa';
 
 // "Agora não" pausa o convite por 30 minutos. Pausas longas (ou por aba, que no iPhone
@@ -22,9 +24,25 @@ const DISMISS_KEY = 'sme-pwa-install-dismissed-until';
 const DISMISS_MINUTES = 30;
 // Link que sempre abre o convite, ignorando a pausa (ex.: enviar por WhatsApp): /?instalar
 const FORCE_PARAM = 'instalar';
+// Depois de tocar em "Instalar", o convite não abre sozinho por 7 dias (a pessoa já agiu).
+const ATTEMPT_DAYS = 7;
+// O convite automático aparece no máximo uma vez por visita, mesmo que a página recarregue.
+const SHOWN_SESSION_KEY = 'sme-pwa-install-auto-shown';
 
 const wasDismissedRecently = () => {
   try { return Number(localStorage.getItem(DISMISS_KEY) || 0) > Date.now(); } catch { return false; }
+};
+
+const rememberAttempt = () => {
+  try { localStorage.setItem(DISMISS_KEY, String(Date.now() + ATTEMPT_DAYS * 86_400_000)); } catch {}
+};
+
+const wasAutoShownThisVisit = () => {
+  try { return sessionStorage.getItem(SHOWN_SESSION_KEY) === '1'; } catch { return false; }
+};
+
+const rememberAutoShown = () => {
+  try { sessionStorage.setItem(SHOWN_SESSION_KEY, '1'); } catch {}
 };
 
 const rememberDismiss = () => {
@@ -110,9 +128,17 @@ export const PwaPrompts = () => {
       window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
     }
     // iPads maiores que 1024 px não passam em isMobileDevice(), mas também instalam pelo Compartilhar.
-    if (pwa.isStandalone || !(pwa.isIos || isMobileDevice()) || (!forcado && wasDismissedRecently())) return;
-    const timer = window.setTimeout(openInstallSheet, 900);
-    return () => window.clearTimeout(timer);
+    if (pwa.isStandalone || !(pwa.isIos || isMobileDevice())) return;
+    if (!forcado && (wasDismissedRecently() || wasAutoShownThisVisit())) return;
+    let cancelado = false;
+    const timer = window.setTimeout(async () => {
+      // App já instalado neste aparelho: não insiste (os botões "Instalar o app" continuam disponíveis).
+      if (!forcado && (await wasInstalled())) return;
+      if (cancelado) return;
+      rememberAutoShown();
+      openInstallSheet();
+    }, 900);
+    return () => { cancelado = true; window.clearTimeout(timer); };
   }, [pwa.isStandalone, pwa.isIos]);
 
   // Cada abertura do convite começa pela pergunta, não pelo passo a passo.
@@ -151,6 +177,8 @@ export const PwaPrompts = () => {
   };
 
   const handleInstall = async () => {
+    // A pessoa já decidiu instalar: o convite não reabre sozinho, qualquer que seja o resultado.
+    rememberAttempt();
     // O iPhone não tem instalação automática: mostra onde tocar.
     if (pwa.isIos && !pwa.canInstall) {
       setIosPassos(true);
@@ -165,8 +193,9 @@ export const PwaPrompts = () => {
         return;
       }
       const accepted = await promptInstall();
-      if (accepted) closeInstallSheet();
-      else dismiss();
+      if (accepted) markInstalled();
+      setShowManualSteps(false);
+      closeInstallSheet();
     } finally {
       setIsInstalling(false);
     }
