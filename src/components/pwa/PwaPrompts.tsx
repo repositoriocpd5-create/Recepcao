@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle2, Download, Loader2, Menu, MoreVertical, RefreshCw, Share, Smartphone, SquarePlus, Wifi, X, Zap } from 'lucide-react';
+import { CheckCircle2, Compass, Copy, Download, Loader2, Menu, MoreHorizontal, MoreVertical, RefreshCw, Share, Smartphone, SquarePlus, Wifi, X, Zap } from 'lucide-react';
 import {
   applyUpdate,
   closeInstallSheet,
+  detectIosBrowser,
   detectMobileBrowser,
   dismissInstalledNotice,
+  iosBrowserCanInstall,
   isInstallAvailable,
   isMobileDevice,
   openInstallSheet,
@@ -14,11 +16,17 @@ import {
   waitForInstallPrompt,
 } from '@/pwa/pwa';
 
-// "Agora não" vale só para esta visita: ao abrir o sistema de novo, o convite volta.
-const DISMISS_KEY = 'sme-pwa-install-dismissed';
+// "Agora não" pausa o convite por algumas horas. Antes valia para a aba inteira, mas o
+// Chrome e o Safari do iPhone mantêm a mesma aba aberta por dias, e o convite nunca voltava.
+const DISMISS_KEY = 'sme-pwa-install-dismissed-until';
+const DISMISS_HOURS = 8;
 
-const wasDismissedThisVisit = () => {
-  try { return sessionStorage.getItem(DISMISS_KEY) === '1'; } catch { return false; }
+const wasDismissedRecently = () => {
+  try { return Number(localStorage.getItem(DISMISS_KEY) || 0) > Date.now(); } catch { return false; }
+};
+
+const rememberDismiss = () => {
+  try { localStorage.setItem(DISMISS_KEY, String(Date.now() + DISMISS_HOURS * 3_600_000)); } catch {}
 };
 
 const BENEFITS = [
@@ -27,10 +35,35 @@ const BENEFITS = [
   { Icon: Wifi, text: 'Atualizações automáticas, sem reinstalar' },
 ];
 
-const IOS_STEPS = [
-  { Icon: Share, text: <>Toque em <strong>Compartilhar</strong> na barra do navegador</> },
-  { Icon: SquarePlus, text: <>Escolha <strong>Adicionar à Tela de Início</strong></> },
-  { Icon: CheckCircle2, text: <>Confirme em <strong>Adicionar</strong></> },
+// Passo a passo no iPhone/iPad: o botão Compartilhar fica em lugares diferentes em cada navegador.
+const IOS_STEPS = {
+  safari: [
+    { Icon: Share, text: <>Toque em <strong>Compartilhar</strong> na barra inferior (ou no menu <strong>⋯</strong>)</> },
+    { Icon: SquarePlus, text: <>Role e escolha <strong>Adicionar à Tela de Início</strong></> },
+    { Icon: CheckCircle2, text: <>Confirme em <strong>Adicionar</strong></> },
+  ],
+  chrome: [
+    { Icon: Share, text: <>Toque em <strong>Compartilhar</strong>, no topo, ao lado do endereço</> },
+    { Icon: SquarePlus, text: <>Role e escolha <strong>Adicionar à Tela de Início</strong></> },
+    { Icon: CheckCircle2, text: <>Confirme em <strong>Adicionar</strong></> },
+  ],
+  edge: [
+    { Icon: MoreHorizontal, text: <>Toque no menu <strong>⋯</strong> na barra inferior</> },
+    { Icon: Share, text: <>Toque em <strong>Compartilhar</strong> e escolha <strong>Adicionar à Tela de Início</strong></> },
+    { Icon: CheckCircle2, text: <>Confirme em <strong>Adicionar</strong></> },
+  ],
+  firefox: [
+    { Icon: Menu, text: <>Toque no menu <strong>☰</strong> e depois em <strong>Compartilhar</strong></> },
+    { Icon: SquarePlus, text: <>Escolha <strong>Adicionar à Tela de Início</strong></> },
+    { Icon: CheckCircle2, text: <>Confirme em <strong>Adicionar</strong></> },
+  ],
+};
+
+// Navegador do iPhone que não instala apps (iOS antigo ou navegador embutido de outro app).
+const IOS_SAFARI_STEPS = [
+  { Icon: Copy, text: <>Toque em <strong>Copiar link</strong> abaixo</> },
+  { Icon: Compass, text: <>Abra o <strong>Safari</strong> e cole o link na barra de endereço</> },
+  { Icon: SquarePlus, text: <>Toque em <strong>Compartilhar</strong> → <strong>Adicionar à Tela de Início</strong></> },
 ];
 
 // Passo a passo quando o navegador Android não libera a instalação nativa.
@@ -62,13 +95,15 @@ export const PwaPrompts = () => {
   const pwa = usePwa();
   const [isInstalling, setIsInstalling] = useState(false);
   const [showManualSteps, setShowManualSteps] = useState(false);
+  const [linkCopiado, setLinkCopiado] = useState(false);
 
   // Ao abrir o sistema no celular (fora do app instalado), o convite aparece em seguida.
   useEffect(() => {
-    if (pwa.isStandalone || !isMobileDevice() || wasDismissedThisVisit()) return;
+    // iPads maiores que 1024 px não passam em isMobileDevice(), mas também instalam pelo Compartilhar.
+    if (pwa.isStandalone || !(pwa.isIos || isMobileDevice()) || wasDismissedRecently()) return;
     const timer = window.setTimeout(openInstallSheet, 900);
     return () => window.clearTimeout(timer);
-  }, [pwa.isStandalone]);
+  }, [pwa.isStandalone, pwa.isIos]);
 
   // Se a instalação nativa ficar disponível com o passo a passo aberto, volta para o botão "Instalar".
   useEffect(() => {
@@ -89,7 +124,7 @@ export const PwaPrompts = () => {
   }, [pwa.installSheetOpen]);
 
   const dismiss = () => {
-    try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch {}
+    rememberDismiss();
     setShowManualSteps(false);
     closeInstallSheet();
   };
@@ -111,7 +146,21 @@ export const PwaPrompts = () => {
     }
   };
 
-  const steps = pwa.isIos && !pwa.canInstall ? IOS_STEPS : showManualSteps ? ANDROID_STEPS[detectMobileBrowser()] : null;
+  const iosBrowser = pwa.isIos ? detectIosBrowser() : null;
+  const iosPrecisaSafari = pwa.isIos && !iosBrowserCanInstall();
+  const steps = pwa.isIos && !pwa.canInstall
+    ? iosPrecisaSafari || iosBrowser === 'other' || !iosBrowser ? IOS_SAFARI_STEPS : IOS_STEPS[iosBrowser]
+    : showManualSteps ? ANDROID_STEPS[detectMobileBrowser()] : null;
+
+  const copiarLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.origin);
+      setLinkCopiado(true);
+      window.setTimeout(() => setLinkCopiado(false), 2500);
+    } catch {
+      window.prompt('Copie o endereço do sistema:', window.location.origin);
+    }
+  };
 
   return createPortal(
     <>
@@ -141,6 +190,11 @@ export const PwaPrompts = () => {
                   </li>
                 ))}
               </ol>
+              {iosPrecisaSafari && (
+                <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-center text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                  Neste navegador o iPhone não permite instalar apps. Use o <strong>Safari</strong>.
+                </p>
+              )}
               <p className="mt-3 text-center text-[11px] text-[#68809f] dark:text-slate-500">Se o app já estiver instalado, abra pelo ícone <strong>SMEDU Recepção</strong> na tela inicial.</p>
               </>
             ) : (
@@ -158,7 +212,11 @@ export const PwaPrompts = () => {
               <button type="button" onClick={dismiss} className="min-h-12 rounded-xl border border-[#d7e6f6] text-sm font-bold text-[#526d91] hover:bg-[#f2f7ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#087ef5] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                 Agora não
               </button>
-              {steps ? (
+              {steps === IOS_SAFARI_STEPS ? (
+                <button type="button" onClick={copiarLink} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#005a9c] text-sm font-bold text-white shadow-[0_12px_24px_-12px_rgba(0,90,156,.9)] hover:bg-[#0877c9] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ef5]">
+                  {linkCopiado ? <><CheckCircle2 className="h-4 w-4" />Link copiado</> : <><Copy className="h-4 w-4" />Copiar link</>}
+                </button>
+              ) : steps ? (
                 <button type="button" onClick={dismiss} className="min-h-12 rounded-xl bg-[#005a9c] text-sm font-bold text-white shadow-[0_12px_24px_-12px_rgba(0,90,156,.9)] hover:bg-[#0877c9] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ef5]">
                   Entendi
                 </button>

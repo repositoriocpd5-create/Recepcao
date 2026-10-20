@@ -28,6 +28,36 @@ const detectIos = () => {
 };
 
 export type MobileBrowser = 'samsung' | 'firefox' | 'chrome' | 'other';
+export type IosBrowser = 'safari' | 'chrome' | 'edge' | 'firefox' | 'other';
+
+/** Navegador no iPhone/iPad: cada um mostra o botão Compartilhar em um lugar diferente. */
+export const detectIosBrowser = (): IosBrowser => {
+  const ua = navigator.userAgent;
+  if (/CriOS/i.test(ua)) return 'chrome';
+  if (/EdgiOS/i.test(ua)) return 'edge';
+  if (/FxiOS/i.test(ua)) return 'firefox';
+  // Outros apps (Instagram, WhatsApp, Gmail...) abrem páginas em navegadores embutidos sem "Safari/" no UA.
+  if (/Safari\//i.test(ua) && !/GSA\/|FBAN|FBAV|Instagram|Line\//i.test(ua)) return 'safari';
+  return 'other';
+};
+
+/** Versão do iOS (ex.: 17.4); null quando não dá para identificar. */
+export const iosVersion = (): number | null => {
+  const match = navigator.userAgent.match(/OS (\d+)[_.](\d+)/);
+  return match ? Number(`${match[1]}.${match[2]}`) : null;
+};
+
+/**
+ * Antes do iOS 16.4 apenas o Safari adiciona sites à Tela de Início;
+ * Chrome, Edge e Firefox no iPhone passaram a permitir a partir dessa versão.
+ */
+export const iosBrowserCanInstall = () => {
+  const navegador = detectIosBrowser();
+  if (navegador === 'safari') return true;
+  if (navegador === 'other') return false;
+  const versao = iosVersion();
+  return versao === null || versao >= 16.4;
+};
 
 /** Navegador do celular, para mostrar o passo a passo certo quando não há instalação nativa. */
 export const detectMobileBrowser = (): MobileBrowser => {
