@@ -191,6 +191,28 @@ export const RamaisPage: React.FC = () => {
 
   const termos = useMemo(() => normalizar(busca).split(/\s+/).filter(Boolean), [busca]);
 
+  // Nomes dos servidores já normalizados, para a busca por servidor não repetir o trabalho a cada tecla.
+  const nomesNormalizados = useMemo(() => {
+    const mapa = new Map<string, string>();
+    servidoresPorLotacao.forEach((lista) => lista.forEach((servidor) => mapa.set(servidor.id, normalizar(servidor.nome))));
+    return mapa;
+  }, [servidoresPorLotacao]);
+
+  /** Servidores de cada unidade cujo nome contém todos os termos buscados (mínimo de 3 letras). */
+  const servidoresEncontrados = useMemo(() => {
+    const encontrados = new Map<string, Servidor[]>();
+    if (termos.join('').length < 3) return encontrados;
+    unidades.forEach((unidade) => {
+      const lista = (unidade.lotacao && servidoresPorLotacao.get(unidade.lotacao)) || [];
+      const achados = lista.filter((servidor) => {
+        const nome = nomesNormalizados.get(servidor.id) || '';
+        return termos.every((termo) => nome.includes(termo));
+      });
+      if (achados.length) encontrados.set(unidade.id, achados);
+    });
+    return encontrados;
+  }, [unidades, servidoresPorLotacao, nomesNormalizados, termos]);
+
   const filtradas = useMemo(
     () =>
       unidades.filter((unidade) => {
@@ -199,9 +221,14 @@ export const RamaisPage: React.FC = () => {
         if (!termos.length) return true;
         const ramais = unidade.ramais.map((r) => `${r.numero} ${r.descricao || ''}`).join(' ');
         const alvo = normalizar(`${unidade.nome} ${unidade.lotacao || ''} ${ramais}`);
-        return termos.every((termo) => alvo.includes(termo));
+        return termos.every((termo) => alvo.includes(termo)) || servidoresEncontrados.has(unidade.id);
       }),
-    [unidades, filtroTipo, somenteComRamal, termos]
+    [unidades, filtroTipo, somenteComRamal, termos, servidoresEncontrados]
+  );
+
+  const totalServidoresEncontrados = useMemo(
+    () => filtradas.reduce((total, unidade) => total + (servidoresEncontrados.get(unidade.id)?.length || 0), 0),
+    [filtradas, servidoresEncontrados]
   );
 
   const grupos = useMemo(() => {
@@ -280,8 +307,9 @@ export const RamaisPage: React.FC = () => {
     });
   }, [unidadeServidores, servidoresPorLotacao, termosServidor]);
 
-  const abrirServidores = (unidade: RamalUnidade) => {
-    setBuscaServidor('');
+  /** Abre a lista de servidores; com filtro, já mostra só os nomes buscados. */
+  const abrirServidores = (unidade: RamalUnidade, filtro = '') => {
+    setBuscaServidor(filtro);
     setUnidadeServidores(unidade);
   };
 
@@ -429,7 +457,7 @@ export const RamaisPage: React.FC = () => {
           <div className="relative min-w-0 flex-1">
             <Input
               ref={buscaRef}
-              placeholder="Buscar unidade, departamento ou ramal..."
+              placeholder="Buscar unidade, ramal ou nome do servidor..."
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
               onKeyDown={(event) => {
@@ -437,7 +465,7 @@ export const RamaisPage: React.FC = () => {
               }}
               icon={<Search className="w-4 h-4" />}
               className="pr-16"
-              aria-label="Buscar unidade, departamento ou ramal"
+              aria-label="Buscar unidade, ramal ou nome do servidor"
               autoComplete="off"
               enterKeyHint="search"
             />
@@ -562,6 +590,7 @@ export const RamaisPage: React.FC = () => {
                   const totalServidores = servidoresDaUnidade(unidade).length;
                   const editando = editandoId === unidade.id;
                   const variosRamais = unidade.ramais.length > 1;
+                  const encontrados = servidoresEncontrados.get(unidade.id) || [];
                   return (
                     <li
                       key={unidade.id}
@@ -604,6 +633,31 @@ export const RamaisPage: React.FC = () => {
                             </span>
                           </span>
                         </button>
+                        {encontrados.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5 pl-12">
+                            {encontrados.slice(0, 3).map((servidor) => (
+                              <button
+                                key={servidor.id}
+                                type="button"
+                                onClick={() => abrirServidores(unidade, servidor.nome)}
+                                className="flex max-w-full items-center gap-1.5 rounded-2xl border border-amber-300/70 bg-amber-50 py-0.5 pl-0.5 pr-2.5 text-left text-[11px] leading-tight font-semibold text-[#102755] transition-colors hover:border-amber-400 hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-slate-100 dark:hover:bg-amber-400/20"
+                                title={`${servidor.nome} · ${servidor.cargo} · matrícula ${servidor.matricula}`}
+                              >
+                                <UserAvatar nome={servidor.nome} className="h-5 w-5 text-[8px] ring-0" />
+                                <span className="min-w-0 py-0.5"><Destaque texto={servidor.nome} termos={termos} /></span>
+                              </button>
+                            ))}
+                            {encontrados.length > 3 && (
+                              <button
+                                type="button"
+                                onClick={() => abrirServidores(unidade, busca)}
+                                className="rounded-full border border-dashed border-amber-300/70 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-50 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-400/10"
+                              >
+                                +{encontrados.length - 3} {encontrados.length - 3 === 1 ? 'servidor' : 'servidores'}
+                              </button>
+                            )}
+                          </div>
+                        )}
                         {variosRamais && (
                           <div className="mt-2 flex flex-wrap gap-1.5 pl-12">
                             {unidade.ramais.map((contato, indice) => (
@@ -696,6 +750,9 @@ export const RamaisPage: React.FC = () => {
             </section>
           ))}
           <p className="text-center text-[11px] text-[#8aa0bd] dark:text-slate-500">
+            {totalServidoresEncontrados > 0 && (
+              <>{totalServidoresEncontrados} {totalServidoresEncontrados === 1 ? 'servidor encontrado' : 'servidores encontrados'} · </>
+            )}
             Exibindo {filtradas.length} de {unidades.length} unidades · clique no nome para ver os servidores, no ramal para copiar{podeEditar ? ', no lápis para editar' : ''}
           </p>
         </div>
@@ -743,7 +800,7 @@ export const RamaisPage: React.FC = () => {
             </div>
           )}
 
-          {servidoresDaUnidade(unidadeServidores).length > 6 && (
+          {(servidoresDaUnidade(unidadeServidores).length > 6 || buscaServidor) && (
             <Input
               placeholder="Filtrar por nome, matrícula ou cargo..."
               value={buscaServidor}
@@ -788,7 +845,10 @@ export const RamaisPage: React.FC = () => {
 
           {termosServidor.length > 0 && servidoresDoModal.length > 0 && (
             <p className="text-center text-[11px] text-[#8aa0bd] dark:text-slate-500">
-              {servidoresDoModal.length} de {servidoresDaUnidade(unidadeServidores).length} servidores
+              {servidoresDoModal.length} de {servidoresDaUnidade(unidadeServidores).length} servidores ·{' '}
+              <button type="button" onClick={() => setBuscaServidor('')} className="font-semibold text-[#005a9c] hover:underline dark:text-sky-300">
+                Ver todos
+              </button>
             </p>
           )}
         </div>
