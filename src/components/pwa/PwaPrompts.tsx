@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle2, Compass, Copy, Download, Loader2, Menu, MoreHorizontal, MoreVertical, RefreshCw, Share, Smartphone, SquarePlus, Wifi, X, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCircle2, Compass, Copy, Download, Loader2, Menu, MoreHorizontal, MoreVertical, RefreshCw, Share, Smartphone, SquarePlus, Wifi, X, Zap } from 'lucide-react';
 import {
   applyUpdate,
   closeInstallSheet,
@@ -16,17 +16,19 @@ import {
   waitForInstallPrompt,
 } from '@/pwa/pwa';
 
-// "Agora não" pausa o convite por algumas horas. Antes valia para a aba inteira, mas o
-// Chrome e o Safari do iPhone mantêm a mesma aba aberta por dias, e o convite nunca voltava.
+// "Agora não" pausa o convite por 30 minutos. Pausas longas (ou por aba, que no iPhone
+// fica aberta por dias) faziam o convite sumir; "Entendi" não pausa, só fecha.
 const DISMISS_KEY = 'sme-pwa-install-dismissed-until';
-const DISMISS_HOURS = 8;
+const DISMISS_MINUTES = 30;
+// Link que sempre abre o convite, ignorando a pausa (ex.: enviar por WhatsApp): /?instalar
+const FORCE_PARAM = 'instalar';
 
 const wasDismissedRecently = () => {
   try { return Number(localStorage.getItem(DISMISS_KEY) || 0) > Date.now(); } catch { return false; }
 };
 
 const rememberDismiss = () => {
-  try { localStorage.setItem(DISMISS_KEY, String(Date.now() + DISMISS_HOURS * 3_600_000)); } catch {}
+  try { localStorage.setItem(DISMISS_KEY, String(Date.now() + DISMISS_MINUTES * 60_000)); } catch {}
 };
 
 const BENEFITS = [
@@ -96,14 +98,27 @@ export const PwaPrompts = () => {
   const [isInstalling, setIsInstalling] = useState(false);
   const [showManualSteps, setShowManualSteps] = useState(false);
   const [linkCopiado, setLinkCopiado] = useState(false);
+  // iPhone/iPad: primeiro o convite com "Instalar"; o passo a passo aparece ao tocar nele.
+  const [iosPassos, setIosPassos] = useState(false);
 
   // Ao abrir o sistema no celular (fora do app instalado), o convite aparece em seguida.
   useEffect(() => {
+    const url = new URL(window.location.href);
+    const forcado = url.searchParams.has(FORCE_PARAM);
+    if (forcado) {
+      url.searchParams.delete(FORCE_PARAM);
+      window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    }
     // iPads maiores que 1024 px não passam em isMobileDevice(), mas também instalam pelo Compartilhar.
-    if (pwa.isStandalone || !(pwa.isIos || isMobileDevice()) || wasDismissedRecently()) return;
+    if (pwa.isStandalone || !(pwa.isIos || isMobileDevice()) || (!forcado && wasDismissedRecently())) return;
     const timer = window.setTimeout(openInstallSheet, 900);
     return () => window.clearTimeout(timer);
   }, [pwa.isStandalone, pwa.isIos]);
+
+  // Cada abertura do convite começa pela pergunta, não pelo passo a passo.
+  useEffect(() => {
+    if (pwa.installSheetOpen) setIosPassos(false);
+  }, [pwa.installSheetOpen]);
 
   // Se a instalação nativa ficar disponível com o passo a passo aberto, volta para o botão "Instalar".
   useEffect(() => {
@@ -129,7 +144,18 @@ export const PwaPrompts = () => {
     closeInstallSheet();
   };
 
+  /** "Entendi": a pessoa vai instalar agora, então o convite fecha sem pausar. */
+  const concluirPassos = () => {
+    setShowManualSteps(false);
+    closeInstallSheet();
+  };
+
   const handleInstall = async () => {
+    // O iPhone não tem instalação automática: mostra onde tocar.
+    if (pwa.isIos && !pwa.canInstall) {
+      setIosPassos(true);
+      return;
+    }
     setIsInstalling(true);
     try {
       // O Chrome pode levar alguns segundos para liberar a instalação nativa.
@@ -148,9 +174,12 @@ export const PwaPrompts = () => {
 
   const iosBrowser = pwa.isIos ? detectIosBrowser() : null;
   const iosPrecisaSafari = pwa.isIos && !iosBrowserCanInstall();
+  const iosSteps = iosPrecisaSafari || iosBrowser === 'other' || !iosBrowser ? IOS_SAFARI_STEPS : IOS_STEPS[iosBrowser];
   const steps = pwa.isIos && !pwa.canInstall
-    ? iosPrecisaSafari || iosBrowser === 'other' || !iosBrowser ? IOS_SAFARI_STEPS : IOS_STEPS[iosBrowser]
+    ? iosPassos ? iosSteps : null
     : showManualSteps ? ANDROID_STEPS[detectMobileBrowser()] : null;
+  // Seta animada apontando onde fica o botão Compartilhar.
+  const setaCompartilhar = steps && steps !== IOS_SAFARI_STEPS ? (iosBrowser === 'chrome' ? 'topo' : iosBrowser === 'safari' ? 'baixo' : null) : null;
 
   const copiarLink = async () => {
     try {
@@ -190,6 +219,11 @@ export const PwaPrompts = () => {
                   </li>
                 ))}
               </ol>
+              {setaCompartilhar === 'baixo' && (
+                <p className="mt-3 flex items-center justify-center gap-1.5 text-xs font-bold text-[#005a9c] dark:text-sky-300">
+                  <ArrowDown className="h-4 w-4 animate-bounce" /> O botão Compartilhar fica logo abaixo desta tela
+                </p>
+              )}
               {iosPrecisaSafari && (
                 <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-center text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
                   Neste navegador o iPhone não permite instalar apps. Use o <strong>Safari</strong>.
@@ -217,7 +251,7 @@ export const PwaPrompts = () => {
                   {linkCopiado ? <><CheckCircle2 className="h-4 w-4" />Link copiado</> : <><Copy className="h-4 w-4" />Copiar link</>}
                 </button>
               ) : steps ? (
-                <button type="button" onClick={dismiss} className="min-h-12 rounded-xl bg-[#005a9c] text-sm font-bold text-white shadow-[0_12px_24px_-12px_rgba(0,90,156,.9)] hover:bg-[#0877c9] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ef5]">
+                <button type="button" onClick={concluirPassos} className="min-h-12 rounded-xl bg-[#005a9c] text-sm font-bold text-white shadow-[0_12px_24px_-12px_rgba(0,90,156,.9)] hover:bg-[#0877c9] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ef5]">
                   Entendi
                 </button>
               ) : (
@@ -227,6 +261,14 @@ export const PwaPrompts = () => {
               )}
             </div>
           </section>
+        </div>
+      )}
+
+      {/* Chrome no iPhone: o Compartilhar fica no topo, à direita do endereço. */}
+      {pwa.installSheetOpen && setaCompartilhar === 'topo' && (
+        <div className="pointer-events-none fixed right-3 top-[max(8px,env(safe-area-inset-top))] z-[81] flex flex-col items-end gap-1 text-white" aria-hidden="true">
+          <ArrowUp className="h-8 w-8 animate-bounce drop-shadow-[0_2px_6px_rgba(0,0,0,.5)]" />
+          <span className="rounded-full bg-[#005a9c] px-3 py-1 text-xs font-bold shadow-lg">Compartilhar</span>
         </div>
       )}
 

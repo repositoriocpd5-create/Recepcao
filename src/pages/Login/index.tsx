@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { AlertCircle, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
+import { AlertCircle, Download, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
+import { isInstallAvailable, openInstallSheet, usePwa } from '@/pwa/pwa';
 import { UserRole } from '@/types';
 
 const inputClass =
@@ -10,6 +11,7 @@ const inputClass =
   'dark:border-slate-700 dark:bg-[#0f1422] dark:text-slate-100 dark:placeholder:text-slate-500';
 
 export const LoginPage: React.FC = () => {
+  const pwa = usePwa();
   const navigate = useNavigate();
   const { login, isSupabaseLive, user } = useAuth();
 
@@ -164,6 +166,17 @@ export const LoginPage: React.FC = () => {
           )}
         </div>
       </main>
+
+      {/* Celular fora do app instalado: atalho permanente para instalar. */}
+      {isInstallAvailable(pwa) && (
+        <button
+          type="button"
+          onClick={openInstallSheet}
+          className="mt-4 flex h-11 w-full max-w-[348px] items-center justify-center gap-2 rounded-lg border border-[#c9dcf5] bg-white text-sm font-bold text-[#1366e8] shadow-sm hover:bg-[#eff5ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1366e8] dark:border-slate-700 dark:bg-[#121826] dark:text-sky-300 dark:hover:bg-slate-800"
+        >
+          <Download className="h-4 w-4" /> Instalar o app
+        </button>
+      )}
 
       <p className="mt-5 text-center text-[11px] text-[#6b7280] dark:text-slate-500">
         Secretaria Municipal de Educação de Itaguaí{!isSupabaseLive && ' · Modo de demonstração'}

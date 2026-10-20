@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { BadgeCheck, BookOpen, Briefcase, Building2, Calendar, CheckCircle2, ChevronRight, FileSpreadsheet, Home, LayoutDashboard, MoreHorizontal, ShieldCheck, Users, ArrowRightLeft, Phone } from 'lucide-react';
+import { BadgeCheck, BookOpen, Briefcase, Building2, Calendar, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Home, LayoutDashboard, MoreHorizontal, ShieldCheck, Users, ArrowRightLeft, Phone } from 'lucide-react';
+import { isInstallAvailable, openInstallSheet, usePwa } from '@/pwa/pwa';
 import { useAuth } from '@/contexts/AuthContext';
 
 const primaryItems = [
@@ -15,6 +16,7 @@ export const MobileBottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
+  const pwa = usePwa();
   const moreItems = [
     { label: 'Movimentações', path: '/movimentacoes', icon: ArrowRightLeft },
     { label: 'Ramais', path: '/ramais', icon: Phone },
@@ -39,6 +41,11 @@ export const MobileBottomNav = () => {
               <Icon className="h-5 w-5 text-[#075aa6]" /><span className="flex-1">{label}</span><ChevronRight className="h-4 w-4 text-[#68809f]" />
             </button>
           ))}
+          {isInstallAvailable(pwa) && (
+            <button onClick={() => { setMoreOpen(false); openInstallSheet(); }} className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-xl border border-[#d7e6f6] bg-[#f4f9ff] px-3 text-left text-sm font-bold text-[#005a9c] hover:bg-[#e8f3ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#087ef5]">
+              <Download className="h-5 w-5" /><span className="flex-1">Instalar app no celular</span><ChevronRight className="h-4 w-4 text-[#68809f]" />
+            </button>
+          )}
         </section>
       )}
       <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-50 flex min-h-[72px] items-start gap-1 border-t border-[#0a71bb] bg-[linear-gradient(160deg,#075fa7_0%,#005a9c_48%,#043c74_100%)] px-1.5 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_24px_-14px_rgba(4,60,116,.6)] md:hidden">
