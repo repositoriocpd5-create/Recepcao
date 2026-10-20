@@ -17,6 +17,7 @@ import {
   Save,
   Trash2,
   ChevronRight,
+  UserSearch,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/Card';
@@ -30,6 +31,10 @@ import { RamalContato, RamalUnidade, RamalUnidadeTipo, Servidor } from '@/types'
 import { cn } from '@/lib/utils';
 
 type FiltroTipo = 'todos' | RamalUnidadeTipo;
+/** Unidades: busca só no nome da unidade e no ramal. Servidores: busca só no nome das pessoas. */
+type ModoBusca = 'unidades' | 'servidores';
+const MODO_BUSCA_KEY = 'sme-ramais-modo-busca';
+const MIN_LETRAS_SERVIDOR = 3;
 
 const ORDEM_CATEGORIAS = [
   'Departamentos SMEDU',
@@ -129,6 +134,9 @@ export const RamaisPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+  const [modoBusca, setModoBusca] = useState<ModoBusca>(() => {
+    try { return localStorage.getItem(MODO_BUSCA_KEY) === 'servidores' ? 'servidores' : 'unidades'; } catch { return 'unidades'; }
+  });
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>('todos');
   const [somenteComRamal, setSomenteComRamal] = useState(false);
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
@@ -190,6 +198,15 @@ export const RamaisPage: React.FC = () => {
   }, [aviso]);
 
   const termos = useMemo(() => normalizar(busca).split(/\s+/).filter(Boolean), [busca]);
+  // No modo servidores, o nome da unidade não é destacado (a busca não olhou para ele).
+  const termosUnidade = modoBusca === 'unidades' ? termos : [];
+  const buscaServidorCurta = modoBusca === 'servidores' && termos.length > 0 && termos.join('').length < MIN_LETRAS_SERVIDOR;
+
+  const trocarModoBusca = (modo: ModoBusca) => {
+    setModoBusca(modo);
+    try { localStorage.setItem(MODO_BUSCA_KEY, modo); } catch {}
+    buscaRef.current?.focus();
+  };
 
   // Nomes dos servidores já normalizados, para a busca por servidor não repetir o trabalho a cada tecla.
   const nomesNormalizados = useMemo(() => {
@@ -201,7 +218,7 @@ export const RamaisPage: React.FC = () => {
   /** Servidores de cada unidade cujo nome contém todos os termos buscados (mínimo de 3 letras). */
   const servidoresEncontrados = useMemo(() => {
     const encontrados = new Map<string, Servidor[]>();
-    if (termos.join('').length < 3) return encontrados;
+    if (modoBusca !== 'servidores' || termos.join('').length < MIN_LETRAS_SERVIDOR) return encontrados;
     unidades.forEach((unidade) => {
       const lista = (unidade.lotacao && servidoresPorLotacao.get(unidade.lotacao)) || [];
       const achados = lista.filter((servidor) => {
@@ -211,7 +228,7 @@ export const RamaisPage: React.FC = () => {
       if (achados.length) encontrados.set(unidade.id, achados);
     });
     return encontrados;
-  }, [unidades, servidoresPorLotacao, nomesNormalizados, termos]);
+  }, [unidades, servidoresPorLotacao, nomesNormalizados, termos, modoBusca]);
 
   const filtradas = useMemo(
     () =>
@@ -219,11 +236,15 @@ export const RamaisPage: React.FC = () => {
         if (filtroTipo !== 'todos' && unidade.tipo !== filtroTipo) return false;
         if (somenteComRamal && !unidade.ramais.length) return false;
         if (!termos.length) return true;
+        if (modoBusca === 'servidores') {
+          // Com menos de 3 letras ainda não filtra: evita esvaziar a lista enquanto a pessoa digita.
+          return termos.join('').length < MIN_LETRAS_SERVIDOR || servidoresEncontrados.has(unidade.id);
+        }
         const ramais = unidade.ramais.map((r) => `${r.numero} ${r.descricao || ''}`).join(' ');
         const alvo = normalizar(`${unidade.nome} ${unidade.lotacao || ''} ${ramais}`);
-        return termos.every((termo) => alvo.includes(termo)) || servidoresEncontrados.has(unidade.id);
+        return termos.every((termo) => alvo.includes(termo));
       }),
-    [unidades, filtroTipo, somenteComRamal, termos, servidoresEncontrados]
+    [unidades, filtroTipo, somenteComRamal, termos, servidoresEncontrados, modoBusca]
   );
 
   const totalServidoresEncontrados = useMemo(
@@ -378,7 +399,7 @@ export const RamaisPage: React.FC = () => {
 
   const abasTipo: { valor: FiltroTipo; rotulo: string; total: number }[] = [
     { valor: 'todos', rotulo: 'Todos', total: unidades.length },
-    { valor: 'unidade_escolar', rotulo: 'Unidades escolares', total: totalEscolas },
+    { valor: 'unidade_escolar', rotulo: 'Escolas', total: totalEscolas },
     { valor: 'departamento', rotulo: 'Departamentos', total: totalDepartamentos },
   ];
 
@@ -391,35 +412,39 @@ export const RamaisPage: React.FC = () => {
   return (
     <div className="space-y-5 min-w-0">
       {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-        <div>
+      <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3 sm:pb-4">
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-500/30">
-              <Phone className="w-5 h-5" />
+            <span className="shrink-0 rounded-lg border border-emerald-500/30 bg-emerald-950 p-1.5 text-emerald-400">
+              <Phone className="h-5 w-5" />
             </span>
-            <h2 className="text-xl font-bold text-slate-100">Ramais das Unidades</h2>
+            <h2 className="truncate text-lg font-bold text-slate-100 sm:text-xl">Ramais das Unidades</h2>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="mt-1 hidden text-xs text-slate-400 sm:block">
             Contato das unidades escolares e dos departamentos da Secretaria Municipal de Educação
+          </p>
+          {/* No celular, um resumo de uma linha substitui os indicadores. */}
+          <p className="mt-1 text-[11px] text-[#627fa5] tabular-nums sm:hidden dark:text-slate-400">
+            {isLoading ? 'Carregando…' : `${totalEscolas} escolas · ${totalDepartamentos} departamentos · ${percentualComRamal}% com ramal`}
           </p>
         </div>
 
         <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-          <Button variant="outline" size="sm" onClick={carregar} isLoading={isLoading}>
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Atualizar</span>
+          <Button variant="outline" size="sm" onClick={carregar} isLoading={isLoading} aria-label="Atualizar" title="Atualizar">
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Atualizar</span>
           </Button>
           {podeEditar && (
-            <Button variant="primary" size="sm" onClick={() => setIsNovaOpen(true)}>
-              <Plus className="w-4 h-4" />
-              <span>Nova unidade</span>
+            <Button variant="primary" size="sm" onClick={() => setIsNovaOpen(true)} aria-label="Nova unidade" title="Nova unidade">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nova unidade</span>
             </Button>
           )}
         </div>
       </div>
 
-      {/* Indicadores */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* Indicadores (telas maiores) */}
+      <div className="hidden grid-cols-2 gap-3 sm:grid lg:grid-cols-4">
         {estatisticas.map(({ rotulo, valor, icone: Icone, cor }) => (
           <Card key={rotulo} className="p-4">
             <div className="flex items-center gap-3">
@@ -451,21 +476,48 @@ export const RamaisPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Busca e filtros */}
-      <Card className="p-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+      {/* Busca e filtros: fixa no topo ao rolar, para buscar de novo sem voltar ao início. */}
+      <div className="sticky top-[76px] z-20 -mx-4 border-b border-[#dce4f0] bg-[#f4f8fd]/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:rounded-xl sm:border sm:bg-white sm:p-4 sm:shadow-[0_8px_22px_-14px_rgba(18,44,82,.22)] sm:backdrop-blur-none dark:border-slate-800 dark:bg-[#0b0f19]/95 sm:dark:bg-[#121826]">
+        {/* Onde buscar */}
+        <div className="mb-2.5 grid grid-cols-2 gap-1 rounded-xl border border-[#dce4f0] bg-white p-1 sm:inline-grid sm:w-auto dark:border-slate-800 dark:bg-[#101625]" role="radiogroup" aria-label="Buscar por">
+          {([
+            { valor: 'unidades', rotulo: 'Unidades', icone: School, dica: 'Nome da escola, departamento ou ramal' },
+            { valor: 'servidores', rotulo: 'Servidores', icone: UserSearch, dica: 'Nome da pessoa lotada' },
+          ] as const).map(({ valor, rotulo, icone: Icone, dica }) => (
+            <button
+              key={valor}
+              type="button"
+              role="radio"
+              aria-checked={modoBusca === valor}
+              onClick={() => trocarModoBusca(valor)}
+              title={dica}
+              className={cn(
+                'flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition-colors',
+                modoBusca === valor
+                  ? 'bg-[#005a9c] text-white shadow-sm'
+                  : 'text-[#4b6485] hover:bg-[#f2f7fd] hover:text-[#102755] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+              )}
+            >
+              <Icone className="h-4 w-4" />
+              {rotulo}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center">
           <div className="relative min-w-0 flex-1">
             <Input
               ref={buscaRef}
-              placeholder="Buscar unidade, ramal ou nome do servidor..."
+              type="search"
+              placeholder={modoBusca === 'unidades' ? 'Escola, depto. ou ramal' : 'Nome do servidor'}
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Escape') setBusca('');
               }}
-              icon={<Search className="w-4 h-4" />}
-              className="pr-16"
-              aria-label="Buscar unidade, ramal ou nome do servidor"
+              icon={modoBusca === 'unidades' ? <Search className="w-4 h-4" /> : <UserSearch className="w-4 h-4" />}
+              className="pr-16 text-base sm:text-sm [&::-webkit-search-cancel-button]:hidden"
+              aria-label={modoBusca === 'unidades' ? 'Buscar escola, departamento ou ramal' : 'Buscar pelo nome do servidor'}
               autoComplete="off"
               enterKeyHint="search"
             />
@@ -473,7 +525,7 @@ export const RamaisPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => { setBusca(''); buscaRef.current?.focus(); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-100"
                 aria-label="Limpar busca"
               >
                 <X className="h-4 w-4" />
@@ -483,20 +535,19 @@ export const RamaisPage: React.FC = () => {
             )}
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-1 rounded-lg border border-[#dce4f0] bg-[#f4f7fc] p-1 text-xs dark:border-slate-800 dark:bg-[#101625]" role="tablist" aria-label="Tipo de unidade">
+          {/* Filtros: uma única linha rolável no celular */}
+          <div className="-mx-4 flex items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden" role="group" aria-label="Filtros">
             {abasTipo.map((aba) => (
               <button
                 key={aba.valor}
                 type="button"
-                role="tab"
-                aria-selected={filtroTipo === aba.valor}
+                aria-pressed={filtroTipo === aba.valor}
                 onClick={() => setFiltroTipo(aba.valor)}
                 className={cn(
-                  'flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 font-semibold transition-colors',
+                  'flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-semibold transition-colors',
                   filtroTipo === aba.valor
-                    ? 'bg-[#005a9c] text-white shadow-sm'
-                    : 'text-[#4b6485] hover:bg-white hover:text-[#102755] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+                    ? 'border-[#102755] bg-[#102755] text-white dark:border-sky-400 dark:bg-sky-500/20 dark:text-sky-100'
+                    : 'border-[#dce4f0] bg-white text-[#4b6485] hover:border-[#9fc9ed] dark:border-slate-800 dark:bg-transparent dark:text-slate-400'
                 )}
               >
                 {aba.rotulo}
@@ -505,22 +556,30 @@ export const RamaisPage: React.FC = () => {
                 </span>
               </button>
             ))}
-          </div>
-
-          <label className="flex cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded-lg border border-[#dce4f0] px-3 py-2 text-xs font-semibold text-[#4b6485] transition-colors hover:border-[#9fc9ed] has-[:checked]:border-emerald-500/60 has-[:checked]:bg-emerald-50 has-[:checked]:text-emerald-700 dark:border-slate-800 dark:text-slate-400 dark:has-[:checked]:bg-emerald-500/10 dark:has-[:checked]:text-emerald-300">
-            <input
-              type="checkbox"
-              checked={somenteComRamal}
-              onChange={(event) => setSomenteComRamal(event.target.checked)}
-              className="h-3.5 w-3.5 accent-emerald-600"
-            />
-            Somente com ramal
-          </label>
+            <span className="mx-0.5 h-5 w-px shrink-0 bg-[#dce4f0] dark:bg-slate-800" aria-hidden="true" />
+            <button
+              type="button"
+              aria-pressed={somenteComRamal}
+              onClick={() => setSomenteComRamal((atual) => !atual)}
+              className={cn(
+                'flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-semibold transition-colors',
+                somenteComRamal
+                  ? 'border-emerald-600 bg-emerald-600 text-white'
+                  : 'border-[#dce4f0] bg-white text-[#4b6485] hover:border-[#9fc9ed] dark:border-slate-800 dark:bg-transparent dark:text-slate-400'
+              )}
+            >
+              {somenteComRamal ? <Check className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" />}
+              Com ramal
+            </button>
           </div>
         </div>
 
+        {buscaServidorCurta && (
+          <p className="mt-2 text-[11px] text-[#627fa5] dark:text-slate-400">Digite ao menos {MIN_LETRAS_SERVIDOR} letras do nome do servidor.</p>
+        )}
+
         {grupos.length > 1 && (
-          <nav className="mt-3 flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Ir para categoria">
+          <nav className="mt-3 hidden gap-1.5 overflow-x-auto [scrollbar-width:none] sm:flex [&::-webkit-scrollbar]:hidden" aria-label="Ir para categoria">
             {grupos.map((grupo) => (
               <a
                 key={grupo.categoria}
@@ -532,7 +591,7 @@ export const RamaisPage: React.FC = () => {
             ))}
           </nav>
         )}
-      </Card>
+      </div>
 
       {/* Conteúdo */}
       {erro ? (
@@ -622,13 +681,15 @@ export const RamaisPage: React.FC = () => {
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="block text-[13px] font-semibold leading-snug text-[#102755] decoration-[#005a9c]/40 underline-offset-2 group-hover/nome:underline dark:text-slate-100">
-                              <Destaque texto={unidade.nome} termos={termos} />
+                              <Destaque texto={unidade.nome} termos={termosUnidade} />
                             </span>
                             <span className="mt-0.5 flex items-center gap-1 text-[11px] text-[#627fa5] dark:text-slate-400">
                               <Users className="h-3 w-3" />
-                              {totalServidores
-                                ? `${totalServidores} ${totalServidores === 1 ? 'servidor lotado' : 'servidores lotados'}`
-                                : 'Nenhum servidor lotado'}
+                              {totalServidores ? (
+                                <>{totalServidores} {totalServidores === 1 ? 'servidor' : 'servidores'}<span className="hidden sm:inline"> {totalServidores === 1 ? 'lotado' : 'lotados'}</span></>
+                              ) : (
+                                <>Sem servidores<span className="hidden sm:inline"> lotados</span></>
+                              )}
                               <ChevronRight className="h-3 w-3 opacity-0 transition-opacity group-hover/nome:opacity-100" />
                             </span>
                           </span>
@@ -664,7 +725,7 @@ export const RamaisPage: React.FC = () => {
                               <RamalPill
                                 key={`${contato.numero}-${indice}`}
                                 contato={contato}
-                                termos={termos}
+                                termos={termosUnidade}
                                 compacto
                                 copiado={copiadoId === `${unidade.id}-${indice}`}
                                 onCopiar={() => copiarRamal(unidade, contato, indice)}
@@ -713,7 +774,7 @@ export const RamaisPage: React.FC = () => {
                           {variosRamais ? null : unidade.ramais.length ? (
                             <RamalPill
                               contato={unidade.ramais[0]}
-                              termos={termos}
+                              termos={termosUnidade}
                               copiado={copiadoId === `${unidade.id}-0`}
                               onCopiar={() => copiarRamal(unidade, unidade.ramais[0], 0)}
                             />
@@ -723,11 +784,13 @@ export const RamaisPage: React.FC = () => {
                               onClick={() => iniciarEdicao(unidade)}
                               className="flex items-center gap-1.5 rounded-lg border border-dashed border-[#c7d6ea] px-3 py-2 text-[11px] font-semibold text-[#627fa5] transition-colors hover:border-[#005a9c] hover:text-[#005a9c] dark:border-slate-700 dark:text-slate-400 dark:hover:border-sky-400 dark:hover:text-sky-300"
                             >
-                              <Plus className="h-3.5 w-3.5" /> {unidade.tipo === 'departamento' ? 'Adicionar ramais' : 'Adicionar ramal'}
+                              <Plus className="h-3.5 w-3.5" />
+                              <span className="sm:hidden">Ramal</span>
+                              <span className="hidden sm:inline">{unidade.tipo === 'departamento' ? 'Adicionar ramais' : 'Adicionar ramal'}</span>
                             </button>
                           ) : (
-                            <span className="flex items-center gap-1.5 rounded-lg border border-dashed border-[#d8e3f2] px-3 py-2 text-[11px] font-medium text-[#8aa0bd] dark:border-slate-800 dark:text-slate-500">
-                              <PhoneOff className="h-3.5 w-3.5" /> Sem ramal
+                            <span className="flex items-center gap-1.5 rounded-lg px-1 py-2 text-[11px] font-medium text-[#8aa0bd] sm:border sm:border-dashed sm:border-[#d8e3f2] sm:px-3 dark:text-slate-500 sm:dark:border-slate-800" title="Sem ramal">
+                              <PhoneOff className="h-3.5 w-3.5" /><span className="hidden sm:inline">Sem ramal</span>
                             </span>
                           )}
                           {podeEditar && unidade.ramais.length > 0 && (
