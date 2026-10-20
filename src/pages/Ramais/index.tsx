@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Save,
   Trash2,
+  ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/Card';
@@ -24,7 +25,8 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
 import { dataService } from '@/services/dataService';
-import { RamalContato, RamalUnidade, RamalUnidadeTipo } from '@/types';
+import { UserAvatar } from '@/components/ui/UserAvatar';
+import { RamalContato, RamalUnidade, RamalUnidadeTipo, Servidor } from '@/types';
 import { cn } from '@/lib/utils';
 
 type FiltroTipo = 'todos' | RamalUnidadeTipo;
@@ -121,7 +123,9 @@ export const RamaisPage: React.FC = () => {
   const buscaRef = useRef<HTMLInputElement>(null);
 
   const [unidades, setUnidades] = useState<RamalUnidade[]>([]);
-  const [servidoresPorLotacao, setServidoresPorLotacao] = useState<Map<string, number>>(new Map());
+  const [servidoresPorLotacao, setServidoresPorLotacao] = useState<Map<string, Servidor[]>>(new Map());
+  const [unidadeServidores, setUnidadeServidores] = useState<RamalUnidade | null>(null);
+  const [buscaServidor, setBuscaServidor] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
@@ -150,12 +154,13 @@ export const RamaisPage: React.FC = () => {
     if (ramais.status === 'fulfilled') setUnidades(ramais.value);
     else setErro(ramais.reason instanceof Error ? ramais.reason.message : 'Não foi possível carregar os ramais.');
     if (servidores.status === 'fulfilled') {
-      const contagem = new Map<string, number>();
+      const porLotacao = new Map<string, Servidor[]>();
       servidores.value.forEach((servidor) => {
         const lotacao = servidor.lotacao?.trim();
-        if (lotacao && servidor.status === 'ativo') contagem.set(lotacao, (contagem.get(lotacao) || 0) + 1);
+        if (lotacao && servidor.status === 'ativo') porLotacao.set(lotacao, [...(porLotacao.get(lotacao) || []), servidor]);
       });
-      setServidoresPorLotacao(contagem);
+      porLotacao.forEach((lista) => lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+      setServidoresPorLotacao(porLotacao);
     }
     setIsLoading(false);
   };
@@ -260,6 +265,24 @@ export const RamaisPage: React.FC = () => {
     } finally {
       setSalvandoId(null);
     }
+  };
+
+  const servidoresDaUnidade = (unidade: RamalUnidade | null) =>
+    unidade?.lotacao ? servidoresPorLotacao.get(unidade.lotacao) || [] : [];
+
+  const termosServidor = useMemo(() => normalizar(buscaServidor).split(/\s+/).filter(Boolean), [buscaServidor]);
+  const servidoresDoModal = useMemo(() => {
+    const lista = servidoresDaUnidade(unidadeServidores);
+    if (!termosServidor.length) return lista;
+    return lista.filter((servidor) => {
+      const alvo = normalizar(`${servidor.nome} ${servidor.matricula} ${servidor.cargo}`);
+      return termosServidor.every((termo) => alvo.includes(termo));
+    });
+  }, [unidadeServidores, servidoresPorLotacao, termosServidor]);
+
+  const abrirServidores = (unidade: RamalUnidade) => {
+    setBuscaServidor('');
+    setUnidadeServidores(unidade);
   };
 
   const atualizarLinha = (indice: number, campos: Partial<RamalContato>) =>
@@ -536,7 +559,7 @@ export const RamaisPage: React.FC = () => {
               <ul className="grid gap-2 lg:grid-cols-2">
                 {grupo.itens.map((unidade) => {
                   const Icone = iconeDaUnidade(unidade);
-                  const totalServidores = unidade.lotacao ? servidoresPorLotacao.get(unidade.lotacao) || 0 : 0;
+                  const totalServidores = servidoresDaUnidade(unidade).length;
                   const editando = editandoId === unidade.id;
                   const variosRamais = unidade.ramais.length > 1;
                   return (
@@ -550,30 +573,39 @@ export const RamaisPage: React.FC = () => {
                           : 'border-[#e3eaf4] hover:border-[#b9d4ee] hover:shadow-[0_8px_18px_-14px_rgba(18,44,82,.35)] dark:border-slate-800 dark:hover:border-slate-700'
                       )}
                     >
-                      <span
-                        className={cn(
-                          'grid h-9 w-9 shrink-0 place-items-center rounded-lg',
-                          unidade.tipo === 'departamento'
-                            ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300'
-                            : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300'
-                        )}
-                        aria-hidden="true"
-                      >
-                        <Icone className="h-[18px] w-[18px]" />
-                      </span>
-
                       <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-semibold leading-snug text-[#102755] dark:text-slate-100" title={unidade.nome}>
-                          <Destaque texto={unidade.nome} termos={termos} />
-                        </p>
-                        {totalServidores > 0 && (
-                          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-[#627fa5] dark:text-slate-400">
-                            <Users className="h-3 w-3" />
-                            {totalServidores} {totalServidores === 1 ? 'servidor lotado' : 'servidores lotados'}
-                          </p>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => abrirServidores(unidade)}
+                          className="group/nome -m-1 flex w-[calc(100%+0.5rem)] items-center gap-3 rounded-lg p-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#005a9c]/40"
+                          title={`Ver servidores de ${unidade.nome}`}
+                        >
+                          <span
+                            className={cn(
+                              'grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-colors',
+                              unidade.tipo === 'departamento'
+                                ? 'bg-indigo-50 text-indigo-600 group-hover/nome:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300'
+                                : 'bg-emerald-50 text-emerald-600 group-hover/nome:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300'
+                            )}
+                            aria-hidden="true"
+                          >
+                            <Icone className="h-[18px] w-[18px]" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[13px] font-semibold leading-snug text-[#102755] decoration-[#005a9c]/40 underline-offset-2 group-hover/nome:underline dark:text-slate-100">
+                              <Destaque texto={unidade.nome} termos={termos} />
+                            </span>
+                            <span className="mt-0.5 flex items-center gap-1 text-[11px] text-[#627fa5] dark:text-slate-400">
+                              <Users className="h-3 w-3" />
+                              {totalServidores
+                                ? `${totalServidores} ${totalServidores === 1 ? 'servidor lotado' : 'servidores lotados'}`
+                                : 'Nenhum servidor lotado'}
+                              <ChevronRight className="h-3 w-3 opacity-0 transition-opacity group-hover/nome:opacity-100" />
+                            </span>
+                          </span>
+                        </button>
                         {variosRamais && (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
+                          <div className="mt-2 flex flex-wrap gap-1.5 pl-12">
                             {unidade.ramais.map((contato, indice) => (
                               <RamalPill
                                 key={`${contato.numero}-${indice}`}
@@ -664,7 +696,7 @@ export const RamaisPage: React.FC = () => {
             </section>
           ))}
           <p className="text-center text-[11px] text-[#8aa0bd] dark:text-slate-500">
-            Exibindo {filtradas.length} de {unidades.length} unidades{podeEditar ? ' · clique em um ramal para copiar, no lápis para editar' : ' · clique em um ramal para copiar'}
+            Exibindo {filtradas.length} de {unidades.length} unidades · clique no nome para ver os servidores, no ramal para copiar{podeEditar ? ', no lápis para editar' : ''}
           </p>
         </div>
       )}
@@ -683,6 +715,84 @@ export const RamaisPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Servidores lotados na unidade */}
+      <Modal
+        isOpen={!!unidadeServidores}
+        onClose={() => setUnidadeServidores(null)}
+        title={unidadeServidores?.nome || ''}
+        description={(() => {
+          const total = servidoresDaUnidade(unidadeServidores).length;
+          return total ? `${total} ${total === 1 ? 'servidor lotado' : 'servidores lotados'}` : 'Nenhum servidor lotado';
+        })()}
+        maxWidth="lg"
+      >
+        <div className="space-y-4">
+          {unidadeServidores && unidadeServidores.ramais.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {unidadeServidores.ramais.map((contato, indice) => (
+                <RamalPill
+                  key={`${contato.numero}-${indice}`}
+                  contato={contato}
+                  termos={[]}
+                  compacto
+                  copiado={copiadoId === `${unidadeServidores.id}-${indice}`}
+                  onCopiar={() => copiarRamal(unidadeServidores, contato, indice)}
+                />
+              ))}
+            </div>
+          )}
+
+          {servidoresDaUnidade(unidadeServidores).length > 6 && (
+            <Input
+              placeholder="Filtrar por nome, matrícula ou cargo..."
+              value={buscaServidor}
+              onChange={(event) => setBuscaServidor(event.target.value)}
+              icon={<Search className="w-4 h-4" />}
+              aria-label="Filtrar servidores"
+              autoComplete="off"
+              autoFocus
+            />
+          )}
+
+          {servidoresDaUnidade(unidadeServidores).length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-[#d8e3f2] py-10 text-center dark:border-slate-800">
+              <Users className="h-6 w-6 text-[#8aa0bd]" />
+              <p className="text-sm font-semibold text-[#102755] dark:text-slate-100">Nenhum servidor lotado</p>
+              <p className="max-w-xs text-xs text-[#627fa5] dark:text-slate-400">
+                Não há servidores ativos com esta lotação no quadro funcional.
+              </p>
+            </div>
+          ) : servidoresDoModal.length === 0 ? (
+            <p className="py-8 text-center text-xs text-[#627fa5] dark:text-slate-400">Nenhum servidor corresponde a “{buscaServidor}”.</p>
+          ) : (
+            <ul className="max-h-[55vh] divide-y divide-[#edf2f8] overflow-y-auto overflow-x-hidden pr-1 dark:divide-slate-800">
+              {servidoresDoModal.map((servidor) => (
+                <li key={servidor.id} className="flex items-center gap-3 py-2.5">
+                  <UserAvatar nome={servidor.nome} className="h-9 w-9 text-[11px]" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-semibold text-[#102755] dark:text-slate-100" title={servidor.nome}>
+                      <Destaque texto={servidor.nome} termos={termosServidor} />
+                    </p>
+                    <p className="truncate text-[11px] text-[#627fa5] dark:text-slate-400" title={servidor.cargo}>
+                      <Destaque texto={servidor.cargo} termos={termosServidor} />
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-md bg-[#f2f7fd] px-2 py-1 font-mono text-[11px] font-bold text-[#005a9c] tabular-nums dark:bg-sky-500/10 dark:text-sky-300">
+                    <Destaque texto={servidor.matricula} termos={termosServidor} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {termosServidor.length > 0 && servidoresDoModal.length > 0 && (
+            <p className="text-center text-[11px] text-[#8aa0bd] dark:text-slate-500">
+              {servidoresDoModal.length} de {servidoresDaUnidade(unidadeServidores).length} servidores
+            </p>
+          )}
+        </div>
+      </Modal>
 
       {/* Ramais do departamento */}
       <Modal
