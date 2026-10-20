@@ -413,23 +413,52 @@ export const RecepcaoPage: React.FC = () => {
     : setores.find((s) => s.id === destinosVisita[0]?.setor_destino_id);
 
 
-  // Consulta de Servidor por Matrícula
-  const handleConsultarMatricula = async (e?: React.FormEvent) => {
+  // Busca de servidor por nome: sem dígitos, o texto digitado é tratado como nome.
+  const normalizarBusca = (texto: string) =>
+    texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const isBuscaPorNome = /[a-zà-ú]/i.test(matriculaInput) && !/\d/.test(matriculaInput);
+  const termosBuscaNome = isBuscaPorNome ? normalizarBusca(matriculaInput).split(' ').filter(Boolean) : [];
+  const servidoresPorNome = termosBuscaNome.length
+    ? todosServidores
+        .filter((servidor) => {
+          const nome = normalizarBusca(servidor.nome);
+          return termosBuscaNome.every((termo) => nome.includes(termo));
+        })
+        .slice(0, 8)
+    : [];
+
+  // Consulta de Servidor por Matrícula (ou pelo nome, quando há um único resultado)
+  const handleConsultarMatricula = async (e?: React.FormEvent, matriculaEscolhida?: string) => {
     if (e) e.preventDefault();
-    if (!matriculaInput.trim()) return;
+    if (!matriculaEscolhida && isBuscaPorNome) {
+      if (servidoresPorNome.length === 1) {
+        matriculaEscolhida = servidoresPorNome[0].matricula;
+      } else {
+        setSearchFeedback({
+          type: 'error',
+          message: servidoresPorNome.length
+            ? 'Mais de um servidor encontrado. Selecione um nome na lista.'
+            : `Nenhum servidor encontrado com o nome "${matriculaInput.trim()}".`,
+        });
+        return;
+      }
+    }
+    const matricula = matriculaEscolhida ?? matriculaInput;
+    if (!matricula.trim()) return;
+    if (matriculaEscolhida) setMatriculaInput(matriculaEscolhida);
 
     setIsLoadingSearch(true);
     setSearchFeedback({ type: null, message: '' });
     setServidorResultado(null);
 
     try {
-      const res = await dataService.consultarServidorPorMatricula(matriculaInput, user);
+      const res = await dataService.consultarServidorPorMatricula(matricula, user);
       setServidorResultado(res);
 
       if (!res.encontrado) {
         setSearchFeedback({
           type: 'error',
-          message: `Nenhum servidor encontrado com a matrícula "${matriculaInput.toUpperCase()}".`,
+          message: `Nenhum servidor encontrado com a matrícula "${matricula.toUpperCase()}".`,
         });
       } else if (res.no_predio) {
         setSearchFeedback({
@@ -1449,26 +1478,48 @@ export const RecepcaoPage: React.FC = () => {
         onClose={() => setIsIdentificationModalOpen(false)}
         title={activeTab === 'servidor' ? 'Identificar servidor' : 'Identificar visitante'}
         description={activeTab === 'servidor'
-          ? 'Informe a matrícula institucional para iniciar o atendimento.'
+          ? 'Informe a matrícula institucional ou busque pelo nome para iniciar o atendimento.'
           : 'Informe o CPF do visitante para consultar o cadastro.'}
         maxWidth="md"
       >
         {activeTab === 'servidor' ? (
           <form onSubmit={handleConsultarMatricula} className="space-y-4">
             <Input
-              label="Matrícula"
-              placeholder="Ex.: 38.000 ou 38000"
+              label="Matrícula ou nome"
+              placeholder="Ex.: 38000 ou Maria da Silva"
               value={matriculaInput}
-              onChange={(event) => setMatriculaInput(event.target.value)}
+              onChange={(event) => {
+                setMatriculaInput(event.target.value);
+                setSearchFeedback({ type: null, message: '' });
+              }}
               icon={<Search className="w-4 h-4" />}
               enterKeyHint="search"
               autoComplete="off"
               autoCapitalize="characters"
               autoFocus
             />
+            {isBuscaPorNome && termosBuscaNome.join('').length >= 2 && (
+              <div className="max-h-64 overflow-y-auto rounded-lg border border-[#d8e3f2] divide-y divide-[#e8eef7] dark:border-slate-700 dark:divide-slate-800">
+                {servidoresPorNome.length === 0 ? (
+                  <p className="px-3 py-2.5 text-xs text-[#627fa5] dark:text-slate-400">Nenhum servidor encontrado com esse nome.</p>
+                ) : (
+                  servidoresPorNome.map((servidor) => (
+                    <button
+                      key={servidor.id}
+                      type="button"
+                      onClick={() => handleConsultarMatricula(undefined, servidor.matricula)}
+                      className="w-full px-3 py-2 text-left hover:bg-[#f2f7fd] focus:bg-[#f2f7fd] focus:outline-none dark:hover:bg-slate-800 dark:focus:bg-slate-800"
+                    >
+                      <span className="block text-sm font-semibold text-[#102755] dark:text-slate-100">{servidor.nome}</span>
+                      <span className="block text-xs text-[#627fa5] dark:text-slate-400">Matrícula {servidor.matricula} · {servidor.cargo}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => setIsIdentificationModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" variant="primary" isLoading={isLoadingSearch}><Search className="w-4 h-4" /> Consultar matrícula</Button>
+              <Button type="submit" variant="primary" isLoading={isLoadingSearch}><Search className="w-4 h-4" /> Consultar</Button>
             </div>
           </form>
         ) : (
@@ -1516,7 +1567,7 @@ export const RecepcaoPage: React.FC = () => {
                 <UserPlus className="w-3.5 h-3.5" /> Cadastrar visitante
               </Button>
             )}
-            {activeTab === 'servidor' && !servidorResultado?.encontrado && searchFeedback.type === 'error' && (
+            {activeTab === 'servidor' && !isBuscaPorNome && !servidorResultado?.encontrado && searchFeedback.type === 'error' && (
               <Button
                 size="sm"
                 variant="outline"
