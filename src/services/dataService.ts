@@ -729,6 +729,79 @@ export const dataService = {
   },
 
   // 5. Consulta Atômica de Visitante por CPF
+  /** Grava a foto do rosto (já em JPEG) no bucket privado e registra o consentimento biométrico. */
+  async salvarFotoVisitante(visitanteId: string, foto: Blob, operador?: UserProfile | null): Promise<Visitante> {
+    const agora = new Date().toISOString();
+    if (isSupabaseConfigured) {
+      const caminho = `${visitanteId}.jpg`;
+      const { error: erroUpload } = await supabase.storage
+        .from('visitantes-fotos')
+        .upload(caminho, foto, { contentType: 'image/jpeg', upsert: true, cacheControl: '0' });
+      if (erroUpload) {
+        throw new Error(/bucket/i.test(erroUpload.message)
+          ? 'O armazenamento de fotos ainda não existe. Execute a migração 20261020150000_biometria_visitantes.sql no Supabase.'
+          : `Não foi possível enviar a foto: ${erroUpload.message}`);
+      }
+      const { data, error } = await supabase
+        .from('visitantes')
+        .update({ foto_path: caminho, biometria_consentida_em: agora })
+        .eq('id', visitanteId)
+        .select()
+        .single();
+      if (error) throw new Error(`Foto enviada, mas não foi possível vincular ao cadastro: ${error.message}`);
+      await this.registrarLogAuditoria({
+        usuario_id: operador?.id, usuario_email: operador?.email, acao: 'CADASTRO_FOTO_VISITANTE',
+        tabela: 'visitantes', registro_id: visitanteId, detalhes: { consentimento: agora }, ip_origem: getTerminalInfo(),
+      });
+      return data as Visitante;
+    }
+
+    const fotoUrl = await new Promise<string>((resolve, reject) => {
+      const leitor = new FileReader();
+      leitor.onload = () => resolve(String(leitor.result));
+      leitor.onerror = () => reject(new Error('Não foi possível ler a foto.'));
+      leitor.readAsDataURL(foto);
+    });
+    const visitantes = getStorage<Visitante[]>(STORAGE_KEYS.VISITANTES, INITIAL_VISITANTES);
+    const indice = visitantes.findIndex((v) => v.id === visitanteId);
+    if (indice < 0) throw new Error('Visitante não encontrado.');
+    visitantes[indice] = { ...visitantes[indice], foto_url: fotoUrl, biometria_consentida_em: agora };
+    setStorage(STORAGE_KEYS.VISITANTES, visitantes);
+    return visitantes[indice];
+  },
+
+  /** URL temporária (assinada) da foto do visitante; null quando não há foto. */
+  async getFotoVisitanteUrl(visitante: Pick<Visitante, 'foto_path' | 'foto_url'>): Promise<string | null> {
+    if (isSupabaseConfigured && visitante.foto_path) {
+      const { data, error } = await supabase.storage.from('visitantes-fotos').createSignedUrl(visitante.foto_path, 60 * 60);
+      return error ? null : data.signedUrl;
+    }
+    return visitante.foto_url || null;
+  },
+
+  /** Marca que a digital foi cadastrada no agente biométrico (o template não sai do agente). */
+  async registrarDigitalVisitante(visitanteId: string, operador?: UserProfile | null): Promise<void> {
+    const agora = new Date().toISOString();
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('visitantes')
+        .update({ digital_cadastrada_em: agora, biometria_consentida_em: agora })
+        .eq('id', visitanteId);
+      if (error) throw new Error(`Digital cadastrada no leitor, mas não foi possível registrar no cadastro: ${error.message}`);
+      await this.registrarLogAuditoria({
+        usuario_id: operador?.id, usuario_email: operador?.email, acao: 'CADASTRO_DIGITAL_VISITANTE',
+        tabela: 'visitantes', registro_id: visitanteId, detalhes: { consentimento: agora }, ip_origem: getTerminalInfo(),
+      });
+      return;
+    }
+    const visitantes = getStorage<Visitante[]>(STORAGE_KEYS.VISITANTES, INITIAL_VISITANTES);
+    const indice = visitantes.findIndex((v) => v.id === visitanteId);
+    if (indice >= 0) {
+      visitantes[indice] = { ...visitantes[indice], digital_cadastrada_em: agora, biometria_consentida_em: agora };
+      setStorage(STORAGE_KEYS.VISITANTES, visitantes);
+    }
+  },
+
   async consultarVisitantePorCpf(
     cpf: string,
     operador?: UserProfile | null

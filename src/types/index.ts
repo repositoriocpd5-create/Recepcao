@@ -106,6 +106,11 @@ export interface Visitante {
   email?: string;
   empresa_orgao?: string;
   foto_url?: string;
+  /** Caminho da foto no bucket privado visitantes-fotos. */
+  foto_path?: string | null;
+  digital_cadastrada_em?: string | null;
+  /** Consentimento específico para dado biométrico (LGPD, art. 11). */
+  biometria_consentida_em?: string | null;
   observacoes?: string;
   ativo: boolean;
   created_at?: string;

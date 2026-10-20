@@ -59,10 +59,13 @@ import { biometricProvider, isBiometricAgentConfigured, DeviceStatus, Identifica
 import { generateInstitutionalPdf } from '@/services/pdfService';
 import { ReceptionClock } from '@/components/recepcao/ReceptionClock';
 import { BarcodeCameraScanner } from '@/components/recepcao/BarcodeCameraScanner';
+import { BiometriaVisitante } from '@/components/recepcao/BiometriaVisitante';
 import { RoteiroDestinosModal, isRowBackgroundClick } from '@/components/movimentacoes/RoteiroDestinosModal';
 
 interface FichaPessoaIdentificadaProps {
   nome: string;
+  /** Foto do rosto, quando cadastrada; sem ela, mostra a inicial do nome. */
+  fotoUrl?: string | null;
   documentos: string;
   status: { texto: string; tom: 'sucesso' | 'alerta' };
   dados: Array<{ icone: React.ReactNode; rotulo: string; valor: string }>;
@@ -72,14 +75,22 @@ interface FichaPessoaIdentificadaProps {
 
 // Conteúdo do modal "Pessoa identificada" (servidor ou visitante).
 // No celular: dados em lista compacta e barra de ações fixa no rodapé (sempre visível).
-export const FichaPessoaIdentificada: React.FC<FichaPessoaIdentificadaProps> = ({ nome, documentos, status, dados, extra, acoes }) => (
+export const FichaPessoaIdentificada: React.FC<FichaPessoaIdentificadaProps> = ({ nome, fotoUrl, documentos, status, dados, extra, acoes }) => (
   <>
     <div className="space-y-4 px-4 pb-4 pt-5 sm:space-y-6 sm:px-7 sm:pb-6 sm:pt-6">
       <div className="flex flex-col gap-3 rounded-2xl border border-[#dce6f3] bg-white p-3.5 shadow-[0_10px_30px_-18px_rgba(18,44,82,.35)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900/60">
         <div className="flex min-w-0 items-center gap-3 sm:gap-5">
-          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-2xl font-extrabold text-white shadow-[0_0_0_4px_#e6f1fd] sm:h-20 sm:w-20 sm:text-4xl dark:shadow-[0_0_0_4px_rgba(30,64,120,.5)]">
-            {nome.charAt(0)}
-          </div>
+          {fotoUrl ? (
+            <img
+              src={fotoUrl}
+              alt={`Foto de ${nome}`}
+              className="h-[74px] w-14 shrink-0 rounded-2xl object-cover shadow-[0_0_0_4px_#e6f1fd] sm:h-[106px] sm:w-20 dark:shadow-[0_0_0_4px_rgba(30,64,120,.5)]"
+            />
+          ) : (
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-2xl font-extrabold text-white shadow-[0_0_0_4px_#e6f1fd] sm:h-20 sm:w-20 sm:text-4xl dark:shadow-[0_0_0_4px_rgba(30,64,120,.5)]">
+              {nome.charAt(0)}
+            </div>
+          )}
           <div className="min-w-0">
             <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#627289] sm:text-xs dark:text-slate-400">Identificação</span>
             <h4 className="line-clamp-2 break-words text-lg font-extrabold leading-tight text-[#0d1f45] sm:truncate sm:text-2xl dark:text-slate-100" title={nome}>{nome}</h4>
@@ -207,6 +218,10 @@ export const RecepcaoPage: React.FC = () => {
   const [novoVisTelefone, setNovoVisTelefone] = useState('');
   const [novoVisEmpresa, setNovoVisEmpresa] = useState('');
   const [novoVisObservacoes, setNovoVisObservacoes] = useState('');
+  const [novoVisFoto, setNovoVisFoto] = useState<Blob | null>(null);
+  const [novoVisColetarDigital, setNovoVisColetarDigital] = useState(false);
+  const [novoVisConsentimento, setNovoVisConsentimento] = useState(false);
+  const [visitanteFotoUrl, setVisitanteFotoUrl] = useState<string | null>(null);
   const [isSubmittingVisitante, setIsSubmittingVisitante] = useState(false);
 
   // Cadastro rápido de servidor não localizado
@@ -757,6 +772,22 @@ export const RecepcaoPage: React.FC = () => {
   };
 
   // Cadastrar Novo Visitante
+  const limparBiometriaVisitante = () => {
+    setNovoVisFoto(null);
+    setNovoVisColetarDigital(false);
+    setNovoVisConsentimento(false);
+  };
+
+  // Foto do visitante identificado (URL assinada e temporária do bucket privado).
+  useEffect(() => {
+    const visitante = visitanteResultado?.visitante;
+    setVisitanteFotoUrl(null);
+    if (!visitante || (!visitante.foto_path && !visitante.foto_url)) return;
+    let ativo = true;
+    dataService.getFotoVisitanteUrl(visitante).then((url) => { if (ativo) setVisitanteFotoUrl(url); });
+    return () => { ativo = false; };
+  }, [visitanteResultado?.visitante?.id, visitanteResultado?.visitante?.foto_path, visitanteResultado?.visitante?.foto_url]);
+
   const handleCadastrarVisitante = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingVisitante(true);
@@ -773,25 +804,48 @@ export const RecepcaoPage: React.FC = () => {
         user
       );
 
+      // Biometria é opcional e só é gravada com o consentimento do visitante (LGPD, art. 11).
+      let visitanteSalvo = novo;
+      const pendencias: string[] = [];
+      if (novoVisConsentimento && novoVisFoto) {
+        try {
+          visitanteSalvo = await dataService.salvarFotoVisitante(novo.id, novoVisFoto, user);
+        } catch (err) {
+          pendencias.push(err instanceof Error ? err.message : 'A foto não foi salva.');
+        }
+      }
+      if (novoVisConsentimento && novoVisColetarDigital) {
+        const leitura = await biometricProvider.startEnrollment(novo.id);
+        if (leitura.status === 'identified') {
+          try {
+            await dataService.registrarDigitalVisitante(novo.id, user);
+          } catch (err) {
+            pendencias.push(err instanceof Error ? err.message : 'A digital não foi registrada.');
+          }
+        } else {
+          pendencias.push(`Digital: ${leitura.message}`);
+        }
+      }
+
       setIsNovoVisitanteModalOpen(false);
       setVisitanteResultado({
         encontrado: true,
-        visitante: novo,
+        visitante: visitanteSalvo,
         no_predio: false,
       });
       // O cadastro é apenas a primeira etapa: encaminha diretamente para a confirmação da pessoa.
       setIsIdentificationModalOpen(false);
       setIsPersonDetailsModalOpen(true);
-      setSearchFeedback({
-        type: 'success',
-        message: `Visitante "${novo.nome}" cadastrado com sucesso! Prossiga com o registro de entrada.`,
-      });
+      setSearchFeedback(pendencias.length
+        ? { type: 'warning', message: `Visitante "${novo.nome}" cadastrado, com pendências: ${pendencias.join(' ')}` }
+        : { type: 'success', message: `Visitante "${novo.nome}" cadastrado com sucesso! Prossiga com o registro de entrada.` });
       // Limpar formulário de visitante
       setNovoVisNome('');
       setNovoVisRg('');
       setNovoVisTelefone('');
       setNovoVisEmpresa('');
       setNovoVisObservacoes('');
+      limparBiometriaVisitante();
     } catch (err: any) {
       alert(`Falha ao cadastrar: ${err.message}`);
     } finally {
@@ -1656,6 +1710,7 @@ export const RecepcaoPage: React.FC = () => {
         {activeTab === 'visitante' && visitanteResultado?.encontrado && visitanteResultado.visitante && (
           <FichaPessoaIdentificada
             nome={visitanteResultado.visitante.nome}
+            fotoUrl={visitanteFotoUrl}
             documentos={`CPF: ${visitanteResultado.visitante.cpf}${visitanteResultado.visitante.rg ? `  •  RG: ${visitanteResultado.visitante.rg}` : ''}`}
             status={visitanteResultado.no_predio ? { texto: 'Entrada em andamento', tom: 'alerta' } : { texto: 'Apto para entrada', tom: 'sucesso' }}
             dados={[
@@ -2216,7 +2271,7 @@ export const RecepcaoPage: React.FC = () => {
       {/* MODAL 2: Cadastro Rápido de Visitante */}
       <Modal
         isOpen={isNovoVisitanteModalOpen}
-        onClose={() => setIsNovoVisitanteModalOpen(false)}
+        onClose={() => { setIsNovoVisitanteModalOpen(false); limparBiometriaVisitante(); }}
         title="Cadastro de Novo Visitante"
         description="Cadastre os dados pessoais do visitante em conformidade com a LGPD"
       >
@@ -2271,11 +2326,21 @@ export const RecepcaoPage: React.FC = () => {
             placeholder="Ex: Necessidade especial de mobilidade, etc."
           />
 
+          <BiometriaVisitante
+            foto={novoVisFoto}
+            onFotoChange={setNovoVisFoto}
+            coletarDigital={novoVisColetarDigital}
+            onColetarDigitalChange={setNovoVisColetarDigital}
+            consentimento={novoVisConsentimento}
+            onConsentimentoChange={setNovoVisConsentimento}
+            leitorStatus={biometricStatus}
+          />
+
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setIsNovoVisitanteModalOpen(false)}
+              onClick={() => { setIsNovoVisitanteModalOpen(false); limparBiometriaVisitante(); }}
             >
               Cancelar
             </Button>
