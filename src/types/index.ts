@@ -48,6 +48,20 @@ export interface Setor {
   departamento?: Departamento;
 }
 
+export type RamalUnidadeTipo = 'unidade_escolar' | 'departamento';
+
+/** Unidade escolar ou departamento da SMEDU com o ramal de contato. */
+export interface RamalUnidade {
+  id: string;
+  tipo: RamalUnidadeTipo;
+  categoria: string;
+  nome: string;
+  /** Lotação correspondente no quadro de servidores. */
+  lotacao?: string | null;
+  ramal?: string | null;
+  ativo: boolean;
+}
+
 export interface ServidorSetorVinculo {
   servidor_id: string;
   setor_id: string;

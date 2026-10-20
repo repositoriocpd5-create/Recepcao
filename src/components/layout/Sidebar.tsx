@@ -14,6 +14,7 @@ import {
   ChevronRight,
   BadgeCheck,
   BookOpen,
+  Phone,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
   const operationalNav = [
     { name: 'Recepção (Atendimento)', path: '/recepcao', icon: UserCheck, badge: 'Principal' },
     { name: 'Movimentações', path: '/movimentacoes', icon: ArrowRightLeft },
+    { name: 'Ramais', path: '/ramais', icon: Phone },
     { name: 'Visitantes', path: '/visitantes', icon: Users },
     { name: 'Servidores', path: '/servidores', icon: Briefcase },
     { name: 'Autorizações', path: '/autorizacoes', icon: CheckCircle2 },

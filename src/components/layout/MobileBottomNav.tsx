@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { BadgeCheck, BookOpen, Briefcase, Building2, Calendar, CheckCircle2, ChevronRight, FileSpreadsheet, Home, LayoutDashboard, MoreHorizontal, ShieldCheck, Users, ArrowRightLeft } from 'lucide-react';
+import { BadgeCheck, BookOpen, Briefcase, Building2, Calendar, CheckCircle2, ChevronRight, FileSpreadsheet, Home, LayoutDashboard, MoreHorizontal, ShieldCheck, Users, ArrowRightLeft, Phone } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const primaryItems = [
@@ -17,6 +17,7 @@ export const MobileBottomNav = () => {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreItems = [
     { label: 'Movimentações', path: '/movimentacoes', icon: ArrowRightLeft },
+    { label: 'Ramais', path: '/ramais', icon: Phone },
     { label: 'Autorizações', path: '/autorizacoes', icon: CheckCircle2 },
     ...(user?.role === 'admin' ? [{ label: 'Agendamentos', path: '/agendamentos', icon: Calendar }] : []),
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },

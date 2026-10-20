@@ -14,6 +14,7 @@ import {
   Cracha,
   CrachaStatus,
   ServidorSetorVinculo,
+  RamalUnidade,
 } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
@@ -28,6 +29,7 @@ import {
   DEMO_USERS,
 } from './mockData';
 import { SERVIDORES_OFICIAIS } from './servidoresOficiais';
+import { RAMAIS_UNIDADES_INICIAIS } from './ramaisUnidades';
 
 // Local storage keys para persistência no ambiente de teste/demonstração
 const STORAGE_KEYS = {
@@ -42,6 +44,7 @@ const STORAGE_KEYS = {
   CRACHAS: 'smedu_crachas',
   SERVIDOR_SETOR_VINCULOS: 'sme_servidor_setor_vinculos',
   USUARIOS: 'sme_admin_users',
+  RAMAIS_UNIDADES: 'sme_ramais_unidades',
 };
 
 type MovimentacaoAdminUpdate = Pick<
@@ -212,6 +215,51 @@ export const dataService = {
       departamento: deps.find((d) => d.id === s.departamento_id),
     }));
     return departamentoId ? enriched.filter((s) => s.departamento_id === departamentoId) : enriched;
+  },
+
+  async getRamaisUnidades(): Promise<RamalUnidade[]> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase
+        .from('ramais_unidades')
+        .select('id, tipo, categoria, nome, lotacao, ramal, ativo')
+        .eq('ativo', true)
+        .order('nome');
+      return requireLiveResult(data, error, 'Não foi possível carregar os ramais') as RamalUnidade[];
+    }
+    return getStorage<RamalUnidade[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS).filter((u) => u.ativo);
+  },
+
+  async salvarRamalUnidade(unidade: Partial<RamalUnidade>): Promise<RamalUnidade> {
+    const dados = { ...unidade, ramal: unidade.ramal?.trim() || null };
+    if (isSupabaseConfigured) {
+      const { id, ...campos } = dados;
+      const query = id
+        ? supabase.from('ramais_unidades').update({ ...campos, updated_at: new Date().toISOString() }).eq('id', id)
+        : supabase.from('ramais_unidades').insert(campos);
+      const { data, error } = await query.select('id, tipo, categoria, nome, lotacao, ramal, ativo').single();
+      if (error) throw new Error(`Não foi possível salvar o ramal: ${error.message}`);
+      return data as RamalUnidade;
+    }
+
+    const lista = getStorage<RamalUnidade[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS);
+    if (dados.id) {
+      const indice = lista.findIndex((item) => item.id === dados.id);
+      if (indice < 0) throw new Error('Unidade não encontrada.');
+      lista[indice] = { ...lista[indice], ...dados } as RamalUnidade;
+      setStorage(STORAGE_KEYS.RAMAIS_UNIDADES, lista);
+      return lista[indice];
+    }
+    const nova: RamalUnidade = {
+      id: `ru-${Date.now()}`,
+      tipo: dados.tipo || 'unidade_escolar',
+      categoria: dados.categoria || 'Escolas Municipais',
+      nome: dados.nome || '',
+      lotacao: dados.lotacao ?? null,
+      ramal: dados.ramal,
+      ativo: true,
+    };
+    setStorage(STORAGE_KEYS.RAMAIS_UNIDADES, [...lista, nova]);
+    return nova;
   },
 
   async getServidorSetorVinculos(): Promise<ServidorSetorVinculo[]> {

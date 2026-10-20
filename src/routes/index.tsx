@@ -16,6 +16,7 @@ import { SetoresPage } from '@/pages/Setores';
 import { AdministracaoPage } from '@/pages/Administracao';
 import { CrachasPage } from '@/pages/Crachas';
 import { ManualPage } from '@/pages/Manual';
+import { RamaisPage } from '@/pages/Ramais';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string }> = ({
   children,
@@ -59,6 +60,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="recepcao" element={<RecepcaoPage />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="movimentacoes" element={<MovimentacoesPage />} />
+        <Route path="ramais" element={<RamaisPage />} />
         <Route path="visitantes" element={<VisitantesPage />} />
         <Route path="servidores" element={<ServidoresPage />} />
         <Route path="autorizacoes" element={<AutorizacoesPage />} />
