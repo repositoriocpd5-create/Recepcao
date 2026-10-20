@@ -15,6 +15,7 @@ import {
   CrachaStatus,
   ServidorSetorVinculo,
   RamalUnidade,
+  RamalContato,
 } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
@@ -88,6 +89,22 @@ function setStorage<T>(key: string, value: T): void {
   } catch (err) {
     console.error('Falha ao salvar no localStorage', err);
   }
+}
+
+/** Remove ramais vazios ou repetidos e apara os textos. */
+function limparRamais(ramais: RamalContato[]): RamalContato[] {
+  const vistos = new Set<string>();
+  return ramais
+    .map((r) => ({ numero: r.numero.trim(), descricao: r.descricao?.trim() || null }))
+    .filter((r) => r.numero && !vistos.has(r.numero) && vistos.add(r.numero));
+}
+
+/** Garante a lista de ramais, inclusive em registros que só têm a coluna ramal. */
+function normalizarRamalUnidade(unidade: Partial<RamalUnidade>): RamalUnidade {
+  const ramais = Array.isArray(unidade.ramais) && unidade.ramais.length
+    ? unidade.ramais
+    : unidade.ramal ? [{ numero: unidade.ramal }] : [];
+  return { ...unidade, ramais, ramal: ramais[0]?.numero ?? null, ativo: unidade.ativo ?? true } as RamalUnidade;
 }
 
 function requireLiveResult<T>(data: T | null, error: { message: string } | null, operation: string): T {
@@ -219,29 +236,50 @@ export const dataService = {
 
   async getRamaisUnidades(): Promise<RamalUnidade[]> {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('ramais_unidades')
-        .select('id, tipo, categoria, nome, lotacao, ramal, ativo')
-        .eq('ativo', true)
-        .order('nome');
-      return requireLiveResult(data, error, 'Não foi possível carregar os ramais') as RamalUnidade[];
+      // select('*') tolera bancos ainda sem a coluna ramais (migração 20261020140000).
+      const { data, error } = await supabase.from('ramais_unidades').select('*').eq('ativo', true).order('nome');
+      const lista = requireLiveResult(data, error, 'Não foi possível carregar os ramais') as Partial<RamalUnidade>[];
+      return lista.map(normalizarRamalUnidade);
     }
-    return getStorage<RamalUnidade[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS).filter((u) => u.ativo);
+    return getStorage<Partial<RamalUnidade>[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS)
+      .map(normalizarRamalUnidade)
+      .filter((u) => u.ativo);
   },
 
   async salvarRamalUnidade(unidade: Partial<RamalUnidade>): Promise<RamalUnidade> {
-    const dados = { ...unidade, ramal: unidade.ramal?.trim() || null };
-    if (isSupabaseConfigured) {
-      const { id, ...campos } = dados;
-      const query = id
-        ? supabase.from('ramais_unidades').update({ ...campos, updated_at: new Date().toISOString() }).eq('id', id)
-        : supabase.from('ramais_unidades').insert(campos);
-      const { data, error } = await query.select('id, tipo, categoria, nome, lotacao, ramal, ativo').single();
-      if (error) throw new Error(`Não foi possível salvar o ramal: ${error.message}`);
-      return data as RamalUnidade;
+    const dados: Partial<RamalUnidade> = { ...unidade };
+    if (unidade.ramais) {
+      dados.ramais = limparRamais(unidade.ramais);
+      dados.ramal = dados.ramais[0]?.numero ?? null;
+    } else if ('ramal' in unidade) {
+      dados.ramal = unidade.ramal?.trim() || null;
+      dados.ramais = dados.ramal ? [{ numero: dados.ramal }] : [];
     }
 
-    const lista = getStorage<RamalUnidade[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS);
+    if (isSupabaseConfigured) {
+      const { id, ...campos } = dados;
+      const gravar = (valores: Partial<RamalUnidade>) => {
+        const query = id
+          ? supabase.from('ramais_unidades').update({ ...valores, updated_at: new Date().toISOString() }).eq('id', id)
+          : supabase.from('ramais_unidades').insert(valores);
+        return query.select('*').single();
+      };
+      let { data, error } = await gravar(campos);
+      const semColuna = !!error && /ramais/.test(error.message) && /column|coluna|schema cache/i.test(error.message);
+      // Banco sem a migração 20261020140000: um único ramal ainda cabe na coluna ramal.
+      if (semColuna && (dados.ramais?.length ?? 0) <= 1) {
+        const { ramais: _ramais, ...semRamais } = campos;
+        ({ data, error } = await gravar(semRamais));
+      }
+      if (error) {
+        throw new Error(semColuna
+          ? 'O banco ainda não aceita vários ramais. Execute a migração 20261020140000_ramais_multiplos.sql no Supabase.'
+          : `Não foi possível salvar o ramal: ${error.message}`);
+      }
+      return normalizarRamalUnidade(data as Partial<RamalUnidade>);
+    }
+
+    const lista = getStorage<Partial<RamalUnidade>[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS).map(normalizarRamalUnidade);
     if (dados.id) {
       const indice = lista.findIndex((item) => item.id === dados.id);
       if (indice < 0) throw new Error('Unidade não encontrada.');
@@ -249,15 +287,15 @@ export const dataService = {
       setStorage(STORAGE_KEYS.RAMAIS_UNIDADES, lista);
       return lista[indice];
     }
-    const nova: RamalUnidade = {
+    const nova = normalizarRamalUnidade({
+      ...dados,
       id: `ru-${Date.now()}`,
       tipo: dados.tipo || 'unidade_escolar',
       categoria: dados.categoria || 'Escolas Municipais',
       nome: dados.nome || '',
       lotacao: dados.lotacao ?? null,
-      ramal: dados.ramal,
       ativo: true,
-    };
+    });
     setStorage(STORAGE_KEYS.RAMAIS_UNIDADES, [...lista, nova]);
     return nova;
   },

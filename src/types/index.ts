@@ -50,7 +50,13 @@ export interface Setor {
 
 export type RamalUnidadeTipo = 'unidade_escolar' | 'departamento';
 
-/** Unidade escolar ou departamento da SMEDU com o ramal de contato. */
+/** Um ramal da unidade, com uma descrição opcional (ex.: Direção, Secretaria). */
+export interface RamalContato {
+  numero: string;
+  descricao?: string | null;
+}
+
+/** Unidade escolar ou departamento da SMEDU com os ramais de contato. */
 export interface RamalUnidade {
   id: string;
   tipo: RamalUnidadeTipo;
@@ -58,7 +64,10 @@ export interface RamalUnidade {
   nome: string;
   /** Lotação correspondente no quadro de servidores. */
   lotacao?: string | null;
+  /** Ramal principal (o primeiro da lista), mantido para compatibilidade. */
   ramal?: string | null;
+  /** Todos os ramais; departamentos podem ter mais de um. */
+  ramais: RamalContato[];
   ativo: boolean;
 }
 

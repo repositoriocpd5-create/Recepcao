@@ -15,6 +15,7 @@ import {
   PhoneOff,
   AlertTriangle,
   Save,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/Card';
@@ -23,7 +24,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
 import { dataService } from '@/services/dataService';
-import { RamalUnidade, RamalUnidadeTipo } from '@/types';
+import { RamalContato, RamalUnidade, RamalUnidadeTipo } from '@/types';
 import { cn } from '@/lib/utils';
 
 type FiltroTipo = 'todos' | RamalUnidadeTipo;
@@ -79,6 +80,41 @@ const Destaque: React.FC<{ texto: string; termos: string[] }> = ({ texto, termos
   return <>{partes}</>;
 };
 
+/** Botão de um ramal: mostra a descrição (ou "Ramal") e copia o número ao clicar. */
+const RamalPill: React.FC<{
+  contato: RamalContato;
+  termos: string[];
+  copiado: boolean;
+  compacto?: boolean;
+  onCopiar: () => void;
+}> = ({ contato, termos, copiado, compacto, onCopiar }) => (
+  <button
+    type="button"
+    onClick={onCopiar}
+    className={cn(
+      'flex max-w-full items-center gap-2 rounded-lg border transition-colors',
+      compacto ? 'px-2.5 py-1' : 'px-3 py-1.5',
+      copiado
+        ? 'border-emerald-500/50 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+        : 'border-[#cfe0f2] bg-[#f2f7fd] text-[#005a9c] hover:border-[#005a9c] dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-400'
+    )}
+    title={`Copiar ramal ${contato.numero}`}
+    aria-label={`${contato.descricao || 'Ramal'} ${contato.numero}. Copiar`}
+  >
+    <span className="min-w-0 text-left leading-none">
+      <span className="block truncate text-[9px] font-bold uppercase tracking-wider opacity-70">
+        <Destaque texto={contato.descricao || 'Ramal'} termos={contato.descricao ? termos : []} />
+      </span>
+      <span className={cn('mt-0.5 block font-mono font-extrabold tabular-nums', compacto ? 'text-sm' : 'text-base')}>
+        <Destaque texto={contato.numero} termos={termos} />
+      </span>
+    </span>
+    {copiado ? <Check className="h-4 w-4 shrink-0" /> : <Copy className="h-3.5 w-3.5 shrink-0 opacity-50" />}
+  </button>
+);
+
+const MAX_RAMAIS_DEPARTAMENTO = 10;
+
 export const RamaisPage: React.FC = () => {
   const { user } = useAuth();
   const podeEditar = user?.role === 'admin' || user?.role === 'gestor';
@@ -97,6 +133,11 @@ export const RamaisPage: React.FC = () => {
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [ramalEditado, setRamalEditado] = useState('');
   const [salvandoId, setSalvandoId] = useState<string | null>(null);
+
+  // Editor de vários ramais (departamentos)
+  const [editorUnidade, setEditorUnidade] = useState<RamalUnidade | null>(null);
+  const [linhasEditor, setLinhasEditor] = useState<RamalContato[]>([]);
+  const [isSalvandoEditor, setIsSalvandoEditor] = useState(false);
 
   const [isNovaOpen, setIsNovaOpen] = useState(false);
   const [novaUnidade, setNovaUnidade] = useState({ nome: '', tipo: 'unidade_escolar' as RamalUnidadeTipo, categoria: 'Escolas Municipais', ramal: '' });
@@ -149,9 +190,10 @@ export const RamaisPage: React.FC = () => {
     () =>
       unidades.filter((unidade) => {
         if (filtroTipo !== 'todos' && unidade.tipo !== filtroTipo) return false;
-        if (somenteComRamal && !unidade.ramal) return false;
+        if (somenteComRamal && !unidade.ramais.length) return false;
         if (!termos.length) return true;
-        const alvo = normalizar(`${unidade.nome} ${unidade.lotacao || ''} ${unidade.ramal || ''}`);
+        const ramais = unidade.ramais.map((r) => `${r.numero} ${r.descricao || ''}`).join(' ');
+        const alvo = normalizar(`${unidade.nome} ${unidade.lotacao || ''} ${ramais}`);
         return termos.every((termo) => alvo.includes(termo));
       }),
     [unidades, filtroTipo, somenteComRamal, termos]
@@ -176,22 +218,27 @@ export const RamaisPage: React.FC = () => {
 
   const totalEscolas = unidades.filter((u) => u.tipo === 'unidade_escolar').length;
   const totalDepartamentos = unidades.filter((u) => u.tipo === 'departamento').length;
-  const totalComRamal = unidades.filter((u) => u.ramal).length;
+  const totalComRamal = unidades.filter((u) => u.ramais.length).length;
   const percentualComRamal = unidades.length ? Math.round((totalComRamal / unidades.length) * 100) : 0;
 
-  const copiarRamal = async (unidade: RamalUnidade) => {
-    if (!unidade.ramal) return;
+  const copiarRamal = async (unidade: RamalUnidade, contato: RamalContato, indice: number) => {
+    const chave = `${unidade.id}-${indice}`;
     try {
-      await navigator.clipboard.writeText(unidade.ramal);
-      setCopiadoId(unidade.id);
-      setAviso({ tipo: 'sucesso', texto: `Ramal ${unidade.ramal} copiado.` });
-      window.setTimeout(() => setCopiadoId((atual) => (atual === unidade.id ? null : atual)), 1600);
+      await navigator.clipboard.writeText(contato.numero);
+      setCopiadoId(chave);
+      setAviso({ tipo: 'sucesso', texto: `Ramal ${contato.numero}${contato.descricao ? ` (${contato.descricao})` : ''} copiado.` });
+      window.setTimeout(() => setCopiadoId((atual) => (atual === chave ? null : atual)), 1600);
     } catch {
       setAviso({ tipo: 'erro', texto: 'Não foi possível copiar o ramal.' });
     }
   };
 
   const iniciarEdicao = (unidade: RamalUnidade) => {
+    if (unidade.tipo === 'departamento') {
+      setEditorUnidade(unidade);
+      setLinhasEditor(unidade.ramais.length ? unidade.ramais.map((r) => ({ ...r })) : [{ numero: '', descricao: '' }]);
+      return;
+    }
     setEditandoId(unidade.id);
     setRamalEditado(unidade.ramal || '');
   };
@@ -212,6 +259,39 @@ export const RamaisPage: React.FC = () => {
       setAviso({ tipo: 'erro', texto: err instanceof Error ? err.message : 'Não foi possível salvar o ramal.' });
     } finally {
       setSalvandoId(null);
+    }
+  };
+
+  const atualizarLinha = (indice: number, campos: Partial<RamalContato>) =>
+    setLinhasEditor((linhas) => linhas.map((linha, i) => (i === indice ? { ...linha, ...campos } : linha)));
+
+  const numerosRepetidos = useMemo(() => {
+    const contagem = new Map<string, number>();
+    linhasEditor.forEach((linha) => {
+      const numero = linha.numero.trim();
+      if (numero) contagem.set(numero, (contagem.get(numero) || 0) + 1);
+    });
+    return new Set(Array.from(contagem).filter(([, total]) => total > 1).map(([numero]) => numero));
+  }, [linhasEditor]);
+
+  const salvarEditor = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editorUnidade || numerosRepetidos.size) return;
+    setIsSalvandoEditor(true);
+    try {
+      const salva = await dataService.salvarRamalUnidade({ id: editorUnidade.id, ramais: linhasEditor });
+      setUnidades((lista) => lista.map((item) => (item.id === salva.id ? salva : item)));
+      setEditorUnidade(null);
+      setAviso({
+        tipo: 'sucesso',
+        texto: salva.ramais.length
+          ? `${salva.ramais.length} ${salva.ramais.length === 1 ? 'ramal salvo' : 'ramais salvos'} para ${salva.nome}.`
+          : `Ramais de ${salva.nome} removidos.`,
+      });
+    } catch (err) {
+      setAviso({ tipo: 'erro', texto: err instanceof Error ? err.message : 'Não foi possível salvar os ramais.' });
+    } finally {
+      setIsSalvandoEditor(false);
     }
   };
 
@@ -458,12 +538,13 @@ export const RamaisPage: React.FC = () => {
                   const Icone = iconeDaUnidade(unidade);
                   const totalServidores = unidade.lotacao ? servidoresPorLotacao.get(unidade.lotacao) || 0 : 0;
                   const editando = editandoId === unidade.id;
-                  const copiado = copiadoId === unidade.id;
+                  const variosRamais = unidade.ramais.length > 1;
                   return (
                     <li
                       key={unidade.id}
                       className={cn(
-                        'group flex min-h-[68px] items-center gap-3 rounded-xl border bg-white px-3 py-2.5 transition-all dark:bg-[#121826]',
+                        'group flex min-h-[68px] gap-3 rounded-xl border bg-white px-3 py-2.5 transition-all dark:bg-[#121826]',
+                        variosRamais ? 'items-start' : 'items-center',
                         editando
                           ? 'border-[#005a9c] ring-2 ring-[#005a9c]/15 dark:border-sky-500 dark:ring-sky-500/20'
                           : 'border-[#e3eaf4] hover:border-[#b9d4ee] hover:shadow-[0_8px_18px_-14px_rgba(18,44,82,.35)] dark:border-slate-800 dark:hover:border-slate-700'
@@ -490,6 +571,20 @@ export const RamaisPage: React.FC = () => {
                             <Users className="h-3 w-3" />
                             {totalServidores} {totalServidores === 1 ? 'servidor lotado' : 'servidores lotados'}
                           </p>
+                        )}
+                        {variosRamais && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {unidade.ramais.map((contato, indice) => (
+                              <RamalPill
+                                key={`${contato.numero}-${indice}`}
+                                contato={contato}
+                                termos={termos}
+                                compacto
+                                copiado={copiadoId === `${unidade.id}-${indice}`}
+                                onCopiar={() => copiarRamal(unidade, contato, indice)}
+                              />
+                            ))}
+                          </div>
                         )}
                       </div>
 
@@ -529,47 +624,33 @@ export const RamaisPage: React.FC = () => {
                         </form>
                       ) : (
                         <div className="flex shrink-0 items-center gap-1">
-                          {unidade.ramal ? (
-                            <button
-                              type="button"
-                              onClick={() => copiarRamal(unidade)}
-                              className={cn(
-                                'flex items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors',
-                                copiado
-                                  ? 'border-emerald-500/50 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                  : 'border-[#cfe0f2] bg-[#f2f7fd] text-[#005a9c] hover:border-[#005a9c] dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-400'
-                              )}
-                              title="Copiar ramal"
-                              aria-label={`Ramal ${unidade.ramal}. Copiar`}
-                            >
-                              <span className="text-left leading-none">
-                                <span className="block text-[9px] font-bold uppercase tracking-wider opacity-70">Ramal</span>
-                                <span className="mt-0.5 block font-mono text-base font-extrabold tabular-nums">
-                                  <Destaque texto={unidade.ramal} termos={termos} />
-                                </span>
-                              </span>
-                              {copiado ? <Check className="h-4 w-4" /> : <Copy className="h-3.5 w-3.5 opacity-50 transition-opacity group-hover:opacity-100" />}
-                            </button>
+                          {variosRamais ? null : unidade.ramais.length ? (
+                            <RamalPill
+                              contato={unidade.ramais[0]}
+                              termos={termos}
+                              copiado={copiadoId === `${unidade.id}-0`}
+                              onCopiar={() => copiarRamal(unidade, unidade.ramais[0], 0)}
+                            />
                           ) : podeEditar ? (
                             <button
                               type="button"
                               onClick={() => iniciarEdicao(unidade)}
                               className="flex items-center gap-1.5 rounded-lg border border-dashed border-[#c7d6ea] px-3 py-2 text-[11px] font-semibold text-[#627fa5] transition-colors hover:border-[#005a9c] hover:text-[#005a9c] dark:border-slate-700 dark:text-slate-400 dark:hover:border-sky-400 dark:hover:text-sky-300"
                             >
-                              <Plus className="h-3.5 w-3.5" /> Adicionar ramal
+                              <Plus className="h-3.5 w-3.5" /> {unidade.tipo === 'departamento' ? 'Adicionar ramais' : 'Adicionar ramal'}
                             </button>
                           ) : (
                             <span className="flex items-center gap-1.5 rounded-lg border border-dashed border-[#d8e3f2] px-3 py-2 text-[11px] font-medium text-[#8aa0bd] dark:border-slate-800 dark:text-slate-500">
                               <PhoneOff className="h-3.5 w-3.5" /> Sem ramal
                             </span>
                           )}
-                          {podeEditar && unidade.ramal && (
+                          {podeEditar && unidade.ramais.length > 0 && (
                             <button
                               type="button"
                               onClick={() => iniciarEdicao(unidade)}
                               className="grid h-9 w-9 place-items-center rounded-lg text-[#8aa0bd] opacity-100 transition-opacity hover:bg-[#eef4fb] hover:text-[#005a9c] focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 dark:hover:bg-slate-800 dark:hover:text-sky-300"
-                              aria-label={`Editar ramal de ${unidade.nome}`}
-                              title="Editar ramal"
+                              aria-label={unidade.tipo === 'departamento' ? `Editar ramais de ${unidade.nome}` : `Editar ramal de ${unidade.nome}`}
+                              title={unidade.tipo === 'departamento' ? 'Editar ramais' : 'Editar ramal'}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -602,6 +683,85 @@ export const RamaisPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Ramais do departamento */}
+      <Modal
+        isOpen={!!editorUnidade}
+        onClose={() => setEditorUnidade(null)}
+        title="Ramais do departamento"
+        description={editorUnidade?.nome}
+        maxWidth="lg"
+      >
+        <form onSubmit={salvarEditor} className="space-y-4">
+          <div className="hidden grid-cols-[7rem_minmax(0,1fr)_2.5rem] gap-2 px-1 text-[11px] font-semibold text-[#627fa5] sm:grid dark:text-slate-400">
+            <span>Ramal</span>
+            <span>Descrição (opcional)</span>
+            <span />
+          </div>
+          <ul className="space-y-2">
+            {linhasEditor.map((linha, indice) => {
+              const repetido = numerosRepetidos.has(linha.numero.trim());
+              return (
+                <li key={indice} className="grid grid-cols-[6.5rem_minmax(0,1fr)_2.5rem] items-start gap-2 sm:grid-cols-[7rem_minmax(0,1fr)_2.5rem]">
+                  <input
+                    autoFocus={indice === linhasEditor.length - 1}
+                    value={linha.numero}
+                    onChange={(event) => atualizarLinha(indice, { numero: event.target.value.replace(/[^\d\s/-]/g, '').slice(0, 20) })}
+                    inputMode="numeric"
+                    placeholder="Ex.: 2905"
+                    aria-label={`Número do ramal ${indice + 1}`}
+                    aria-invalid={repetido}
+                    className={cn(
+                      'h-11 w-full rounded-lg border bg-white px-3 text-center font-mono text-sm font-bold text-[#102755] focus:outline-none focus:ring-2 dark:bg-[#0d1220] dark:text-slate-100',
+                      repetido
+                        ? 'border-rose-400 focus:ring-rose-500/30'
+                        : 'border-[#cfdcec] focus:border-[#005a9c] focus:ring-[#005a9c]/20 dark:border-slate-700'
+                    )}
+                  />
+                  <input
+                    value={linha.descricao || ''}
+                    onChange={(event) => atualizarLinha(indice, { descricao: event.target.value.slice(0, 40) })}
+                    placeholder="Ex.: Direção, Secretaria"
+                    aria-label={`Descrição do ramal ${indice + 1}`}
+                    className="h-11 w-full rounded-lg border border-[#cfdcec] bg-white px-3 text-sm text-[#102755] placeholder:text-[#9db0c8] focus:border-[#005a9c] focus:outline-none focus:ring-2 focus:ring-[#005a9c]/20 dark:border-slate-700 dark:bg-[#0d1220] dark:text-slate-100 dark:placeholder:text-slate-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setLinhasEditor((linhas) => (linhas.length === 1 ? [{ numero: '', descricao: '' }] : linhas.filter((_, i) => i !== indice)))}
+                    className="grid h-11 w-10 place-items-center rounded-lg text-[#8aa0bd] hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
+                    aria-label={`Remover ramal ${indice + 1}`}
+                    title="Remover"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                  {repetido && <p className="col-span-3 -mt-1 px-1 text-[11px] text-rose-500">Este ramal já está na lista.</p>}
+                </li>
+              );
+            })}
+          </ul>
+
+          {linhasEditor.length < MAX_RAMAIS_DEPARTAMENTO && (
+            <button
+              type="button"
+              onClick={() => setLinhasEditor((linhas) => [...linhas, { numero: '', descricao: '' }])}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#c7d6ea] py-2.5 text-xs font-semibold text-[#005a9c] transition-colors hover:border-[#005a9c] hover:bg-[#f2f7fd] dark:border-slate-700 dark:text-sky-300 dark:hover:border-sky-400 dark:hover:bg-sky-500/10"
+            >
+              <Plus className="h-4 w-4" /> Adicionar outro ramal
+            </button>
+          )}
+
+          <p className="text-[11px] text-[#627fa5] dark:text-slate-400">
+            O primeiro ramal da lista é o principal. Linhas sem número são ignoradas ao salvar.
+          </p>
+
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={() => setEditorUnidade(null)}>Cancelar</Button>
+            <Button type="submit" variant="primary" isLoading={isSalvandoEditor} disabled={numerosRepetidos.size > 0}>
+              <Save className="w-4 h-4" /> Salvar ramais
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Nova unidade */}
       <Modal

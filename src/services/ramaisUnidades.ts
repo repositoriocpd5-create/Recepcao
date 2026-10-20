@@ -90,6 +90,7 @@ const UNIDADES: Pick<RamalUnidade, 'tipo' | 'categoria' | 'nome' | 'lotacao' | '
 export const RAMAIS_UNIDADES_INICIAIS: RamalUnidade[] = UNIDADES.map((unidade, indice) => ({
   ramal: null,
   ...unidade,
+  ramais: unidade.ramal ? [{ numero: unidade.ramal }] : [],
   id: `ru-${indice + 1}`,
   ativo: true,
 }));
