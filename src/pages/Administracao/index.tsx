@@ -26,6 +26,7 @@ import { dataService } from '@/services/dataService';
 import { DEMO_USERS } from '@/services/mockData';
 import { UserProfile, UserRole } from '@/types';
 import { cn } from '@/lib/utils';
+import { GestaoUnidades } from '@/components/admin/GestaoUnidades';
 
 const STORAGE_KEY_USERS = 'sme_admin_users';
 
@@ -282,7 +283,7 @@ export const AdministracaoPage: React.FC = () => {
             </span>
             <h2 className="text-xl font-bold text-slate-100">Painel de Administração do Sistema</h2>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Controle de operadores, papéis e permissões do sistema</p>
+          <p className="text-xs text-slate-400 mt-1">Controle de operadores, permissões e unidades escolares do sistema</p>
         </div>
       </div>
 
@@ -455,6 +456,9 @@ export const AdministracaoPage: React.FC = () => {
           </div>
         </div>
       </Card>
+
+      {/* ─── UNIDADES ESCOLARES E DEPARTAMENTOS (tela de Ramais) ─── */}
+      <GestaoUnidades onAviso={exibirToast} />
 
       {/* ─── MODAL DE ADICIONAR / EDITAR USUÁRIO ─── */}
       <Modal

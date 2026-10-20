@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
 import { dataService } from '@/services/dataService';
+import { CATEGORIAS_POR_TIPO, ORDEM_CATEGORIAS } from '@/services/ramaisUnidades';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { RamalContato, RamalUnidade, RamalUnidadeTipo, Servidor } from '@/types';
 import { cn } from '@/lib/utils';
@@ -35,21 +36,6 @@ type FiltroTipo = 'todos' | RamalUnidadeTipo;
 type ModoBusca = 'unidades' | 'servidores';
 const MODO_BUSCA_KEY = 'sme-ramais-modo-busca';
 const MIN_LETRAS_SERVIDOR = 3;
-
-const ORDEM_CATEGORIAS = [
-  'Departamentos SMEDU',
-  'Escolas Municipais',
-  'Escolas Estadualizadas',
-  'CIEPs',
-  'Educação Infantil',
-  'Creches Municipais',
-  'Centros e Colégios',
-];
-
-const CATEGORIAS_POR_TIPO: Record<RamalUnidadeTipo, string[]> = {
-  departamento: ['Departamentos SMEDU'],
-  unidade_escolar: ORDEM_CATEGORIAS.slice(1),
-};
 
 /** Minúsculas e sem acentos, preservando um caractere por caractere do original. */
 const normalizarCaractere = (c: string) => c.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase() || c;

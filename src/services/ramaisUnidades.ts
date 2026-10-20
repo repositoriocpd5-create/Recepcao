@@ -1,4 +1,20 @@
-import { RamalUnidade } from '@/types';
+import { RamalUnidade, RamalUnidadeTipo } from '@/types';
+
+/** Ordem de exibição das categorias nas telas de Ramais e Administração. */
+export const ORDEM_CATEGORIAS = [
+  'Departamentos SMEDU',
+  'Escolas Municipais',
+  'Escolas Estadualizadas',
+  'CIEPs',
+  'Educação Infantil',
+  'Creches Municipais',
+  'Centros e Colégios',
+];
+
+export const CATEGORIAS_POR_TIPO: Record<RamalUnidadeTipo, string[]> = {
+  departamento: ['Departamentos SMEDU'],
+  unidade_escolar: ORDEM_CATEGORIAS.slice(1),
+};
 
 /** Unidades escolares e departamentos da SMEDU, a partir das lotações do quadro funcional. */
 const UNIDADES: Pick<RamalUnidade, 'tipo' | 'categoria' | 'nome' | 'lotacao' | 'ramal'>[] = [

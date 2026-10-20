@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const primaryItems = [
   { label: 'Recepção', path: '/recepcao', icon: Home },
   { label: 'Visitantes', path: '/visitantes', icon: Users },
-  { label: 'Servidores', path: '/servidores', icon: Briefcase },
+  { label: 'Ramais', path: '/ramais', icon: Phone },
   { label: 'Crachás', path: '/crachas', icon: BadgeCheck },
 ];
 
@@ -19,7 +19,7 @@ export const MobileBottomNav = () => {
   const pwa = usePwa();
   const moreItems = [
     { label: 'Movimentações', path: '/movimentacoes', icon: ArrowRightLeft },
-    { label: 'Ramais', path: '/ramais', icon: Phone },
+    { label: 'Servidores', path: '/servidores', icon: Briefcase },
     { label: 'Autorizações', path: '/autorizacoes', icon: CheckCircle2 },
     ...(user?.role === 'admin' ? [{ label: 'Agendamentos', path: '/agendamentos', icon: Calendar }] : []),
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
