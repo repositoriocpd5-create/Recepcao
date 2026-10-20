@@ -20,6 +20,7 @@ import {
   UserSearch,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTecladoVirtual } from '@/hooks/useTecladoVirtual';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -112,6 +113,11 @@ export const RamaisPage: React.FC = () => {
   const { user } = useAuth();
   const podeEditar = user?.role === 'admin' || user?.role === 'gestor';
   const buscaRef = useRef<HTMLInputElement>(null);
+  const inicioBuscaRef = useRef<HTMLDivElement>(null);
+  const [buscaFocada, setBuscaFocada] = useState(false);
+  // Celular digitando na busca: a barra sobe para o topo e os resultados ficam logo abaixo dela.
+  const tecladoAberto = useTecladoVirtual();
+  const modoFoco = tecladoAberto && buscaFocada;
 
   const [unidades, setUnidades] = useState<RamalUnidade[]>([]);
   const [servidoresPorLotacao, setServidoresPorLotacao] = useState<Map<string, Servidor[]>>(new Map());
@@ -187,6 +193,16 @@ export const RamaisPage: React.FC = () => {
   // No modo servidores, o nome da unidade não é destacado (a busca não olhou para ele).
   const termosUnidade = modoBusca === 'unidades' ? termos : [];
   const buscaServidorCurta = modoBusca === 'servidores' && termos.length > 0 && termos.join('').length < MIN_LETRAS_SERVIDOR;
+
+  // Mantém o início dos resultados logo abaixo da barra enquanto o teclado está aberto.
+  useEffect(() => {
+    if (!modoFoco || !inicioBuscaRef.current) return;
+    const topo = inicioBuscaRef.current.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top: topo, behavior: 'auto' });
+  }, [modoFoco, busca, modoBusca, filtroTipo, somenteComRamal]);
+
+  /** Fecha o teclado para ver os resultados em tela cheia. */
+  const fecharTeclado = () => buscaRef.current?.blur();
 
   const trocarModoBusca = (modo: ModoBusca) => {
     setModoBusca(modo);
@@ -463,9 +479,17 @@ export const RamaisPage: React.FC = () => {
       </div>
 
       {/* Busca e filtros: fixa no topo ao rolar, para buscar de novo sem voltar ao início. */}
-      <div className="sticky top-[76px] z-20 -mx-4 border-b border-[#dce4f0] bg-[#f4f8fd]/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:rounded-xl sm:border sm:bg-white sm:p-4 sm:shadow-[0_8px_22px_-14px_rgba(18,44,82,.22)] sm:backdrop-blur-none dark:border-slate-800 dark:bg-[#0b0f19]/95 sm:dark:bg-[#121826]">
+      <div ref={inicioBuscaRef} aria-hidden="true" />
+      <div className={cn(
+        'sticky -mx-4 border-b border-[#dce4f0] px-4 backdrop-blur dark:border-slate-800',
+        'sm:static sm:mx-0 sm:rounded-xl sm:border sm:bg-white sm:p-4 sm:shadow-[0_8px_22px_-14px_rgba(18,44,82,.22)] sm:backdrop-blur-none sm:dark:bg-[#121826]',
+        // Digitando no celular: cobre a barra superior e fica compacta, sobrando espaço para os resultados.
+        modoFoco
+          ? 'top-0 z-[45] bg-[#f4f8fd] py-2 shadow-[0_8px_18px_-12px_rgba(18,44,82,.45)] dark:bg-[#0b0f19]'
+          : 'top-[76px] z-20 bg-[#f4f8fd]/95 py-3 dark:bg-[#0b0f19]/95'
+      )}>
         {/* Onde buscar */}
-        <div className="mb-2.5 grid grid-cols-2 gap-1 rounded-xl border border-[#dce4f0] bg-white p-1 sm:inline-grid sm:w-auto dark:border-slate-800 dark:bg-[#101625]" role="radiogroup" aria-label="Buscar por">
+        <div className={cn('grid grid-cols-2 gap-1 rounded-xl border border-[#dce4f0] bg-white p-1 sm:inline-grid sm:w-auto dark:border-slate-800 dark:bg-[#101625]', modoFoco ? 'mb-2' : 'mb-2.5')} role="radiogroup" aria-label="Buscar por">
           {([
             { valor: 'unidades', rotulo: 'Unidades', icone: School, dica: 'Nome da escola, departamento ou ramal' },
             { valor: 'servidores', rotulo: 'Servidores', icone: UserSearch, dica: 'Nome da pessoa lotada' },
@@ -477,8 +501,11 @@ export const RamaisPage: React.FC = () => {
               aria-checked={modoBusca === valor}
               onClick={() => trocarModoBusca(valor)}
               title={dica}
+              // Com o teclado aberto, o botão não pode tirar o foco do campo (fecharia o teclado).
+              onMouseDown={(event) => { if (modoFoco) event.preventDefault(); }}
               className={cn(
-                'flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition-colors',
+                'flex items-center justify-center gap-2 rounded-lg px-4 font-bold transition-colors',
+                modoFoco ? 'min-h-8 text-xs' : 'min-h-10 text-sm',
                 modoBusca === valor
                   ? 'bg-[#005a9c] text-white shadow-sm'
                   : 'text-[#4b6485] hover:bg-[#f2f7fd] hover:text-[#102755] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
@@ -500,7 +527,11 @@ export const RamaisPage: React.FC = () => {
               onChange={(event) => setBusca(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Escape') setBusca('');
+                // "Pesquisar" no teclado do celular: fecha o teclado e mostra os resultados.
+                if (event.key === 'Enter') { event.preventDefault(); fecharTeclado(); }
               }}
+              onFocus={() => setBuscaFocada(true)}
+              onBlur={() => setBuscaFocada(false)}
               icon={modoBusca === 'unidades' ? <Search className="w-4 h-4" /> : <UserSearch className="w-4 h-4" />}
               className="pr-16 text-base sm:text-sm [&::-webkit-search-cancel-button]:hidden"
               aria-label={modoBusca === 'unidades' ? 'Buscar escola, departamento ou ramal' : 'Buscar pelo nome do servidor'}
@@ -510,6 +541,7 @@ export const RamaisPage: React.FC = () => {
             {busca ? (
               <button
                 type="button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => { setBusca(''); buscaRef.current?.focus(); }}
                 className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-100"
                 aria-label="Limpar busca"
@@ -528,6 +560,7 @@ export const RamaisPage: React.FC = () => {
                 key={aba.valor}
                 type="button"
                 aria-pressed={filtroTipo === aba.valor}
+                onMouseDown={(event) => { if (modoFoco) event.preventDefault(); }}
                 onClick={() => setFiltroTipo(aba.valor)}
                 className={cn(
                   'flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-semibold transition-colors',
@@ -546,6 +579,7 @@ export const RamaisPage: React.FC = () => {
             <button
               type="button"
               aria-pressed={somenteComRamal}
+              onMouseDown={(event) => { if (modoFoco) event.preventDefault(); }}
               onClick={() => setSomenteComRamal((atual) => !atual)}
               className={cn(
                 'flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-semibold transition-colors',
@@ -579,7 +613,8 @@ export const RamaisPage: React.FC = () => {
         )}
       </div>
 
-      {/* Conteúdo */}
+      {/* Conteúdo. Tocar na lista fecha o teclado; a altura mínima permite levar os resultados até o topo. */}
+      <div onTouchStart={() => { if (modoFoco) fecharTeclado(); }} className={cn(modoFoco && 'min-h-[100dvh]')}>
       {erro ? (
         <Card className="flex flex-col items-center gap-3 py-12 text-center">
           <span className="grid h-12 w-12 place-items-center rounded-full bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300">
@@ -806,6 +841,7 @@ export const RamaisPage: React.FC = () => {
           </p>
         </div>
       )}
+      </div>
 
       {/* Aviso flutuante */}
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex justify-center px-4 md:bottom-6">

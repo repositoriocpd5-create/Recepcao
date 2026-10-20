@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { BadgeCheck, BookOpen, Briefcase, Building2, Calendar, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Home, LayoutDashboard, MoreHorizontal, ShieldCheck, Users, ArrowRightLeft, Phone } from 'lucide-react';
 import { isInstallAvailable, openInstallSheet, usePwa } from '@/pwa/pwa';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTecladoVirtual } from '@/hooks/useTecladoVirtual';
 
 const primaryItems = [
   { label: 'Recepção', path: '/recepcao', icon: Home },
@@ -17,6 +18,8 @@ export const MobileBottomNav = () => {
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
   const pwa = usePwa();
+  // Com o teclado aberto, o menu ficaria grudado em cima dele e esconderia o conteúdo.
+  const tecladoAberto = useTecladoVirtual();
   const moreItems = [
     { label: 'Movimentações', path: '/movimentacoes', icon: ArrowRightLeft },
     { label: 'Servidores', path: '/servidores', icon: Briefcase },
@@ -29,6 +32,7 @@ export const MobileBottomNav = () => {
     { label: 'Manual de Uso', path: '/manual', icon: BookOpen },
   ];
   const isMoreActive = moreItems.some((item) => item.path === location.pathname);
+  if (tecladoAberto) return null;
 
   return (
     <>
