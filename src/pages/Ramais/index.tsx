@@ -18,6 +18,7 @@ import {
   Trash2,
   ChevronRight,
   UserSearch,
+  LayoutGrid,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTecladoVirtual } from '@/hooks/useTecladoVirtual';
@@ -399,10 +400,26 @@ export const RamaisPage: React.FC = () => {
     buscaRef.current?.focus();
   };
 
-  const abasTipo: { valor: FiltroTipo; rotulo: string; total: number }[] = [
-    { valor: 'todos', rotulo: 'Todos', total: unidades.length },
-    { valor: 'unidade_escolar', rotulo: 'Escolas', total: totalEscolas },
-    { valor: 'departamento', rotulo: 'Departamentos', total: totalDepartamentos },
+  // Cada filtro tem sua cor (a mesma dos cards de estatística): ativo = preenchido, inativo = contador tingido.
+  const abasTipo: { valor: FiltroTipo; rotulo: string; total: number; icone: typeof Phone; ativo: string; contadorAtivo: string; contador: string }[] = [
+    {
+      valor: 'todos', rotulo: 'Todos', total: unidades.length, icone: LayoutGrid,
+      ativo: 'border-transparent bg-gradient-to-b from-[#1f4f8f] to-[#102755] text-white shadow-[0_6px_16px_-6px_rgba(16,39,85,.65)] dark:from-sky-500 dark:to-sky-700',
+      contadorAtivo: 'bg-white text-[#102755] dark:text-sky-800',
+      contador: 'bg-[#e6f1fb] text-[#005a9c] dark:bg-sky-500/15 dark:text-sky-300',
+    },
+    {
+      valor: 'unidade_escolar', rotulo: 'Escolas', total: totalEscolas, icone: School,
+      ativo: 'border-transparent bg-gradient-to-b from-emerald-500 to-emerald-700 text-white shadow-[0_6px_16px_-6px_rgba(4,120,87,.65)]',
+      contadorAtivo: 'bg-white text-emerald-700',
+      contador: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    },
+    {
+      valor: 'departamento', rotulo: 'Departamentos', total: totalDepartamentos, icone: Building2,
+      ativo: 'border-transparent bg-gradient-to-b from-indigo-500 to-indigo-700 text-white shadow-[0_6px_16px_-6px_rgba(67,56,202,.65)]',
+      contadorAtivo: 'bg-white text-indigo-700',
+      contador: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
+    },
   ];
 
   const estatisticas = [
@@ -554,41 +571,48 @@ export const RamaisPage: React.FC = () => {
           </div>
 
           {/* Filtros: uma única linha rolável no celular */}
-          <div className="-mx-4 flex items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden" role="group" aria-label="Filtros">
-            {abasTipo.map((aba) => (
-              <button
-                key={aba.valor}
-                type="button"
-                aria-pressed={filtroTipo === aba.valor}
-                onMouseDown={(event) => { if (modoFoco) event.preventDefault(); }}
-                onClick={() => setFiltroTipo(aba.valor)}
-                className={cn(
-                  'flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-semibold transition-colors',
-                  filtroTipo === aba.valor
-                    ? 'border-[#102755] bg-[#102755] text-white dark:border-sky-400 dark:bg-sky-500/20 dark:text-sky-100'
-                    : 'border-[#dce4f0] bg-white text-[#4b6485] hover:border-[#9fc9ed] dark:border-slate-800 dark:bg-transparent dark:text-slate-400'
-                )}
-              >
-                {aba.rotulo}
-                <span className={cn('rounded-full px-1.5 text-[10px] tabular-nums', filtroTipo === aba.valor ? 'bg-white/20' : 'bg-[#e1e9f4] dark:bg-slate-800')}>
-                  {aba.total}
-                </span>
-              </button>
-            ))}
-            <span className="mx-0.5 h-5 w-px shrink-0 bg-[#dce4f0] dark:bg-slate-800" aria-hidden="true" />
+          <div className="-mx-4 -my-2 flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden" role="group" aria-label="Filtros">
+            {abasTipo.map((aba) => {
+              const ativo = filtroTipo === aba.valor;
+              const Icone = aba.icone;
+              return (
+                <button
+                  key={aba.valor}
+                  type="button"
+                  aria-pressed={ativo}
+                  onMouseDown={(event) => { if (modoFoco) event.preventDefault(); }}
+                  onClick={() => setFiltroTipo(aba.valor)}
+                  className={cn(
+                    'flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border py-1 pl-2.5 pr-1.5 text-xs font-bold transition-all duration-200 active:scale-[.97]',
+                    ativo
+                      ? aba.ativo
+                      : 'border-[#dce4f0] bg-white text-[#4b6485] shadow-[0_1px_2px_rgba(16,39,85,.06),0_2px_6px_-2px_rgba(16,39,85,.08)] hover:-translate-y-px hover:border-[#b9d3ee] hover:text-[#102755] hover:shadow-[0_4px_12px_-4px_rgba(16,39,85,.18)] dark:border-slate-800 dark:bg-[#101625] dark:text-slate-300 dark:shadow-none dark:hover:border-slate-700'
+                  )}
+                >
+                  <Icone className={cn('h-3.5 w-3.5', ativo ? 'opacity-90' : 'opacity-60')} />
+                  {aba.rotulo}
+                  <span className={cn('min-w-[1.6rem] rounded-lg px-1.5 py-0.5 text-center text-[11px] font-extrabold tabular-nums', ativo ? `${aba.contadorAtivo} shadow-sm` : aba.contador)}>
+                    {aba.total}
+                  </span>
+                </button>
+              );
+            })}
+            <span className="mx-0.5 h-6 w-px shrink-0 bg-[#dce4f0] dark:bg-slate-800" aria-hidden="true" />
             <button
               type="button"
               aria-pressed={somenteComRamal}
               onMouseDown={(event) => { if (modoFoco) event.preventDefault(); }}
               onClick={() => setSomenteComRamal((atual) => !atual)}
               className={cn(
-                'flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-semibold transition-colors',
+                'flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3 text-xs font-bold transition-all duration-200 active:scale-[.97]',
                 somenteComRamal
-                  ? 'border-emerald-600 bg-emerald-600 text-white'
-                  : 'border-[#dce4f0] bg-white text-[#4b6485] hover:border-[#9fc9ed] dark:border-slate-800 dark:bg-transparent dark:text-slate-400'
+                  ? 'border-transparent bg-gradient-to-b from-amber-400 to-amber-500 text-amber-950 shadow-[0_6px_16px_-6px_rgba(217,119,6,.7)]'
+                  : 'border-dashed border-[#c9d6e8] bg-white text-[#4b6485] shadow-[0_1px_2px_rgba(16,39,85,.06)] hover:-translate-y-px hover:border-amber-400 hover:text-amber-700 hover:shadow-[0_4px_12px_-4px_rgba(217,119,6,.3)] dark:border-slate-700 dark:bg-[#101625] dark:text-slate-300 dark:hover:text-amber-300'
               )}
             >
-              {somenteComRamal ? <Check className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" />}
+              <span className={cn('grid h-4 w-4 place-items-center rounded-full', somenteComRamal ? 'bg-white/70' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300')}>
+                {somenteComRamal ? <Check className="h-3 w-3" strokeWidth={3} /> : <Phone className="h-2.5 w-2.5" />}
+              </span>
               Com ramal
             </button>
           </div>
@@ -604,9 +628,10 @@ export const RamaisPage: React.FC = () => {
               <a
                 key={grupo.categoria}
                 href={`#categoria-${normalizar(grupo.categoria).replace(/\s+/g, '-')}`}
-                className="shrink-0 rounded-full border border-[#dce4f0] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#4b6485] transition-colors hover:border-[#005a9c] hover:text-[#005a9c] dark:border-slate-800 dark:bg-transparent dark:text-slate-400 dark:hover:border-sky-400 dark:hover:text-sky-300"
+                className="group flex shrink-0 items-center gap-1.5 rounded-lg border border-[#e1e9f4] bg-white py-1 pl-2.5 pr-1 text-[11px] font-semibold text-[#4b6485] shadow-[0_1px_2px_rgba(16,39,85,.05)] transition-all hover:-translate-y-px hover:border-[#9fc9ed] hover:text-[#005a9c] hover:shadow-[0_4px_10px_-4px_rgba(0,90,156,.25)] dark:border-slate-800 dark:bg-[#101625] dark:text-slate-400 dark:shadow-none dark:hover:border-sky-500/50 dark:hover:text-sky-300"
               >
-                {grupo.categoria} <span className="tabular-nums opacity-70">{grupo.itens.length}</span>
+                {grupo.categoria}
+                <span className="rounded-md bg-[#eef4fb] px-1.5 text-[10px] font-extrabold tabular-nums text-[#005a9c] transition-colors group-hover:bg-[#005a9c] group-hover:text-white dark:bg-slate-800 dark:text-sky-300 dark:group-hover:bg-sky-500 dark:group-hover:text-white">{grupo.itens.length}</span>
               </a>
             ))}
           </nav>
