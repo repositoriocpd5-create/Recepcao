@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
@@ -9,6 +9,8 @@ export const AppLayout: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('smedu-sidebar-collapsed') === 'true'
   );
+
+  const fecharMenu = useCallback(() => setMobileMenuOpen(false), []);
 
   const toggleSidebar = () => {
     setSidebarCollapsed((collapsed) => {
@@ -25,16 +27,15 @@ export const AppLayout: React.FC = () => {
         <Sidebar
           isOpen={mobileMenuOpen}
           isCollapsed={sidebarCollapsed}
-          onClose={() => setMobileMenuOpen(false)}
+          onClose={fecharMenu}
         />
 
         {/* Backdrop para mobile */}
-        {mobileMenuOpen && (
-          <div
-            className="fixed inset-0 bg-black/60 z-20 md:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-        )}
+        <div
+          aria-hidden="true"
+          className={`fixed inset-0 z-[55] bg-[#04162e]/55 backdrop-blur-[2px] transition-opacity duration-300 md:hidden ${mobileMenuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          onClick={() => setMobileMenuOpen(false)}
+        />
 
         {/* Conteúdo principal */}
         <main className="min-w-0 flex-1 overflow-x-clip p-4 pb-28 md:pb-6 lg:px-7 lg:py-6">
