@@ -415,7 +415,7 @@ export const RamaisPage: React.FC = () => {
       contador: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
     },
     {
-      valor: 'departamento', rotulo: 'Departamentos', total: totalDepartamentos, icone: Building2,
+      valor: 'departamento', rotulo: 'Deptos', total: totalDepartamentos, icone: Building2,
       ativo: 'border-transparent bg-gradient-to-b from-indigo-500 to-indigo-700 text-white shadow-[0_6px_16px_-6px_rgba(67,56,202,.65)]',
       contadorAtivo: 'bg-white text-indigo-700',
       contador: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
