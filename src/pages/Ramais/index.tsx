@@ -30,7 +30,7 @@ import { Modal } from '@/components/ui/Modal';
 import { dataService } from '@/services/dataService';
 import { CATEGORIAS_POR_TIPO, ORDEM_CATEGORIAS } from '@/services/ramaisUnidades';
 import { UserAvatar } from '@/components/ui/UserAvatar';
-import { RamalContato, RamalUnidade, RamalUnidadeTipo, Servidor } from '@/types';
+import { RamalContato, RamalUnidade, RamalUnidadeTipo, Servidor, ServidorSetorVinculo, Setor } from '@/types';
 import { cn } from '@/lib/utils';
 
 type FiltroTipo = 'todos' | RamalUnidadeTipo;
@@ -42,6 +42,55 @@ const MIN_LETRAS_SERVIDOR = 3;
 /** Minúsculas e sem acentos, preservando um caractere por caractere do original. */
 const normalizarCaractere = (c: string) => c.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase() || c;
 const normalizar = (texto: string) => Array.from(texto, normalizarCaractere).join('');
+
+/** Chave para comparar lotações e nomes: sem acentos, maiúsculas ou espaços repetidos. */
+const chave = (texto?: string | null) => normalizar(texto || '').replace(/\s+/g, ' ').trim();
+/** "(DTE) Departamento de Transporte Escolar" → sigla "DTE" e nome sem a sigla. */
+const SIGLA_NO_NOME = /^\s*\(([^)]+)\)\s*/;
+
+/**
+ * Servidores ativos de cada unidade: pela lotação do quadro funcional e, nos departamentos,
+ * também pelas pessoas vinculadas ao setor de mesmo nome ou sigla (Departamentos & Setores).
+ */
+const agruparServidoresPorUnidade = (
+  unidades: RamalUnidade[],
+  servidores: Servidor[],
+  setores: Setor[],
+  vinculos: ServidorSetorVinculo[],
+) => {
+  const ativos = servidores.filter((servidor) => servidor.status === 'ativo');
+  const porId = new Map(ativos.map((servidor) => [servidor.id, servidor]));
+  const porLotacao = new Map<string, Servidor[]>();
+  ativos.forEach((servidor) => {
+    const lotacao = chave(servidor.lotacao);
+    if (lotacao) porLotacao.set(lotacao, [...(porLotacao.get(lotacao) || []), servidor]);
+  });
+  const porSetor = new Map<string, Set<string>>();
+  const vincular = (setorId: string, servidorId: string) => porSetor.set(setorId, (porSetor.get(setorId) || new Set()).add(servidorId));
+  vinculos.forEach((vinculo) => vincular(vinculo.setor_id, vinculo.servidor_id));
+  ativos.forEach((servidor) => { if (servidor.setor_id) vincular(servidor.setor_id, servidor.id); });
+
+  const resultado = new Map<string, Servidor[]>();
+  unidades.forEach((unidade) => {
+    const encontrados = new Map<string, Servidor>();
+    const adicionar = (servidor?: Servidor) => { if (servidor) encontrados.set(servidor.id, servidor); };
+    const lotacoes = new Set([chave(unidade.lotacao), chave(unidade.nome)].filter(Boolean));
+    lotacoes.forEach((lotacao) => porLotacao.get(lotacao)?.forEach(adicionar));
+
+    if (unidade.tipo === 'departamento') {
+      const sigla = chave(SIGLA_NO_NOME.exec(unidade.nome)?.[1]);
+      const nome = chave(unidade.nome.replace(SIGLA_NO_NOME, ''));
+      setores
+        .filter((setor) => chave(setor.nome) === nome || (sigla && chave(setor.sigla) === sigla))
+        .forEach((setor) => porSetor.get(setor.id)?.forEach((id) => adicionar(porId.get(id))));
+    }
+
+    if (encontrados.size) {
+      resultado.set(unidade.id, [...encontrados.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+    }
+  });
+  return resultado;
+};
 
 const iconeDaUnidade = (unidade: RamalUnidade) => {
   if (unidade.tipo === 'departamento') return Building2;
@@ -121,7 +170,7 @@ export const RamaisPage: React.FC = () => {
   const modoFoco = tecladoAberto && buscaFocada;
 
   const [unidades, setUnidades] = useState<RamalUnidade[]>([]);
-  const [servidoresPorLotacao, setServidoresPorLotacao] = useState<Map<string, Servidor[]>>(new Map());
+  const [quadro, setQuadro] = useState<{ servidores: Servidor[]; setores: Setor[]; vinculos: ServidorSetorVinculo[] }>({ servidores: [], setores: [], vinculos: [] });
   const [unidadeServidores, setUnidadeServidores] = useState<RamalUnidade | null>(null);
   const [buscaServidor, setBuscaServidor] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -151,17 +200,21 @@ export const RamaisPage: React.FC = () => {
   const carregar = async () => {
     setIsLoading(true);
     setErro(null);
-    const [ramais, servidores] = await Promise.allSettled([dataService.getRamaisUnidades(), dataService.getServidores()]);
+    const [ramais, servidores, setores, vinculos] = await Promise.allSettled([
+      dataService.getRamaisUnidades(),
+      dataService.getServidores(),
+      dataService.getSetores(),
+      dataService.getServidorSetorVinculos(),
+    ]);
     if (ramais.status === 'fulfilled') setUnidades(ramais.value);
     else setErro(ramais.reason instanceof Error ? ramais.reason.message : 'Não foi possível carregar os ramais.');
+    // Setores e vínculos são complementares: sem eles, a contagem segue só pela lotação.
     if (servidores.status === 'fulfilled') {
-      const porLotacao = new Map<string, Servidor[]>();
-      servidores.value.forEach((servidor) => {
-        const lotacao = servidor.lotacao?.trim();
-        if (lotacao && servidor.status === 'ativo') porLotacao.set(lotacao, [...(porLotacao.get(lotacao) || []), servidor]);
+      setQuadro({
+        servidores: servidores.value,
+        setores: setores.status === 'fulfilled' ? setores.value : [],
+        vinculos: vinculos.status === 'fulfilled' ? vinculos.value : [],
       });
-      porLotacao.forEach((lista) => lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
-      setServidoresPorLotacao(porLotacao);
     }
     setIsLoading(false);
   };
@@ -212,18 +265,23 @@ export const RamaisPage: React.FC = () => {
   };
 
   // Nomes dos servidores já normalizados, para a busca por servidor não repetir o trabalho a cada tecla.
+  const servidoresPorUnidade = useMemo(
+    () => agruparServidoresPorUnidade(unidades, quadro.servidores, quadro.setores, quadro.vinculos),
+    [unidades, quadro],
+  );
+
   const nomesNormalizados = useMemo(() => {
     const mapa = new Map<string, string>();
-    servidoresPorLotacao.forEach((lista) => lista.forEach((servidor) => mapa.set(servidor.id, normalizar(servidor.nome))));
+    servidoresPorUnidade.forEach((lista) => lista.forEach((servidor) => mapa.set(servidor.id, normalizar(servidor.nome))));
     return mapa;
-  }, [servidoresPorLotacao]);
+  }, [servidoresPorUnidade]);
 
   /** Servidores de cada unidade cujo nome contém todos os termos buscados (mínimo de 3 letras). */
   const servidoresEncontrados = useMemo(() => {
     const encontrados = new Map<string, Servidor[]>();
     if (modoBusca !== 'servidores' || termos.join('').length < MIN_LETRAS_SERVIDOR) return encontrados;
     unidades.forEach((unidade) => {
-      const lista = (unidade.lotacao && servidoresPorLotacao.get(unidade.lotacao)) || [];
+      const lista = servidoresPorUnidade.get(unidade.id) || [];
       const achados = lista.filter((servidor) => {
         const nome = nomesNormalizados.get(servidor.id) || '';
         return termos.every((termo) => nome.includes(termo));
@@ -231,7 +289,7 @@ export const RamaisPage: React.FC = () => {
       if (achados.length) encontrados.set(unidade.id, achados);
     });
     return encontrados;
-  }, [unidades, servidoresPorLotacao, nomesNormalizados, termos, modoBusca]);
+  }, [unidades, servidoresPorUnidade, nomesNormalizados, termos, modoBusca]);
 
   const filtradas = useMemo(
     () =>
@@ -319,7 +377,7 @@ export const RamaisPage: React.FC = () => {
   };
 
   const servidoresDaUnidade = (unidade: RamalUnidade | null) =>
-    unidade?.lotacao ? servidoresPorLotacao.get(unidade.lotacao) || [] : [];
+    (unidade && servidoresPorUnidade.get(unidade.id)) || [];
 
   const termosServidor = useMemo(() => normalizar(buscaServidor).split(/\s+/).filter(Boolean), [buscaServidor]);
   const servidoresDoModal = useMemo(() => {
@@ -329,7 +387,7 @@ export const RamaisPage: React.FC = () => {
       const alvo = normalizar(`${servidor.nome} ${servidor.matricula} ${servidor.cargo}`);
       return termosServidor.every((termo) => alvo.includes(termo));
     });
-  }, [unidadeServidores, servidoresPorLotacao, termosServidor]);
+  }, [unidadeServidores, servidoresPorUnidade, termosServidor]);
 
   /** Abre a lista de servidores; com filtro, já mostra só os nomes buscados. */
   const abrirServidores = (unidade: RamalUnidade, filtro = '') => {
