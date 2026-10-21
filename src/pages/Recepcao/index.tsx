@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   PhoneCall,
   MessageSquare,
+  School,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -53,6 +54,7 @@ import {
   DestinoVisita,
   ConsultaServidorResultado,
   ConsultaVisitanteResultado,
+  RamalUnidade,
 } from '@/types';
 import { cn, formatDateTime, formatTime } from '@/lib/utils';
 import { biometricProvider, isBiometricAgentConfigured, DeviceStatus, IdentificationMethod } from '@/services/identification';
@@ -67,6 +69,8 @@ interface FichaPessoaIdentificadaProps {
   /** Foto do rosto, quando cadastrada; sem ela, mostra a inicial do nome. */
   fotoUrl?: string | null;
   documentos: string;
+  /** Unidade escolar ou departamento onde a pessoa está lotada (mostrado abaixo dos documentos). */
+  unidade?: { nome: string; escola: boolean } | null;
   status: { texto: string; tom: 'sucesso' | 'alerta' };
   dados: Array<{ icone: React.ReactNode; rotulo: string; valor: string }>;
   extra?: React.ReactNode;
@@ -75,7 +79,7 @@ interface FichaPessoaIdentificadaProps {
 
 // Conteúdo do modal "Pessoa identificada" (servidor ou visitante).
 // No celular: dados em lista compacta e barra de ações fixa no rodapé (sempre visível).
-export const FichaPessoaIdentificada: React.FC<FichaPessoaIdentificadaProps> = ({ nome, fotoUrl, documentos, status, dados, extra, acoes }) => (
+export const FichaPessoaIdentificada: React.FC<FichaPessoaIdentificadaProps> = ({ nome, fotoUrl, documentos, unidade, status, dados, extra, acoes }) => (
   <>
     <div className="space-y-4 px-4 pb-4 pt-5 sm:space-y-6 sm:px-7 sm:pb-6 sm:pt-6">
       <div className="flex flex-col gap-3 rounded-2xl border border-[#dce6f3] bg-white p-3.5 shadow-[0_10px_30px_-18px_rgba(18,44,82,.35)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900/60">
@@ -95,6 +99,12 @@ export const FichaPessoaIdentificada: React.FC<FichaPessoaIdentificadaProps> = (
             <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#627289] sm:text-xs dark:text-slate-400">Identificação</span>
             <h4 className="line-clamp-2 break-words text-lg font-extrabold leading-tight text-[#0d1f45] sm:truncate sm:text-2xl dark:text-slate-100" title={nome}>{nome}</h4>
             <p className="mt-0.5 text-xs text-[#627289] sm:text-base dark:text-slate-400">{documentos}</p>
+            {unidade && (
+              <p className="mt-1.5 flex items-start gap-1.5 text-xs font-semibold leading-snug text-[#0b5ed7] sm:text-sm dark:text-sky-300" title={unidade.nome}>
+                {unidade.escola ? <School className="mt-px h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" /> : <Building2 className="mt-px h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />}
+                <span className="line-clamp-2">{unidade.nome}</span>
+              </p>
+            )}
           </div>
         </div>
         <span className={cn(
@@ -177,6 +187,8 @@ export const RecepcaoPage: React.FC = () => {
   const [setores, setSetores] = useState<Setor[]>([]);
   const [todosServidores, setTodosServidores] = useState<Servidor[]>([]);
   const [vinculosServidorSetor, setVinculosServidorSetor] = useState<ServidorSetorVinculo[]>([]);
+  // Unidades da tela de Ramais: dão o nome amigável da lotação (escola ou departamento).
+  const [unidadesRamais, setUnidadesRamais] = useState<RamalUnidade[]>([]);
 
   // Pessoas no prédio em tempo real
   const [pessoasNoPredio, setPessoasNoPredio] = useState<Movimentacao[]>([]);
@@ -248,9 +260,10 @@ export const RecepcaoPage: React.FC = () => {
         dataService.getServidores(),
         dataService.getMovimentacoes(),
         dataService.getServidorSetorVinculos(),
+        dataService.getRamaisUnidades(),
       ]);
 
-      const [depsResultado, setoresResultado, servidoresResultado, movimentacoesResultado, vinculosResultado] = resultados;
+      const [depsResultado, setoresResultado, servidoresResultado, movimentacoesResultado, vinculosResultado, unidadesResultado] = resultados;
       if (depsResultado.status === 'fulfilled') {
         setDepartamentos(depsResultado.value);
         if (depsResultado.value.length > 0 && !formDestinoDepId) {
@@ -278,6 +291,7 @@ export const RecepcaoPage: React.FC = () => {
         console.error('Erro ao carregar movimentações:', movimentacoesResultado.reason);
       }
       if (vinculosResultado.status === 'fulfilled') setVinculosServidorSetor(vinculosResultado.value);
+      if (unidadesResultado.status === 'fulfilled') setUnidadesRamais(unidadesResultado.value);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
     } finally {
@@ -374,6 +388,26 @@ export const RecepcaoPage: React.FC = () => {
 
   // Setores e responsáveis filtrados pelo destino selecionado.
   const normalizarNomeSetor = (nome?: string) => (nome || '').trim().toLocaleUpperCase('pt-BR');
+
+  /**
+   * Onde o servidor está lotado: nome da unidade escolar ou do departamento (tela de Ramais)
+   * pela lotação do quadro; sem correspondência, a própria lotação, o setor ou o departamento.
+   */
+  const unidadeDoServidor = (servidor: Servidor): { nome: string; escola: boolean } | null => {
+    const chave = (texto?: string | null) =>
+      (texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const lotacao = chave(servidor.lotacao);
+    if (lotacao) {
+      const unidade = unidadesRamais.find((u) => chave(u.lotacao) === lotacao || chave(u.nome) === lotacao);
+      if (unidade) return { nome: unidade.nome, escola: unidade.tipo === 'unidade_escolar' };
+      return { nome: servidor.lotacao!.trim(), escola: !/^smedu\b/.test(lotacao) };
+    }
+    const setorId = servidor.setor_id || vinculosServidorSetor.find((v) => v.servidor_id === servidor.id)?.setor_id;
+    const setor = setorId ? setores.find((s) => s.id === setorId) : undefined;
+    if (setor) return { nome: setor.nome, escola: false };
+    const departamento = departamentos.find((d) => d.id === servidor.departamento_id);
+    return departamento ? { nome: departamento.nome, escola: false } : null;
+  };
   const setoresDestinoOpcoes = Array.from(
     setores
       .filter((setor) => setor.ativo !== false)
@@ -1737,10 +1771,11 @@ export const RecepcaoPage: React.FC = () => {
           <FichaPessoaIdentificada
             nome={servidorResultado.servidor.nome}
             documentos={`Matrícula: ${servidorResultado.servidor.matricula}  •  CPF: ${servidorResultado.servidor.cpf || '—'}`}
+            unidade={unidadeDoServidor(servidorResultado.servidor)}
             status={servidorResultado.no_predio ? { texto: 'Presente no prédio', tom: 'alerta' } : { texto: 'Apto para entrada', tom: 'sucesso' }}
             dados={[
               { icone: <Briefcase className="w-5 h-5" />, rotulo: 'Cargo', valor: servidorResultado.servidor.cargo || 'Não informado' },
-              { icone: <Building2 className="w-5 h-5" />, rotulo: 'Lotação', valor: `${servidorResultado.servidor.departamento?.sigla || 'SMEDU'} - ${servidorResultado.servidor.setor?.nome || 'Geral'}` },
+              { icone: <Building2 className="w-5 h-5" />, rotulo: 'Lotação', valor: servidorResultado.servidor.lotacao?.trim() || unidadeDoServidor(servidorResultado.servidor)?.nome || 'Não informada' },
               { icone: <Phone className="w-5 h-5" />, rotulo: 'Contato', valor: servidorResultado.servidor.telefone || servidorResultado.servidor.email || 'Não informado' },
             ]}
             acoes={<>
