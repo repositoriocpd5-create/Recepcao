@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { LoginPage } from '@/pages/Login';
 import { RecepcaoPage } from '@/pages/Recepcao';
 import { DashboardPage } from '@/pages/Dashboard';
@@ -25,11 +26,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: strin
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center text-emerald-500">
-        <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingScreen mensagem="Verificando sua sessão" />;
   }
 
   if (!user) {
