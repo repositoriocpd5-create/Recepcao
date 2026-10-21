@@ -959,7 +959,7 @@ export const RecepcaoPage: React.FC = () => {
       </div>
       {/* 1. Cabeçalho de Recepção */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-1">
-        <div className="order-2 md:order-1">
+        <div className="order-2 hidden sm:block md:order-1">
           <div className="flex items-center gap-2">
             <span className="p-3 rounded-2xl bg-[#dcfce7] text-[#16a34a] border border-[#ccefd8] shadow-sm dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-500/30">
               <UserCheck className="w-6 h-6" />
@@ -1005,7 +1005,54 @@ export const RecepcaoPage: React.FC = () => {
       </div>
 
       {/* 2. Seleção do fluxo principal: a identificação é o único passo nesta tela. */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {/* Celular: dois cartões lado a lado (título, ícone e "Identificar por" com a seta). */}
+      <div className="grid grid-cols-2 gap-3 sm:hidden">
+        {([
+          {
+            metodo: 'matricula', tab: 'servidor', titulo: 'Servidor', campo: 'matrícula', Icone: Briefcase,
+            icone: 'border-[#c5e0fa] bg-[#dcecff] text-[#1677e8] dark:border-blue-500/30 dark:bg-blue-950/60 dark:text-blue-400',
+            seta: 'bg-[#087ef5] shadow-[0_6px_14px_-6px_rgba(8,126,245,.8)]',
+            ativo: 'border-[#8cc8ff] bg-[linear-gradient(160deg,#eaf4ff_0%,#f6faff_100%)] shadow-[0_14px_26px_-18px_rgba(8,119,201,.7)] dark:border-blue-500/60 dark:bg-none dark:bg-[#131b2e]',
+          },
+          {
+            metodo: 'cpf', tab: 'visitante', titulo: 'Visitante', campo: 'CPF', Icone: Users,
+            icone: 'border-[#ccefd8] bg-[#e8f8ee] text-[#16a34a] dark:border-emerald-500/30 dark:bg-emerald-950/60 dark:text-emerald-400',
+            seta: 'bg-[#00a65a] shadow-[0_6px_14px_-6px_rgba(0,166,90,.8)]',
+            ativo: 'border-[#a7ebc3] bg-[linear-gradient(160deg,#ebfbf1_0%,#f7fdf9_100%)] shadow-[0_14px_26px_-18px_rgba(22,163,74,.6)] dark:border-emerald-500/60 dark:bg-none dark:bg-[#131b2e]',
+          },
+        ] as const).map(({ metodo, tab, titulo, campo, Icone, icone, seta, ativo }) => (
+          <button
+            key={metodo}
+            type="button"
+            onClick={() => {
+              setActiveTab(tab);
+              setIdentificationMethod(metodo);
+              setSearchFeedback({ type: null, message: '' });
+              setIsIdentificationModalOpen(true);
+            }}
+            className={`flex min-w-0 flex-col rounded-[20px] border p-3 text-left transition-all duration-200 active:scale-[.98] ${
+              identificationMethod === metodo
+                ? ativo
+                : 'border-[#dce4f0] bg-white shadow-[0_10px_22px_-18px_rgba(18,44,82,.45)] dark:border-slate-800 dark:bg-[#101625]'
+            }`}
+          >
+            <h3 className="text-base font-extrabold uppercase tracking-wide text-[#102755] dark:text-slate-100">{titulo}</h3>
+            <span className={`mt-2.5 grid h-14 w-14 place-items-center rounded-2xl border shadow-sm ${icone}`}>
+              <Icone className="h-7 w-7" />
+            </span>
+            <span className="mt-3 flex items-end justify-between gap-2">
+              <span className="min-w-0 whitespace-nowrap text-xs leading-tight text-[#173b70] dark:text-slate-400">
+                Identificar por<span className="block text-sm font-extrabold text-[#102755] dark:text-slate-100">{campo}</span>
+              </span>
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-white ${seta}`}>
+                <ArrowRight className="h-5 w-5" />
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="hidden grid-cols-1 gap-4 sm:grid md:grid-cols-2">
         {/* Card Servidor */}
         <div
           onClick={() => {

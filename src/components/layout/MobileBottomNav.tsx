@@ -9,7 +9,7 @@ const primaryItems = [
   { label: 'Recepção', path: '/recepcao', icon: Home },
   { label: 'Visitantes', path: '/visitantes', icon: Users },
   { label: 'Ramais', path: '/ramais', icon: Phone },
-  { label: 'Crachás', path: '/crachas', icon: BadgeCheck },
+  { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
 ];
 
 export const MobileBottomNav = () => {
@@ -25,7 +25,7 @@ export const MobileBottomNav = () => {
     { label: 'Servidores', path: '/servidores', icon: Briefcase },
     { label: 'Autorizações', path: '/autorizacoes', icon: CheckCircle2 },
     ...(user?.role === 'admin' ? [{ label: 'Agendamentos', path: '/agendamentos', icon: Calendar }] : []),
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { label: 'Crachás', path: '/crachas', icon: BadgeCheck },
     ...(user?.role === 'admin' ? [{ label: 'Relatórios & Auditoria', path: '/relatorios', icon: FileSpreadsheet }] : []),
     { label: 'Departamentos & Setores', path: '/departamentos', icon: Building2 },
     ...(user?.role === 'admin' ? [{ label: 'Administração', path: '/administracao', icon: ShieldCheck }] : []),
