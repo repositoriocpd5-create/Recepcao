@@ -102,6 +102,7 @@ export const AdministracaoPage: React.FC = () => {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [formNome, setFormNome] = useState('');
   const [formEmail, setFormEmail] = useState('');
+  const [formMatricula, setFormMatricula] = useState('');
   const [formCargo, setFormCargo] = useState('');
   const [formRole, setFormRole] = useState<UserRole>('recepcionista');
   const [formAtivo, setFormAtivo] = useState(true);
@@ -122,6 +123,7 @@ export const AdministracaoPage: React.FC = () => {
     setEditingUser(null);
     setFormNome('');
     setFormEmail('');
+    setFormMatricula('');
     setFormCargo('');
     setFormRole('recepcionista');
     setFormAtivo(true);
@@ -134,6 +136,7 @@ export const AdministracaoPage: React.FC = () => {
     setEditingUser(u);
     setFormNome(u.nome_completo);
     setFormEmail(u.email);
+    setFormMatricula(u.matricula || '');
     setFormCargo(u.cargo);
     setFormRole(u.role);
     setFormAtivo(u.ativo);
@@ -162,6 +165,15 @@ export const AdministracaoPage: React.FC = () => {
       setFormErro('Informe um e-mail institucional válido.');
       return;
     }
+    const matricula = formMatricula.trim();
+    if (matricula && !/^\d{3,10}$/.test(matricula)) {
+      setFormErro('A matrícula deve ter só números (de 3 a 10 dígitos).');
+      return;
+    }
+    if (matricula && usuarios.some((u) => u.matricula === matricula && u.id !== editingUser?.id)) {
+      setFormErro('Esta matrícula já é usada por outro operador.');
+      return;
+    }
     const emailDuplicado = usuarios.some(
       (u) => u.email.toLowerCase() === formEmail.trim().toLowerCase() && u.id !== editingUser?.id
     );
@@ -180,6 +192,8 @@ export const AdministracaoPage: React.FC = () => {
       cargo: formCargo.trim(),
       role: formRole,
       ativo: formAtivo,
+      // Sem a lista de matrículas carregada (undefined), um campo vazio não apaga a matrícula salva.
+      matricula: matricula || (editingUser && editingUser.matricula === undefined ? undefined : null),
     };
 
     setIsSaving(true);
@@ -201,7 +215,10 @@ export const AdministracaoPage: React.FC = () => {
     if (!isSupabaseLive) saveUsers(updated);
     setUsuarios(updated);
     setIsModalOpen(false);
-    exibirToast(editingUser ? `Usuário "${userSalvo.nome_completo}" atualizado com sucesso!` : `Usuário "${userSalvo.nome_completo}" cadastrado no Supabase com acesso liberado!`);
+    // A versão antiga da função admin-manage-user não conhece a matrícula e a ignora.
+    if (isSupabaseLive && dados.matricula && userSalvo.matricula === undefined) {
+      exibirToast('Dados salvos, mas a matrícula não foi gravada: publique a nova versão da função "admin-manage-user" no Supabase.', 'erro');
+    } else exibirToast(editingUser ? `Usuário "${userSalvo.nome_completo}" atualizado com sucesso!` : `Usuário "${userSalvo.nome_completo}" cadastrado no Supabase com acesso liberado!`);
 
     // Sincroniza a sessão ativa caso o operador editado seja o usuário logado
     if (user && user.id === userSalvo.id) {
@@ -216,6 +233,7 @@ export const AdministracaoPage: React.FC = () => {
       detalhes: {
         nome_completo: userSalvo.nome_completo,
         email: userSalvo.email,
+        matricula: userSalvo.matricula ?? null,
         cargo: userSalvo.cargo,
         role: userSalvo.role,
         ativo: userSalvo.ativo,
@@ -332,7 +350,7 @@ export const AdministracaoPage: React.FC = () => {
             <thead className="bg-[#151c2d] text-slate-400 border-b border-slate-800 uppercase font-mono text-[10px]">
               <tr>
                 <th className="py-3 px-4">Nome do Operador</th>
-                <th className="py-3 px-4">E-mail Institucional</th>
+                <th className="py-3 px-4">E-mail / Matrícula</th>
                 <th className="py-3 px-4">Cargo Declarado</th>
                 <th className="py-3 px-4">Papel (Role)</th>
                 <th className="py-3 px-4">Status</th>
@@ -361,7 +379,10 @@ export const AdministracaoPage: React.FC = () => {
                         <span className="font-semibold text-slate-100">{u.nome_completo}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 font-mono text-slate-300">{u.email}</td>
+                    <td className="py-3 px-4 font-mono text-slate-300">
+                      {u.email}
+                      {u.matricula && <span className="mt-0.5 block text-[10px] text-slate-500">Matrícula {u.matricula}</span>}
+                    </td>
                     <td className="py-3 px-4 text-slate-400">{u.cargo}</td>
                     <td className="py-3 px-4">
                       <span className={cn(
@@ -493,14 +514,26 @@ export const AdministracaoPage: React.FC = () => {
             />
           </div>
 
-          <Input
-            label="E-mail Institucional *"
-            value={formEmail}
-            onChange={(e) => setFormEmail(e.target.value)}
-            placeholder="Ex: joao.silva@sme.gov.br"
-            type="email"
-            required
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-3">
+            <Input
+              label="E-mail Institucional *"
+              value={formEmail}
+              onChange={(e) => setFormEmail(e.target.value)}
+              placeholder="Ex: joao.silva@sme.gov.br"
+              type="email"
+              required
+            />
+            <Input
+              label="Matrícula"
+              value={formMatricula}
+              onChange={(e) => setFormMatricula(e.target.value.replace(/\D/g, ''))}
+              placeholder="Ex: 36006"
+              inputMode="numeric"
+              maxLength={10}
+              autoComplete="off"
+            />
+          </div>
+          <p className="-mt-3 text-[11px] text-[#627fa5] dark:text-slate-400">O operador pode entrar com o e-mail ou com a matrícula.</p>
 
           {(
             <div className="relative">

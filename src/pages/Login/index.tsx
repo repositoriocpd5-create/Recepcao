@@ -35,7 +35,7 @@ export const LoginPage: React.FC = () => {
       await login(email.trim(), password);
       navigate('/recepcao');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Credenciais inválidas. Verifique o e-mail e a senha.');
+      setErrorMsg(err.message || 'Credenciais inválidas. Verifique o e-mail ou a matrícula e a senha.');
     } finally {
       setIsLoading(false);
     }
@@ -90,19 +90,18 @@ export const LoginPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate={false}>
             <div>
-              <label htmlFor="login-email" className="mb-1.5 block text-[11px] font-medium text-[#374151] dark:text-slate-300">E-mail</label>
+              <label htmlFor="login-email" className="mb-1.5 block text-[11px] font-medium text-[#374151] dark:text-slate-300">E-mail ou matrícula</label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9ca3af]" aria-hidden="true" />
                 <input
                   id="login-email"
-                  type="email"
-                  inputMode="email"
+                  type="text"
                   autoComplete="username"
                   autoCapitalize="none"
                   spellCheck={false}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seunome@edu.itaguai.rj.gov.br"
+                  placeholder="seunome@edu.itaguai.rj.gov.br ou 36006"
                   className={inputClass}
                   required
                   autoFocus

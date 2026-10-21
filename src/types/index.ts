@@ -19,6 +19,8 @@ export interface UserProfile {
   cargo: string;
   role: UserRole;
   ativo: boolean;
+  /** Matrícula aceita no login no lugar do e-mail (fica no Supabase Auth). */
+  matricula?: string | null;
   ultimo_acesso?: string;
   created_at?: string;
 }

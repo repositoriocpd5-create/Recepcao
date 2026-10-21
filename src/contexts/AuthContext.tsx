@@ -19,6 +19,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_STORAGE_KEY = 'sme_authenticated_user';
 const ADMIN_USERS_STORAGE_KEY = 'sme_admin_users';
 
+/** Matrícula do quadro funcional: só números (o login aceita ela no lugar do e-mail). */
+export const MATRICULA_LOGIN_REGEX = /^\d{3,10}$/;
+
+/** Login por matrícula: a Edge Function confere a senha e devolve só a sessão. */
+async function entrarComMatricula(matricula: string, password: string) {
+  const { data, error } = await supabase.functions.invoke('login-matricula', { body: { matricula, password } });
+  if (error) {
+    const response = (error as { context?: Response }).context;
+    let mensagem = 'Não foi possível entrar com a matrícula agora. Tente o e-mail ou tente novamente.';
+    if (response instanceof Response) {
+      try {
+        const body = await response.clone().json();
+        if (body?.error) mensagem = body.error;
+      } catch {}
+    }
+    throw new Error(mensagem);
+  }
+  const { data: sessao, error: sessaoError } = await supabase.auth.setSession(data as { access_token: string; refresh_token: string });
+  if (sessaoError || !sessao.user) throw sessaoError || new Error('Não foi possível iniciar a sessão.');
+  return sessao.user;
+}
+
 function getAvailableDemoUsers(): UserProfile[] {
   try {
     const raw = localStorage.getItem(ADMIN_USERS_STORAGE_KEY);
@@ -86,12 +108,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isSupabaseConfigured && password) {
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
+        // Aceita o e-mail ou a matrícula do operador.
+        const porMatricula = MATRICULA_LOGIN_REGEX.test(email);
+        let authUser;
+        if (porMatricula) {
+          authUser = await entrarComMatricula(email, password);
+        } else {
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+          authUser = data.user;
+        }
+        const data = { user: authUser };
 
         if (data.user) {
           const { data: profile } = await supabase
@@ -102,7 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           const u: UserProfile = {
             id: data.user.id,
-            email: data.user.email || email,
+            email: data.user.email || profile?.email || email,
             nome_completo: profile?.nome_completo || 'Operador SMEDU',
             cargo: profile?.cargo || 'Recepcionista',
             role: profile?.role || 'recepcionista',
@@ -116,7 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             acao: 'LOGIN',
             tabela: 'profiles',
             registro_id: u.id,
-            detalhes: { metodo: 'supabase_auth' },
+            detalhes: { metodo: porMatricula ? 'supabase_auth_matricula' : 'supabase_auth' },
           });
 
           setLoading(false);
@@ -131,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isSupabaseConfigured) {
       setLoading(false);
-      throw new Error('Informe o e-mail e a senha de um usuário cadastrado no Supabase.');
+      throw new Error('Informe o e-mail ou a matrícula e a senha de um usuário cadastrado no Supabase.');
     }
 
     // Modo de demonstração / homologação

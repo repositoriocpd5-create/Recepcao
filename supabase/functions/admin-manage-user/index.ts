@@ -1,5 +1,6 @@
 // Supabase Edge Function: admin-manage-user
-// Cria, edita e remove operadores no Supabase Auth + public.profiles.
+// Cria, edita e remove operadores no Supabase Auth + public.profiles
+// (inclusive a matrícula usada no login, guardada em app_metadata).
 // Usa a service_role somente no servidor; o navegador nunca recebe essa chave.
 // Apenas usuários com profiles.role = 'admin' (e ativos) podem chamar.
 
@@ -26,6 +27,31 @@ class HttpError extends Error {
 }
 
 const texto = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+// Matrícula usada como login alternativo ao e-mail; fica em app_metadata (só o servidor altera).
+const MATRICULA_REGEX = /^\d{3,10}$/;
+
+type Admin = ReturnType<typeof createClient>;
+
+/** Percorre os usuários do Auth (o projeto tem poucos operadores). */
+const listarUsuarios = async (admin: Admin) => {
+  const todos = [];
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new HttpError(500, `Não foi possível consultar os usuários: ${error.message}`);
+    todos.push(...data.users);
+    if (data.users.length < 1000) return todos;
+  }
+};
+
+/** Valida a matrícula informada e garante que nenhum outro operador já a use. */
+const conferirMatricula = async (admin: Admin, matricula: string, exceto?: string) => {
+  if (!matricula) return;
+  if (!MATRICULA_REGEX.test(matricula)) throw new HttpError(400, "A matrícula deve ter só números (de 3 a 10 dígitos).");
+  const usuarios = await listarUsuarios(admin);
+  if (usuarios.some((u) => u.id !== exceto && u.app_metadata?.matricula === matricula)) {
+    throw new HttpError(409, "Esta matrícula já é usada por outro operador.");
+  }
+};
 
 // Chave secreta do projeto: novas chaves (SUPABASE_SECRET_KEYS, "sb_secret_...") ou a service_role antiga.
 const chaveSecreta = () => {
@@ -75,17 +101,20 @@ Deno.serve(async (req) => {
       const cargo = texto(payload.cargo) || "Recepcionista";
       const role = texto(payload.role) || "recepcionista";
       const ativo = payload.ativo !== false;
+      const matricula = texto(payload.matricula);
 
       if (!nome_completo) throw new HttpError(400, "Informe o nome completo.");
       if (!EMAIL_REGEX.test(email)) throw new HttpError(400, "Informe um e-mail institucional válido.");
       if (password.length < 8) throw new HttpError(400, "A senha precisa ter pelo menos 8 caracteres.");
       if (!ROLES.includes(role)) throw new HttpError(400, "Papel (role) inválido.");
+      await conferirMatricula(admin, matricula);
 
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
         user_metadata: { nome_completo, role },
+        ...(matricula && { app_metadata: { matricula } }),
       });
       if (createError || !created.user) {
         const jaExiste = createError?.status === 422 || /already|registered|exists/i.test(createError?.message ?? "");
@@ -107,7 +136,7 @@ Deno.serve(async (req) => {
       }
       if (!ativo) await admin.auth.admin.updateUserById(id, { ban_duration: BAN_SUSPENSO });
 
-      return json({ profile }, 201);
+      return json({ profile: { ...profile, matricula: matricula || null } }, 201);
     }
 
     if (action === "update_operator") {
@@ -120,6 +149,8 @@ Deno.serve(async (req) => {
       const cargo = texto(payload.cargo);
       const role = texto(payload.role);
       const ativo = typeof payload.ativo === "boolean" ? payload.ativo : undefined;
+      // undefined = não mexe; "" = remove a matrícula do login.
+      const matricula = typeof payload.matricula === "string" ? payload.matricula.trim() : undefined;
 
       if (email && !EMAIL_REGEX.test(email)) throw new HttpError(400, "Informe um e-mail institucional válido.");
       if (password && password.length < 8) throw new HttpError(400, "A nova senha precisa ter pelo menos 8 caracteres.");
@@ -128,10 +159,13 @@ Deno.serve(async (req) => {
         throw new HttpError(400, "Você não pode remover o próprio acesso de administrador nem desativar a própria conta.");
       }
 
+      if (matricula) await conferirMatricula(admin, matricula, id);
+
       const authUpdate: Record<string, unknown> = {};
       if (email) { authUpdate.email = email; authUpdate.email_confirm = true; }
       if (password) authUpdate.password = password;
       if (ativo !== undefined) authUpdate.ban_duration = ativo ? "none" : BAN_SUSPENSO;
+      if (matricula !== undefined) authUpdate.app_metadata = { matricula: matricula || null };
       if (nome_completo || role) authUpdate.user_metadata = { ...(nome_completo && { nome_completo }), ...(role && { role }) };
 
       if (Object.keys(authUpdate).length) {
@@ -151,7 +185,16 @@ Deno.serve(async (req) => {
 
       const { data: profile, error: profileError } = await admin.from("profiles").update(profileUpdate).eq("id", id).select().single();
       if (profileError) throw new HttpError(500, `Falha ao atualizar o perfil: ${profileError.message}`);
-      return json({ profile });
+      const { data: atualizado } = await admin.auth.admin.getUserById(id);
+      return json({ profile: { ...profile, matricula: atualizado?.user?.app_metadata?.matricula ?? null } });
+    }
+
+    if (action === "list_matriculas") {
+      const matriculas: Record<string, string> = {};
+      (await listarUsuarios(admin)).forEach((u) => {
+        if (u.app_metadata?.matricula) matriculas[u.id] = u.app_metadata.matricula;
+      });
+      return json({ matriculas });
     }
 
     if (action === "delete_operator") {

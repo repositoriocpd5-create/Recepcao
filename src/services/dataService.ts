@@ -1357,7 +1357,14 @@ export const dataService = {
     if (isSupabaseConfigured) {
       // Com Supabase, a lista oficial é sempre a do banco (nunca a cópia local do navegador).
       const { data, error } = await supabase.from('profiles').select('*').order('nome_completo');
-      return requireLiveResult(data, error, 'Não foi possível carregar os usuários') as UserProfile[];
+      const perfis = requireLiveResult(data, error, 'Não foi possível carregar os usuários') as UserProfile[];
+      // As matrículas de login ficam no Auth; sem a função publicada, a lista sai sem elas.
+      try {
+        const { matriculas } = await invokeAdminUsuarios<{ matriculas: Record<string, string> }>('list_matriculas', {});
+        return perfis.map((perfil) => ({ ...perfil, matricula: matriculas?.[perfil.id] ?? null }));
+      } catch {
+        return perfis;
+      }
     }
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.USUARIOS);
@@ -1374,6 +1381,7 @@ export const dataService = {
     if (isSupabaseConfigured) {
       const { profile } = await invokeAdminUsuarios<{ profile: UserProfile }>('create_operator', {
         email: u.email, password: senha, nome_completo: u.nome_completo, cargo: u.cargo, role: u.role, ativo: u.ativo,
+        matricula: u.matricula || '',
       });
       return profile;
     }
@@ -1387,6 +1395,7 @@ export const dataService = {
     if (isSupabaseConfigured) {
       const { profile } = await invokeAdminUsuarios<{ profile: UserProfile }>('update_operator', {
         id: u.id, email: u.email, nome_completo: u.nome_completo, cargo: u.cargo, role: u.role, ativo: u.ativo,
+        ...(u.matricula !== undefined ? { matricula: u.matricula || '' } : {}),
         ...(novaSenha ? { password: novaSenha } : {}),
       });
       return profile;
