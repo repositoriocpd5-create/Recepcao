@@ -49,12 +49,16 @@ interface ThemeToggleProps {
 }
 
 const SIZES = {
-  xs: { track: 'h-7 w-14', knob: 'h-5 w-5', shift: 'translate-x-7', icon: 'h-3 w-3', knobIcon: 'h-3.5 w-3.5' },
-  sm: { track: 'h-8 w-16', knob: 'h-6 w-6', shift: 'translate-x-8', icon: 'h-3.5 w-3.5', knobIcon: 'h-4 w-4' },
-  lg: { track: 'h-11 w-[84px]', knob: 'h-9 w-9', shift: 'translate-x-10', icon: 'h-4 w-4', knobIcon: 'h-5 w-5' },
+  xs: { track: 'h-7 w-14', knob: 'h-5 w-5', shift: 'translate-x-7', knobIcon: 'h-3.5 w-3.5' },
+  sm: { track: 'h-8 w-16', knob: 'h-6 w-6', shift: 'translate-x-8', knobIcon: 'h-4 w-4' },
+  lg: { track: 'h-11 w-[84px]', knob: 'h-9 w-9', shift: 'translate-x-10', knobIcon: 'h-5 w-5' },
 };
 
-// Interruptor claro/escuro: o botão desliza para o lado do tema ativo (sol = claro, lua = escuro).
+// Ondas concêntricas que saem do botão (centro em 25% = esquerda, 75% = direita).
+const ondas = (x: string, cor: string) =>
+  `radial-gradient(circle at ${x} 50%, transparent 0 46%, ${cor} 46% 58%, transparent 58% 70%, ${cor} 70% 82%, transparent 82%)`;
+
+// Interruptor claro/escuro: dia = trilho azul com sol amarelo à esquerda; noite = trilho azul-marinho com lua à direita.
 export const ThemeToggle = ({ size = 'sm', className }: ThemeToggleProps) => {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
@@ -69,37 +73,38 @@ export const ThemeToggle = ({ size = 'sm', className }: ThemeToggleProps) => {
       title={isDark ? 'Mudar para o modo claro' : 'Mudar para o modo escuro'}
       onClick={toggleTheme}
       className={cn(
-        'group relative inline-flex shrink-0 items-center rounded-full border bg-[linear-gradient(180deg,#1a2133_0%,#0b0f19_100%)] p-1',
-        'shadow-[inset_0_2px_6px_rgba(0,0,0,.55)] motion-safe:transition-[border-color,box-shadow] motion-safe:duration-300',
+        'group relative inline-flex shrink-0 items-center overflow-hidden rounded-full p-1',
+        'motion-safe:transition-[background,box-shadow] motion-safe:duration-300',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#087ef5] focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#0f1422]',
         isDark
-          ? 'border-[#1d4ed8]/70 shadow-[inset_0_2px_6px_rgba(0,0,0,.55),0_0_14px_-2px_rgba(59,130,246,.55)]'
-          : 'border-[#f59e0b]/70 shadow-[inset_0_2px_6px_rgba(0,0,0,.55),0_0_14px_-2px_rgba(245,158,11,.55)]',
+          ? 'bg-[linear-gradient(90deg,#1c2338_0%,#2e3a57_100%)] shadow-[inset_0_2px_5px_rgba(0,0,0,.5),0_2px_8px_-2px_rgba(15,23,42,.5)]'
+          : 'bg-[linear-gradient(90deg,#1f7be6_0%,#5bb4ff_100%)] shadow-[inset_0_2px_5px_rgba(9,58,128,.45),0_2px_8px_-2px_rgba(31,123,230,.55)]',
         s.track,
         className,
       )}
     >
-      {/* Ícones do trilho (lado inativo) */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-between px-2">
-        <Sun className={cn(s.icon, 'text-[#fbbf24] motion-safe:transition-opacity', isDark ? 'opacity-70' : 'opacity-0')} />
-        <Moon className={cn(s.icon, 'text-[#93c5fd] motion-safe:transition-opacity', isDark ? 'opacity-0' : 'opacity-70')} />
-      </span>
+      {/* Ondas concêntricas em volta do botão */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 rounded-full motion-safe:transition-[background] motion-safe:duration-300"
+        style={{ backgroundImage: isDark ? ondas('75%', 'rgba(255,255,255,.05)') : ondas('25%', 'rgba(255,255,255,.12)') }}
+      />
 
-      {/* Botão deslizante com o ícone do tema ativo */}
+      {/* Botão deslizante: sol amarelo (dia) ou lua clara (noite) */}
       <span
         aria-hidden="true"
         className={cn(
-          'relative grid place-items-center rounded-full bg-[radial-gradient(circle_at_35%_30%,#2c3854_0%,#0d1324_70%)] ring-2',
+          'relative grid place-items-center rounded-full',
           'motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-[cubic-bezier(.34,1.56,.64,1)]',
           isDark
-            ? cn(s.shift, 'ring-[#3b82f6] shadow-[0_0_12px_rgba(59,130,246,.75)]')
-            : 'translate-x-0 ring-[#f59e0b] shadow-[0_0_12px_rgba(245,158,11,.75)]',
+            ? cn(s.shift, 'bg-[radial-gradient(circle_at_35%_30%,#f4f6fc_0%,#cfd5ea_75%)] shadow-[0_2px_6px_rgba(0,0,0,.45)]')
+            : 'translate-x-0 bg-[radial-gradient(circle_at_35%_30%,#ffe45c_0%,#f6b400_75%)] shadow-[0_2px_6px_rgba(120,70,0,.4)]',
           s.knob,
         )}
       >
         {isDark
-          ? <Moon className={cn(s.knobIcon, 'fill-[#dbeafe] text-[#dbeafe] drop-shadow-[0_0_4px_rgba(147,197,253,.9)]')} />
-          : <Sun className={cn(s.knobIcon, 'text-[#fbbf24] drop-shadow-[0_0_4px_rgba(251,191,36,.9)]')} />}
+          ? <Moon className={cn(s.knobIcon, 'fill-[#e8ebf6] text-[#8f9bc4]')} />
+          : <Sun className={cn(s.knobIcon, 'fill-[#ffd23f] text-[#e89a00]')} />}
       </span>
     </button>
   );
