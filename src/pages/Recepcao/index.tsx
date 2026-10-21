@@ -32,6 +32,8 @@ import {
   PhoneCall,
   MessageSquare,
   School,
+  Mail,
+  Smartphone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -198,6 +200,12 @@ export const RecepcaoPage: React.FC = () => {
   // Modais
   const [isIdentificationModalOpen, setIsIdentificationModalOpen] = useState(false);
   const [isPersonDetailsModalOpen, setIsPersonDetailsModalOpen] = useState(false);
+  // Antes da entrada: oferece completar o contato do servidor que está "Não informado".
+  const [isContatoModalOpen, setIsContatoModalOpen] = useState(false);
+  const [contatoTelefone, setContatoTelefone] = useState('');
+  const [contatoEmail, setContatoEmail] = useState('');
+  const [contatoErro, setContatoErro] = useState('');
+  const [isSalvandoContato, setIsSalvandoContato] = useState(false);
   const [isEntradaModalOpen, setIsEntradaModalOpen] = useState(false);
   const [isNovoVisitanteModalOpen, setIsNovoVisitanteModalOpen] = useState(false);
   const [isNovoServidorModalOpen, setIsNovoServidorModalOpen] = useState(false);
@@ -574,6 +582,66 @@ export const RecepcaoPage: React.FC = () => {
   };
 
   // Abrir modal de entrada para Servidor ou Visitante
+  /** (21) 98765-4321 enquanto digita. */
+  const mascaraTelefone = (valor: string) => {
+    const d = valor.replace(/\D/g, '').slice(0, 11);
+    if (d.length <= 2) return d ? `(${d}` : '';
+    if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  };
+
+  /** "Iniciar entrada" do servidor: sem telefone e e-mail, pergunta antes se quer atualizar o contato. */
+  const iniciarEntradaServidor = () => {
+    setIsPersonDetailsModalOpen(false);
+    const servidor = servidorResultado?.servidor;
+    if (servidor && !servidor.telefone?.trim() && !servidor.email?.trim()) {
+      setContatoTelefone('');
+      setContatoEmail('');
+      setContatoErro('');
+      setIsContatoModalOpen(true);
+      return;
+    }
+    handleIniciarEntrada();
+  };
+
+  const pularContato = () => {
+    setIsContatoModalOpen(false);
+    handleIniciarEntrada();
+  };
+
+  const salvarContatoEIniciar = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const servidor = servidorResultado?.servidor;
+    if (!servidor) return;
+    const telefone = contatoTelefone.trim();
+    const email = contatoEmail.trim().toLowerCase();
+    if (!telefone && !email) {
+      setContatoErro('Preencha o telefone ou o e-mail — ou toque em "Agora não".');
+      return;
+    }
+    if (telefone && telefone.replace(/\D/g, '').length < 10) {
+      setContatoErro('Telefone incompleto. Informe o DDD e o número.');
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setContatoErro('E-mail inválido.');
+      return;
+    }
+    setIsSalvandoContato(true);
+    setContatoErro('');
+    try {
+      const atualizado = await dataService.atualizarContatoServidor(servidor.id, { telefone, email });
+      setServidorResultado((atual) => (atual?.servidor ? { ...atual, servidor: { ...atual.servidor, ...atualizado, telefone: atualizado.telefone ?? telefone, email: atualizado.email ?? email } } : atual));
+      setIsContatoModalOpen(false);
+      handleIniciarEntrada();
+    } catch (err) {
+      setContatoErro(err instanceof Error ? err.message : 'Não foi possível salvar o contato.');
+    } finally {
+      setIsSalvandoContato(false);
+    }
+  };
+
   const handleIniciarEntrada = (crachaNumero = '') => {
     void carregarDadosIniciais();
     setFormCracha(crachaNumero);
@@ -1783,7 +1851,7 @@ export const RecepcaoPage: React.FC = () => {
               {servidorResultado.no_predio && servidorResultado.movimentacao_atual ? (
                 <Button variant="danger" className="min-h-12 rounded-xl px-4 sm:px-7" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(servidorResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
               ) : (
-                <Button variant="primary" className="min-h-12 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-4 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] hover:from-[#2a7fff] hover:to-[#0b52d6] sm:px-7" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}><span className="sm:hidden">Iniciar entrada</span><span className="hidden sm:inline">Iniciar registro de entrada</span> <ArrowRight className="w-5 h-5" /></Button>
+                <Button variant="primary" className="min-h-12 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-4 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] hover:from-[#2a7fff] hover:to-[#0b52d6] sm:px-7" onClick={iniciarEntradaServidor}><span className="sm:hidden">Iniciar entrada</span><span className="hidden sm:inline">Iniciar registro de entrada</span> <ArrowRight className="w-5 h-5" /></Button>
               )}
             </>}
           />
@@ -1816,6 +1884,82 @@ export const RecepcaoPage: React.FC = () => {
             </>}
           />
         )}
+      </Modal>
+
+      {/* Atualizar contato do servidor antes de iniciar a entrada */}
+      <Modal
+        isOpen={isContatoModalOpen}
+        onClose={() => { if (!isSalvandoContato) setIsContatoModalOpen(false); }}
+        title="Atualizar contato"
+        description="Este servidor está sem telefone e e-mail cadastrados."
+        icon={<PhoneCall className="w-6 h-6" />}
+        maxWidth="md"
+        variant="destaque"
+      >
+        <form onSubmit={salvarContatoEIniciar}>
+          <div className="space-y-4 px-4 pb-4 pt-5 sm:px-7 sm:pt-6">
+            {servidorResultado?.servidor && (
+              <div className="flex items-center gap-3 rounded-2xl border border-[#dce6f3] bg-[#f6faff] p-3 dark:border-slate-800 dark:bg-slate-900/60">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-base font-extrabold text-white">
+                  {servidorResultado.servidor.nome.charAt(0)}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-extrabold text-[#0d1f45] dark:text-slate-100">{servidorResultado.servidor.nome}</p>
+                  <p className="text-xs text-[#627289] dark:text-slate-400">Matrícula {servidorResultado.servidor.matricula}</p>
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-[#37475e] dark:text-slate-300">
+              Aproveite o atendimento para completar o cadastro. Basta um dos dois campos; você também pode seguir sem atualizar.
+            </p>
+
+            {contatoErro && (
+              <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-950/40 dark:text-rose-300">
+                <AlertTriangle className="mt-px h-4 w-4 shrink-0" />{contatoErro}
+              </div>
+            )}
+
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold text-[#37475e] dark:text-slate-300">Celular / telefone</span>
+              <span className="relative block">
+                <Smartphone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0bf]" />
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="off"
+                  value={contatoTelefone}
+                  onChange={(e) => setContatoTelefone(mascaraTelefone(e.target.value))}
+                  placeholder="(21) 98765-4321"
+                  className="min-h-12 w-full rounded-xl border border-[#d4e0ee] bg-white pl-10 pr-3 text-base text-[#0d1f45] outline-none transition-shadow placeholder:text-[#9aabc3] focus:border-[#0d6efd] focus:ring-4 focus:ring-[#0d6efd]/15 sm:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  autoFocus
+                />
+              </span>
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold text-[#37475e] dark:text-slate-300">E-mail</span>
+              <span className="relative block">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0bf]" />
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  value={contatoEmail}
+                  onChange={(e) => setContatoEmail(e.target.value)}
+                  placeholder="nome@edu.itaguai.rj.gov.br"
+                  className="min-h-12 w-full rounded-xl border border-[#d4e0ee] bg-white pl-10 pr-3 text-base text-[#0d1f45] outline-none transition-shadow placeholder:text-[#9aabc3] focus:border-[#0d6efd] focus:ring-4 focus:ring-[#0d6efd]/15 sm:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              </span>
+            </label>
+          </div>
+          <div className="sticky bottom-0 z-10 flex gap-2 border-t border-[#e3eaf4] bg-white/95 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:justify-end sm:gap-3 sm:px-7 sm:py-5 dark:border-slate-800 dark:bg-[#121826]/95">
+            <Button type="button" variant="outline" className="min-h-12 rounded-xl px-4 sm:px-6" onClick={pularContato} disabled={isSalvandoContato}>Agora não</Button>
+            <Button type="submit" variant="primary" isLoading={isSalvandoContato} className="min-h-12 flex-1 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-4 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] sm:flex-none sm:px-6">
+              Salvar e iniciar entrada <ArrowRight className="w-5 h-5" />
+            </Button>
+          </div>
+        </form>
       </Modal>
 
       <Modal

@@ -534,6 +534,35 @@ export const dataService = {
     }));
   },
 
+  /**
+   * Completa telefone/e-mail do servidor no balcão. Com Supabase passa pela Edge Function
+   * atualizar-contato-servidor (a RLS só deixa admin/gestor editar servidores).
+   */
+  async atualizarContatoServidor(servidorId: string, contato: { telefone?: string; email?: string }): Promise<Servidor> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.functions.invoke('atualizar-contato-servidor', {
+        body: { servidor_id: servidorId, telefone: contato.telefone || '', email: contato.email || '' },
+      });
+      if (!error) return (data as { servidor: Servidor }).servidor;
+      const response = (error as { context?: Response }).context;
+      if (response instanceof Response) {
+        if (response.status === 404) {
+          let mensagem = '';
+          try { mensagem = (await response.clone().json())?.error || ''; } catch {}
+          throw new Error(mensagem || 'A função "atualizar-contato-servidor" ainda não foi publicada no Supabase.');
+        }
+        try {
+          const body = await response.clone().json();
+          if (body?.error) throw new Error(body.error);
+        } catch (parsed) {
+          if (parsed instanceof Error && parsed.message) throw parsed;
+        }
+      }
+      throw new Error('Não foi possível salvar o contato agora. Verifique se a função "atualizar-contato-servidor" está publicada.');
+    }
+    return this.salvarServidor({ id: servidorId, ...(contato.telefone ? { telefone: contato.telefone } : {}), ...(contato.email ? { email: contato.email } : {}) });
+  },
+
   async salvarServidor(servidor: Partial<Servidor>): Promise<Servidor> {
     if (isSupabaseConfigured) {
       if (servidor.id) {
