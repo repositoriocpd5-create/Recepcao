@@ -46,5 +46,7 @@ export default defineConfig({
   server: {
     port: 3000,
     open: false,
+    // Nesta unidade (E:) o aviso de arquivo alterado às vezes não chega e a tela fica com código antigo.
+    watch: { usePolling: true, interval: 300 },
   },
 });
