@@ -74,7 +74,7 @@ export const LoginPage: React.FC = () => {
           <h1 className="flex items-center gap-2 text-xl leading-none">
             <span className="font-extrabold tracking-tight">SMEDU</span>
             <span aria-hidden="true" className="h-6 w-px bg-white/90" />
-            <span className="font-light tracking-wide">RECEPÇÃO</span>
+            <span className="font-light tracking-wide">SOLUÇÕES</span>
           </h1>
         </header>
 
