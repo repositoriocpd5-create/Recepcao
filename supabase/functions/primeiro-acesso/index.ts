@@ -83,6 +83,34 @@ const gerarToken = () => {
   return btoa(String.fromCharCode(...bytes)).replace(/[+/=]/g, (c) => ({ "+": "-", "/": "_", "=": "" }[c] as string));
 };
 
+const escaparHtml = (valor: string) =>
+  valor.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+
+// Senha do SMTP cifrada (AES-GCM) com chave derivada da chave do servidor: no banco fica só "v1:iv:dados".
+// Se a chave do projeto for trocada, basta o administrador informar a senha do SMTP de novo.
+const chaveCifra = async (segredo: string) =>
+  crypto.subtle.importKey("raw", await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${segredo}:smtp`)), "AES-GCM", false, ["encrypt", "decrypt"]);
+const paraB64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+const deB64 = (texto64: string) => Uint8Array.from(atob(texto64), (c) => c.charCodeAt(0));
+
+const cifrar = async (valor: string, segredo: string) => {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const dados = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await chaveCifra(segredo), new TextEncoder().encode(valor)));
+  return `v1:${paraB64(iv)}:${paraB64(dados)}`;
+};
+
+const decifrar = async (valor: string | null, segredo: string) => {
+  if (!valor) return null;
+  if (!valor.startsWith("v1:")) return valor; // gravada antes da cifra
+  const [, iv, dados] = valor.split(":");
+  try {
+    const claro = await crypto.subtle.decrypt({ name: "AES-GCM", iv: deB64(iv) }, await chaveCifra(segredo), deB64(dados));
+    return new TextDecoder().decode(claro);
+  } catch {
+    throw new HttpError(500, "Não foi possível ler a senha do e-mail do sistema. Informe a senha do SMTP novamente na Administração.");
+  }
+};
+
 const senhaValida = (senha: string) => senha.length >= 8 && senha.length <= 72 && /[A-Za-zÀ-ÿ]/.test(senha) && /\d/.test(senha);
 
 type ConfigSmtp = {
@@ -103,7 +131,7 @@ const htmlEmail = (titulo: string, corpo: string, codigo: string | null, nome?: 
       <div style="font-size:12px;opacity:.85;margin-top:4px">Secretaria Municipal de Educação de Itaguaí</div>
     </td></tr>
     <tr><td style="padding:28px 24px 8px">
-      <p style="margin:0 0 12px;font-size:15px">Olá${nome ? `, ${nome.split(" ")[0]}` : ""},</p>
+      <p style="margin:0 0 12px;font-size:15px">Olá${nome ? `, ${escaparHtml(nome.split(" ")[0])}` : ""},</p>
       <p style="margin:0 0 20px;font-size:14px;line-height:1.5">${corpo}</p>
       ${codigo ? `<div style="text-align:center;margin:0 0 20px">
         <span style="display:inline-block;padding:14px 22px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;font-family:'Courier New',monospace;font-size:30px;font-weight:bold;letter-spacing:8px;color:#0b4fa3">${codigo}</span>
@@ -166,9 +194,12 @@ Deno.serve(async (req) => {
     const action = texto(body.action) || "solicitar";
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null;
 
-    const lerSmtp = async (): Promise<ConfigSmtp | null> => {
+    /** Configuração gravada; a senha só é decifrada quando for usada no envio. */
+    const lerSmtp = async (comSenha = false): Promise<ConfigSmtp | null> => {
       const { data } = await admin.from("config_smtp").select("*").eq("id", 1).maybeSingle();
-      return (data as ConfigSmtp) ?? null;
+      if (!data) return null;
+      const config = data as ConfigSmtp;
+      return comSenha ? { ...config, senha: await decifrar(config.senha, serviceKey) } : config;
     };
 
     // ─── Configuração de SMTP (somente administrador ativo) ───
@@ -197,7 +228,7 @@ Deno.serve(async (req) => {
         if (!["ssl", "starttls", "nenhuma"].includes(seguranca)) throw new HttpError(400, "Tipo de segurança inválido.");
         if (!EMAIL_REGEX.test(remetente)) throw new HttpError(400, "Informe o e-mail do remetente.");
         const atual = await lerSmtp();
-        const novaSenha = typeof c.senha === "string" && c.senha.length ? c.senha : atual?.senha ?? null;
+        const novaSenha = typeof c.senha === "string" && c.senha.length ? await cifrar(c.senha, serviceKey) : atual?.senha ?? null;
         const { error } = await admin.from("config_smtp").upsert({
           id: 1,
           host,
@@ -217,7 +248,7 @@ Deno.serve(async (req) => {
       if (action === "smtp_testar") {
         const para = texto(body.para).toLowerCase();
         if (!EMAIL_REGEX.test(para)) throw new HttpError(400, "Informe o e-mail que vai receber o teste.");
-        const config = await lerSmtp();
+        const config = await lerSmtp(true);
         if (!config) throw new HttpError(400, "Salve a configuração antes de testar.");
         try {
           await enviarEmail(config, para, "Teste de e-mail — SMEDU Soluções",
@@ -249,15 +280,16 @@ Deno.serve(async (req) => {
       }
       await admin.from("primeiro_acesso_tentativas").insert({ email, ip });
 
+      // Sem SMTP, a mesma resposta para qualquer e-mail (não revela quem tem acesso).
+      const config = await lerSmtp(true);
+      if (!config) throw new HttpError(503, "O envio de e-mails do sistema ainda não foi configurado. Procure o administrador.");
+
       const [{ data: acesso }, { data: perfil }] = await Promise.all([
         admin.from("acessos_por_email").select("email, responsavel").eq("email", email).maybeSingle(),
         admin.from("profiles").select("id, ativo, nome_completo").eq("email", email).maybeSingle(),
       ]);
       // Sem liberação e sem conta, ou conta desativada: mesma resposta, sem enviar nada.
       if ((!acesso && !perfil) || perfil?.ativo === false) return json(RESPOSTA_SOLICITAR);
-
-      const config = await lerSmtp();
-      if (!config) throw new HttpError(503, "O envio de e-mails do sistema ainda não foi configurado. Procure o administrador.");
 
       const codigo = gerarCodigo();
       // Um código por vez: os anteriores deixam de valer.
