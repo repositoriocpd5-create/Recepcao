@@ -1,18 +1,20 @@
 // Supabase Edge Function: primeiro-acesso
-// Primeiro acesso e "esqueci minha senha" por código enviado ao e-mail.
+// Primeiro acesso e "esqueci minha senha" com código gerado pelo próprio sistema.
 //
-// 1. O navegador envia só o e-mail.
-// 2. Se o e-mail está liberado (acessos_por_email) ou já tem conta ativa, a função cria a conta
-//    quando ainda não existe (sem senha; papel e unidade vêm do gatilho de perfis) e pede ao
-//    Supabase Auth o envio do código de uso único (modelo "Magic Link" com {{ .Token }}).
-// 3. O navegador confirma o código (auth.verifyOtp) — ou a pessoa toca no link do e-mail, que
-//    volta para /primeiro-acesso?etapa=senha já com a sessão — e grava a senha (auth.updateUser).
+// Ações (POST { action, ... }):
+//   solicitar   { email }                 → gera um código de 6 dígitos (10 min) e envia pelo SMTP do sistema
+//   confirmar   { email, codigo }         → confere o código e devolve um token curto (15 min) para trocar a senha
+//   redefinir   { email, token, senha }   → grava a senha (cria a conta do dirigente se ainda não existir)
+//   smtp_obter / smtp_salvar / smtp_testar → configuração do e-mail do sistema (somente administrador)
 //
-// A resposta é sempre a mesma para e-mail cadastrado ou não, para a tela não revelar quem tem
-// acesso. Há limite de pedidos por e-mail e por endereço de origem.
-// Publicar com --no-verify-jwt (é chamada antes do login).
+// O código e o token ficam no banco só como hash (SHA-256 com a chave do servidor). As respostas de
+// "solicitar" são iguais para e-mail cadastrado ou não. Há limite de pedidos por e-mail e por origem,
+// e no máximo 5 tentativas por código.
+// Publicar com --no-verify-jwt (é chamada antes do login; as ações de SMTP conferem o administrador).
+// Observação: Edge Functions do Supabase não abrem conexões nas portas 25 e 587; use 465 (SSL).
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import nodemailer from "npm:nodemailer@6.9.16";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,11 +25,21 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const RESPOSTA_PADRAO = {
+const RESPOSTA_SOLICITAR = {
   ok: true,
   mensagem: "Se o e-mail estiver cadastrado, você receberá um código em instantes. Confira também a caixa de spam.",
 };
+const CODIGO_INVALIDO = "Código inválido ou expirado. Confira os números ou peça um novo código.";
+const VALIDADE_CODIGO_MIN = 10;
+const VALIDADE_TOKEN_MIN = 15;
+const MAX_TENTATIVAS_CODIGO = 5;
 const JANELA_MINUTOS = 15;
 const MAX_POR_EMAIL = 3;
 const MAX_POR_IP = 10;
@@ -41,6 +53,100 @@ const chaveSecreta = () => {
   return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 };
 
+const texto = (valor: unknown) => (typeof valor === "string" ? valor.trim() : "");
+
+const hash = async (valor: string, pimenta: string) => {
+  const dados = new TextEncoder().encode(`${pimenta}:${valor}`);
+  const digest = await crypto.subtle.digest("SHA-256", dados);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+};
+
+/** Comparação em tempo constante (não revela quantos caracteres batem). */
+const iguais = (a: string, b: string) => {
+  if (a.length !== b.length) return false;
+  let diferenca = 0;
+  for (let i = 0; i < a.length; i++) diferenca |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diferenca === 0;
+};
+
+/** 6 dígitos com gerador criptográfico (sem viés de módulo). */
+const gerarCodigo = () => {
+  const limite = 4_294_000_000; // múltiplo de 1.000.000 abaixo de 2^32
+  const buffer = new Uint32Array(1);
+  do crypto.getRandomValues(buffer); while (buffer[0] >= limite);
+  return String(buffer[0] % 1_000_000).padStart(6, "0");
+};
+
+const gerarToken = () => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes)).replace(/[+/=]/g, (c) => ({ "+": "-", "/": "_", "=": "" }[c] as string));
+};
+
+const senhaValida = (senha: string) => senha.length >= 8 && senha.length <= 72 && /[A-Za-zÀ-ÿ]/.test(senha) && /\d/.test(senha);
+
+type ConfigSmtp = {
+  host: string;
+  porta: number;
+  seguranca: "ssl" | "starttls" | "nenhuma";
+  usuario: string | null;
+  senha: string | null;
+  remetente_email: string;
+  remetente_nome: string;
+};
+
+const htmlEmail = (titulo: string, corpo: string, codigo: string | null, nome?: string | null) => `
+<div style="margin:0;padding:24px 12px;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#1f2937">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden">
+    <tr><td style="background:#1366e8;padding:22px 24px;text-align:center;color:#ffffff">
+      <div style="font-size:20px;letter-spacing:.5px"><strong>SMEDU</strong> &nbsp;|&nbsp; SOLUÇÕES</div>
+      <div style="font-size:12px;opacity:.85;margin-top:4px">Secretaria Municipal de Educação de Itaguaí</div>
+    </td></tr>
+    <tr><td style="padding:28px 24px 8px">
+      <p style="margin:0 0 12px;font-size:15px">Olá${nome ? `, ${nome.split(" ")[0]}` : ""},</p>
+      <p style="margin:0 0 20px;font-size:14px;line-height:1.5">${corpo}</p>
+      ${codigo ? `<div style="text-align:center;margin:0 0 20px">
+        <span style="display:inline-block;padding:14px 22px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;font-family:'Courier New',monospace;font-size:30px;font-weight:bold;letter-spacing:8px;color:#0b4fa3">${codigo}</span>
+      </div>
+      <p style="margin:0 0 8px;font-size:13px;color:#4b5563">O código vale por <strong>${VALIDADE_CODIGO_MIN} minutos</strong> e só pode ser usado uma vez.</p>
+      <p style="margin:0 0 20px;font-size:13px;color:#4b5563">Se você não pediu este código, ignore este e-mail. Ninguém consegue entrar sem ele.</p>` : ""}
+    </td></tr>
+    <tr><td style="padding:14px 24px 22px;border-top:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-align:center">
+      ${titulo} · Mensagem automática — não responda. Dúvidas: CPD da SMEDU.
+    </td></tr>
+  </table>
+</div>`;
+
+const enviarEmail = async (config: ConfigSmtp, para: string, assunto: string, html: string, textoSimples: string) => {
+  const transporte = nodemailer.createTransport({
+    host: config.host,
+    port: config.porta,
+    secure: config.seguranca === "ssl",
+    requireTLS: config.seguranca === "starttls",
+    auth: config.usuario ? { user: config.usuario, pass: config.senha ?? "" } : undefined,
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 20_000,
+  });
+  await transporte.sendMail({
+    from: { name: config.remetente_nome, address: config.remetente_email },
+    to: para,
+    subject: assunto,
+    text: textoSimples,
+    html,
+  });
+};
+
+/** Mensagem legível para falhas de SMTP (sem expor a senha). */
+const erroSmtp = (error: unknown) => {
+  const e = error as { code?: string; responseCode?: number; message?: string };
+  if (e?.code === "EAUTH" || e?.responseCode === 535) return "O servidor de e-mail recusou o usuário ou a senha (para Gmail/Microsoft use uma senha de app).";
+  if (e?.code === "ETIMEDOUT" || e?.code === "ECONNECTION" || /timed? ?out|connect/i.test(e?.message ?? "")) {
+    return "Não foi possível conectar ao servidor de e-mail. Confira o servidor e use a porta 465 (SSL): as portas 25 e 587 são bloqueadas no Supabase.";
+  }
+  return `O servidor de e-mail recusou o envio: ${e?.message ?? "erro desconhecido"}`;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
@@ -48,70 +154,209 @@ Deno.serve(async (req) => {
   try {
     const url = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceKey = chaveSecreta();
-    if (!url || !serviceKey) return json({ error: "Função sem acesso às chaves do projeto." }, 500);
-    const opcoes = { auth: { persistSession: false, autoRefreshToken: false } };
-    const admin = createClient(url, serviceKey, opcoes);
+    if (!url || !serviceKey) throw new HttpError(500, "Função sem acesso às chaves do projeto.");
+    const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-    let body: { email?: unknown; retorno?: unknown };
+    let body: Record<string, unknown>;
     try {
       body = await req.json();
     } catch {
-      return json({ error: "Requisição inválida." }, 400);
+      throw new HttpError(400, "Requisição inválida.");
     }
-    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-    // Para onde o link do e-mail leva (tela de criar senha). Só http(s); o Supabase ainda
-    // confere com o Site URL / Redirect URLs do projeto.
-    let retorno: string | undefined;
-    try {
-      const u = new URL(typeof body.retorno === "string" ? body.retorno : "");
-      if (u.protocol === "https:" || u.protocol === "http:") retorno = u.toString();
-    } catch { /* sem retorno: usa o Site URL */ }
-    if (!EMAIL_REGEX.test(email) || email.length > 254) return json({ error: "Informe um e-mail válido." }, 400);
-
-    // Limite de pedidos (por e-mail e por origem) nos últimos minutos.
+    const action = texto(body.action) || "solicitar";
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null;
-    const desde = new Date(Date.now() - JANELA_MINUTOS * 60_000).toISOString();
-    const [porEmail, porIp] = await Promise.all([
-      admin.from("primeiro_acesso_tentativas").select("id", { count: "exact", head: true }).eq("email", email).gte("created_at", desde),
-      ip
-        ? admin.from("primeiro_acesso_tentativas").select("id", { count: "exact", head: true }).eq("ip", ip).gte("created_at", desde)
-        : Promise.resolve({ count: 0 }),
-    ]);
-    if ((porEmail.count ?? 0) >= MAX_POR_EMAIL || (porIp.count ?? 0) >= MAX_POR_IP) {
-      return json({ error: `Muitos pedidos de código. Aguarde ${JANELA_MINUTOS} minutos e tente novamente.` }, 429);
+
+    const lerSmtp = async (): Promise<ConfigSmtp | null> => {
+      const { data } = await admin.from("config_smtp").select("*").eq("id", 1).maybeSingle();
+      return (data as ConfigSmtp) ?? null;
+    };
+
+    // ─── Configuração de SMTP (somente administrador ativo) ───
+    if (action.startsWith("smtp_")) {
+      const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+      const { data: authData } = jwt ? await admin.auth.getUser(jwt) : { data: { user: null } };
+      const quem = authData?.user;
+      const { data: perfil } = quem ? await admin.from("profiles").select("role, ativo, email").eq("id", quem.id).maybeSingle() : { data: null };
+      if (!quem || perfil?.role !== "admin" || perfil?.ativo === false) throw new HttpError(403, "Apenas administradores configuram o e-mail do sistema.");
+
+      if (action === "smtp_obter") {
+        const config = await lerSmtp();
+        if (!config) return json({ config: null });
+        const { senha, ...resto } = config;
+        return json({ config: { ...resto, tem_senha: Boolean(senha) } });
+      }
+
+      if (action === "smtp_salvar") {
+        const c = (body.config ?? {}) as Record<string, unknown>;
+        const host = texto(c.host);
+        const porta = Number(c.porta);
+        const seguranca = texto(c.seguranca);
+        const remetente = texto(c.remetente_email).toLowerCase();
+        if (!host || /\s/.test(host)) throw new HttpError(400, "Informe o servidor SMTP.");
+        if (!Number.isInteger(porta) || porta < 1 || porta > 65535) throw new HttpError(400, "Porta inválida.");
+        if (!["ssl", "starttls", "nenhuma"].includes(seguranca)) throw new HttpError(400, "Tipo de segurança inválido.");
+        if (!EMAIL_REGEX.test(remetente)) throw new HttpError(400, "Informe o e-mail do remetente.");
+        const atual = await lerSmtp();
+        const novaSenha = typeof c.senha === "string" && c.senha.length ? c.senha : atual?.senha ?? null;
+        const { error } = await admin.from("config_smtp").upsert({
+          id: 1,
+          host,
+          porta,
+          seguranca,
+          usuario: texto(c.usuario) || null,
+          senha: novaSenha,
+          remetente_email: remetente,
+          remetente_nome: texto(c.remetente_nome) || "SMEDU Soluções",
+          atualizado_em: new Date().toISOString(),
+          atualizado_por: perfil?.email ?? quem.email,
+        });
+        if (error) throw new HttpError(500, `Não foi possível salvar: ${error.message}`);
+        return json({ ok: true });
+      }
+
+      if (action === "smtp_testar") {
+        const para = texto(body.para).toLowerCase();
+        if (!EMAIL_REGEX.test(para)) throw new HttpError(400, "Informe o e-mail que vai receber o teste.");
+        const config = await lerSmtp();
+        if (!config) throw new HttpError(400, "Salve a configuração antes de testar.");
+        try {
+          await enviarEmail(config, para, "Teste de e-mail — SMEDU Soluções",
+            htmlEmail("Teste de envio", "Este é um e-mail de teste: a configuração de envio do sistema está funcionando.", null),
+            "Teste de e-mail do SMEDU Soluções: a configuração de envio do sistema está funcionando.");
+        } catch (error) {
+          throw new HttpError(502, erroSmtp(error));
+        }
+        return json({ ok: true, mensagem: `E-mail de teste enviado para ${para}.` });
+      }
+
+      throw new HttpError(400, "Ação não suportada.");
     }
-    await admin.from("primeiro_acesso_tentativas").insert({ email, ip });
 
-    const [{ data: acesso }, { data: perfil }] = await Promise.all([
-      admin.from("acessos_por_email").select("email, responsavel").eq("email", email).maybeSingle(),
-      admin.from("profiles").select("id, ativo, nome_completo").eq("email", email).maybeSingle(),
-    ]);
+    const email = texto(body.email).toLowerCase();
+    if (!EMAIL_REGEX.test(email) || email.length > 254) throw new HttpError(400, "Informe um e-mail válido.");
 
-    // Sem liberação e sem conta, ou conta desativada: resposta igual, sem enviar nada.
-    if ((!acesso && !perfil) || perfil?.ativo === false) return json(RESPOSTA_PADRAO);
+    // ─── 1. Solicitar código ───
+    if (action === "solicitar") {
+      const desde = new Date(Date.now() - JANELA_MINUTOS * 60_000).toISOString();
+      const [porEmail, porIp] = await Promise.all([
+        admin.from("primeiro_acesso_tentativas").select("id", { count: "exact", head: true }).eq("email", email).gte("created_at", desde),
+        ip
+          ? admin.from("primeiro_acesso_tentativas").select("id", { count: "exact", head: true }).eq("ip", ip).gte("created_at", desde)
+          : Promise.resolve({ count: 0 }),
+      ]);
+      if ((porEmail.count ?? 0) >= MAX_POR_EMAIL || (porIp.count ?? 0) >= MAX_POR_IP) {
+        throw new HttpError(429, `Muitos pedidos de código. Aguarde ${JANELA_MINUTOS} minutos e tente novamente.`);
+      }
+      await admin.from("primeiro_acesso_tentativas").insert({ email, ip });
 
-    if (!perfil) {
-      const { error } = await admin.auth.admin.createUser({
+      const [{ data: acesso }, { data: perfil }] = await Promise.all([
+        admin.from("acessos_por_email").select("email, responsavel").eq("email", email).maybeSingle(),
+        admin.from("profiles").select("id, ativo, nome_completo").eq("email", email).maybeSingle(),
+      ]);
+      // Sem liberação e sem conta, ou conta desativada: mesma resposta, sem enviar nada.
+      if ((!acesso && !perfil) || perfil?.ativo === false) return json(RESPOSTA_SOLICITAR);
+
+      const config = await lerSmtp();
+      if (!config) throw new HttpError(503, "O envio de e-mails do sistema ainda não foi configurado. Procure o administrador.");
+
+      const codigo = gerarCodigo();
+      // Um código por vez: os anteriores deixam de valer.
+      await admin.from("codigos_acesso").update({ usado_em: new Date().toISOString() }).eq("email", email).is("usado_em", null);
+      const { error } = await admin.from("codigos_acesso").insert({
         email,
-        email_confirm: true,
-        user_metadata: { nome_completo: acesso?.responsavel ?? email.split("@")[0] },
+        codigo_hash: await hash(codigo, serviceKey),
+        expira_em: new Date(Date.now() + VALIDADE_CODIGO_MIN * 60_000).toISOString(),
+        ip,
       });
-      if (error && !/already|registered|exists/i.test(error.message)) {
-        return json({ error: "Não foi possível preparar seu acesso agora. Tente novamente em instantes." }, 500);
+      if (error) throw new HttpError(500, "Não foi possível gerar o código agora. Tente novamente.");
+
+      const nome = perfil?.nome_completo ?? acesso?.responsavel ?? null;
+      try {
+        await enviarEmail(config, email, `Seu código de acesso: ${codigo} — SMEDU Soluções`,
+          htmlEmail("Código de acesso", "Use o código abaixo para criar ou redefinir sua senha de acesso ao sistema.", codigo, nome),
+          `Seu código de acesso ao SMEDU Soluções é ${codigo}. Ele vale por ${VALIDADE_CODIGO_MIN} minutos. Se você não pediu, ignore este e-mail.`);
+      } catch (error) {
+        console.error("SMTP", error);
+        throw new HttpError(502, "Não foi possível enviar o e-mail agora. Tente novamente em instantes ou procure o administrador.");
       }
+      return json(RESPOSTA_SOLICITAR);
     }
 
-    const envio = createClient(url, serviceKey, opcoes);
-    const { error } = await envio.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: retorno } });
-    if (error) {
-      if (error.status === 429 || /rate|seconds|security purposes/i.test(error.message)) {
-        return json({ error: "Um código acabou de ser enviado. Aguarde 1 minuto para pedir outro." }, 429);
+    // ─── 2. Confirmar código ───
+    if (action === "confirmar") {
+      const codigo = texto(body.codigo).replace(/\D/g, "");
+      if (codigo.length !== 6) throw new HttpError(400, CODIGO_INVALIDO);
+      const { data: registro } = await admin
+        .from("codigos_acesso")
+        .select("*")
+        .eq("email", email)
+        .is("usado_em", null)
+        .is("confirmado_em", null)
+        .order("criado_em", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!registro || new Date(registro.expira_em) < new Date() || registro.tentativas >= MAX_TENTATIVAS_CODIGO) {
+        throw new HttpError(400, CODIGO_INVALIDO);
       }
-      return json({ error: "Não foi possível enviar o código agora. Tente novamente em instantes." }, 502);
+      if (!iguais(await hash(codigo, serviceKey), registro.codigo_hash)) {
+        const tentativas = registro.tentativas + 1;
+        await admin.from("codigos_acesso").update({ tentativas }).eq("id", registro.id);
+        throw new HttpError(400, tentativas >= MAX_TENTATIVAS_CODIGO
+          ? "Código incorreto várias vezes. Peça um novo código."
+          : `Código incorreto. Você ainda tem ${MAX_TENTATIVAS_CODIGO - tentativas} tentativa(s).`);
+      }
+      const token = gerarToken();
+      await admin.from("codigos_acesso").update({
+        confirmado_em: new Date().toISOString(),
+        token_hash: await hash(token, serviceKey),
+        token_expira_em: new Date(Date.now() + VALIDADE_TOKEN_MIN * 60_000).toISOString(),
+      }).eq("id", registro.id);
+      return json({ ok: true, token });
     }
 
-    return json(RESPOSTA_PADRAO);
+    // ─── 3. Redefinir senha ───
+    if (action === "redefinir") {
+      const token = texto(body.token);
+      const senha = typeof body.senha === "string" ? body.senha : "";
+      if (!token) throw new HttpError(400, "Sessão de troca de senha inválida. Peça um novo código.");
+      if (!senhaValida(senha)) throw new HttpError(400, "A senha precisa ter pelo menos 8 caracteres, com letras e números.");
+      const { data: registro } = await admin
+        .from("codigos_acesso")
+        .select("*")
+        .eq("email", email)
+        .eq("token_hash", await hash(token, serviceKey))
+        .is("usado_em", null)
+        .maybeSingle();
+      if (!registro || !registro.token_expira_em || new Date(registro.token_expira_em) < new Date()) {
+        throw new HttpError(400, "O prazo para criar a senha terminou. Peça um novo código.");
+      }
+
+      const [{ data: perfil }, { data: acesso }] = await Promise.all([
+        admin.from("profiles").select("id, ativo").eq("email", email).maybeSingle(),
+        admin.from("acessos_por_email").select("responsavel").eq("email", email).maybeSingle(),
+      ]);
+      if (perfil?.ativo === false) throw new HttpError(403, "Esta conta está desativada. Procure o administrador.");
+
+      if (perfil) {
+        const { error } = await admin.auth.admin.updateUserById(perfil.id, { password: senha });
+        if (error) throw new HttpError(400, `Não foi possível salvar a senha: ${error.message}`);
+      } else {
+        const { error } = await admin.auth.admin.createUser({
+          email,
+          password: senha,
+          email_confirm: true,
+          user_metadata: { nome_completo: acesso?.responsavel ?? email.split("@")[0] },
+        });
+        if (error) throw new HttpError(400, `Não foi possível criar o acesso: ${error.message}`);
+      }
+      await admin.from("codigos_acesso").update({ usado_em: new Date().toISOString() }).eq("id", registro.id);
+      return json({ ok: true });
+    }
+
+    throw new HttpError(400, "Ação não suportada.");
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "Erro inesperado." }, 500);
+    if (error instanceof HttpError) return json({ error: error.message }, error.status);
+    console.error(error);
+    return json({ error: "Erro inesperado. Tente novamente." }, 500);
   }
 });

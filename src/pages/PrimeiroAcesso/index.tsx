@@ -2,13 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, Check, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, MailCheck, RotateCcw, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { acessoService } from '@/services/acessoService';
 import { dataService } from '@/services/dataService';
 import { cn } from '@/lib/utils';
 
 type Etapa = 'email' | 'codigo' | 'senha' | 'pronto';
 
-const CODIGO_DEMO = '246810';
 const ESPERA_REENVIO = 60;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -30,24 +29,6 @@ const REGRAS_SENHA = [
   { id: 'letra', rotulo: 'Uma letra', ok: (s: string) => /[A-Za-zÀ-ÿ]/.test(s) },
   { id: 'numero', rotulo: 'Um número', ok: (s: string) => /\d/.test(s) },
 ];
-
-/** Lê a mensagem de erro devolvida pela Edge Function. */
-async function erroDaFuncao(error: unknown): Promise<string> {
-  const e = error as { name?: string; message?: string; context?: Response };
-  if (e?.name === 'FunctionsFetchError' || /failed to send a request/i.test(e?.message || '')) {
-    return navigator.onLine
-      ? 'O envio de códigos ainda não está disponível. Procure o administrador do sistema.'
-      : 'Sem conexão com a internet. Verifique a rede e tente novamente.';
-  }
-  if (e?.context instanceof Response) {
-    if (e.context.status === 404) return 'O envio de códigos ainda não está disponível. Procure o administrador do sistema.';
-    try {
-      const corpo = await e.context.clone().json();
-      if (corpo?.error) return corpo.error;
-    } catch {}
-  }
-  return 'Não foi possível enviar o código agora. Tente novamente.';
-}
 
 const Etapas: React.FC<{ atual: Etapa }> = ({ atual }) => {
   const lista: { id: Etapa; rotulo: string }[] = [
@@ -79,12 +60,12 @@ const Etapas: React.FC<{ atual: Etapa }> = ({ atual }) => {
 /** Primeiro acesso / esqueci minha senha: código no e-mail → senha própria. */
 export const PrimeiroAcessoPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isSupabaseLive, user, entrarComSessaoAtual } = useAuth();
-  // Voltando pelo link do e-mail: a sessão chega na URL e a pessoa vai direto criar a senha.
-  const [veioDoLink] = useState(() => new URLSearchParams(window.location.search).get('etapa') === 'senha');
-  const [etapa, setEtapa] = useState<Etapa>(veioDoLink ? 'senha' : 'email');
+  const { isSupabaseLive, user, login } = useAuth();
+  const [etapa, setEtapa] = useState<Etapa>('email');
   const [email, setEmail] = useState('');
   const [codigo, setCodigo] = useState('');
+  // Liberado pelo backend depois do código certo; vale 15 minutos e uma única troca de senha.
+  const [token, setToken] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmacao, setConfirmacao] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
@@ -95,33 +76,9 @@ export const PrimeiroAcessoPage: React.FC = () => {
   const titulo = useRef<HTMLHeadingElement>(null);
 
   // Já logado (e não no meio deste fluxo): vai para o sistema.
-  // Link do e-mail: confere a sessão; link vencido ou já usado volta para o início com aviso.
   useEffect(() => {
-    if (!veioDoLink || !isSupabaseLive) return;
-    let ativo = true;
-    void (async () => {
-      const erroNaUrl = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('error_description');
-      let { data } = await supabase.auth.getSession();
-      if (!data.session && !erroNaUrl) {
-        await new Promise((r) => setTimeout(r, 800));
-        ({ data } = await supabase.auth.getSession());
-      }
-      if (!ativo) return;
-      window.history.replaceState(null, '', '/primeiro-acesso');
-      if (data.session?.user?.email) {
-        setEmail(data.session.user.email);
-        setEtapa('senha');
-      } else {
-        setEtapa('email');
-        setErro('O link do e-mail expirou ou já foi usado. Peça um novo código.');
-      }
-    })();
-    return () => { ativo = false; };
-  }, [veioDoLink, isSupabaseLive]);
-
-  useEffect(() => {
-    if (user && etapa === 'email' && !veioDoLink) navigate('/', { replace: true });
-  }, [user, etapa, navigate, veioDoLink]);
+    if (user && etapa === 'email') navigate('/', { replace: true });
+  }, [user, etapa, navigate]);
 
   // Cada etapa abre com o foco no campo dela (autoFocus); na conclusão, no título.
   useEffect(() => { if (etapa === 'pronto') titulo.current?.focus(); }, [etapa]);
@@ -145,16 +102,7 @@ export const PrimeiroAcessoPage: React.FC = () => {
     setErro('');
     setAviso('');
     try {
-      if (isSupabaseLive) {
-        const { data, error } = await supabase.functions.invoke('primeiro-acesso', {
-          body: { email: alvo, retorno: `${window.location.origin}/primeiro-acesso?etapa=senha` },
-        });
-        if (error) throw new Error(await erroDaFuncao(error));
-        setAviso(data?.mensagem || 'Se o e-mail estiver cadastrado, você receberá um código em instantes.');
-      } else {
-        await new Promise((r) => setTimeout(r, 500));
-        setAviso(`Modo demonstração: use o código ${CODIGO_DEMO}.`);
-      }
+      setAviso(await acessoService.solicitarCodigo(alvo));
       setEmail(alvo);
       setEspera(ESPERA_REENVIO);
       if (reenvio) setCodigo('');
@@ -168,20 +116,15 @@ export const PrimeiroAcessoPage: React.FC = () => {
 
   const confirmarCodigo = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = codigo.replace(/\D/g, '');
-    if (token.length < 6) {
+    const digitado = codigo.replace(/\D/g, '');
+    if (digitado.length !== 6) {
       setErro('Digite o código de 6 dígitos enviado ao seu e-mail.');
       return;
     }
     setCarregando(true);
     setErro('');
     try {
-      if (isSupabaseLive) {
-        const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
-        if (error) throw new Error(/expired|invalid/i.test(error.message) ? 'Código inválido ou expirado. Confira os números ou peça um novo código.' : error.message);
-      } else if (token !== CODIGO_DEMO) {
-        throw new Error('Código inválido ou expirado. Confira os números ou peça um novo código.');
-      }
+      setToken(await acessoService.confirmarCodigo(email, digitado));
       setAviso('');
       setEtapa('senha');
     } catch (err) {
@@ -204,29 +147,31 @@ export const PrimeiroAcessoPage: React.FC = () => {
     setCarregando(true);
     setErro('');
     try {
-      if (isSupabaseLive) {
-        const { error } = await supabase.auth.updateUser({ password: senha });
-        if (error) {
-          throw new Error(/different from the old/i.test(error.message)
-            ? 'A nova senha precisa ser diferente da anterior.'
-            : /weak|least/i.test(error.message) ? 'Senha fraca. Use pelo menos 8 caracteres, com letras e números.' : error.message);
-        }
-        const perfil = await entrarComSessaoAtual();
-        await dataService.registrarLogAuditoria({
-          usuario_email: email,
-          acao: 'SENHA_DEFINIDA',
-          tabela: 'profiles',
-          registro_id: perfil?.id,
-          detalhes: { metodo: 'codigo_por_email' },
-        });
-        setEtapa('pronto');
-        window.setTimeout(() => navigate('/', { replace: true }), 1500);
-      } else {
-        await new Promise((r) => setTimeout(r, 500));
-        setEtapa('pronto');
-      }
+      await acessoService.redefinirSenha(email, token, senha);
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Não foi possível salvar a senha.');
+      setCarregando(false);
+      return;
+    }
+    if (!isSupabaseLive) {
+      setEtapa('pronto');
+      setCarregando(false);
+      return;
+    }
+    try {
+      // Senha salva: entra com ela e registra a troca na auditoria.
+      await login(email, senha);
+      await dataService.registrarLogAuditoria({
+        usuario_email: email,
+        acao: 'SENHA_DEFINIDA',
+        tabela: 'profiles',
+        detalhes: { metodo: 'codigo_por_email' },
+      });
+      setEtapa('pronto');
+      window.setTimeout(() => navigate('/', { replace: true }), 1200);
+    } catch {
+      // A senha já foi gravada; só a entrada automática falhou.
+      navigate('/login', { replace: true });
     } finally {
       setCarregando(false);
     }
@@ -297,8 +242,7 @@ export const PrimeiroAcessoPage: React.FC = () => {
               <div>
                 <h1 ref={titulo} tabIndex={-1} className={tituloClasse}>Digite o código</h1>
                 <p className="mt-1.5 text-center text-xs leading-relaxed text-[#6b7280] dark:text-slate-400">
-                  Enviamos um e-mail para <strong className="text-[#374151] dark:text-slate-200">{mascarar(email)}</strong>.
-                  Digite o código da mensagem ou toque no link <strong className="text-[#374151] dark:text-slate-200">Entrar</strong> (ou <em>Sign in</em>) para criar sua senha. Vale por 10 minutos.
+                  Enviado para <strong className="text-[#374151] dark:text-slate-200">{mascarar(email)}</strong>. O código vale por 10 minutos.
                 </p>
               </div>
               {aviso && (

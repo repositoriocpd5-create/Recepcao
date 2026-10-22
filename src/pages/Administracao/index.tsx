@@ -30,6 +30,7 @@ import { DEMO_USERS } from '@/services/mockData';
 import { RamalUnidade, UserProfile, UserRole } from '@/types';
 import { cn } from '@/lib/utils';
 import { GestaoUnidades } from '@/components/admin/GestaoUnidades';
+import { ConfiguracaoSmtp } from '@/components/admin/ConfiguracaoSmtp';
 
 const STORAGE_KEY_USERS = 'sme_admin_users';
 
@@ -550,6 +551,8 @@ export const AdministracaoPage: React.FC = () => {
 
       {/* ─── UNIDADES ESCOLARES E DEPARTAMENTOS (tela de Ramais) ─── */}
       <GestaoUnidades onAviso={exibirToast} />
+
+      <ConfiguracaoSmtp onAviso={exibirToast} />
 
       {/* ─── MODAL DE ADICIONAR / EDITAR USUÁRIO ─── */}
       <Modal
