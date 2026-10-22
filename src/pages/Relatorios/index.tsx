@@ -55,6 +55,7 @@ const CATEGORIAS: Record<CategoriaId, { rotulo: string; icone: typeof LogIn; cor
 const ACOES: Record<string, { rotulo: string; categoria: CategoriaId; sensivel?: boolean }> = {
   LOGIN: { rotulo: 'Entrada no sistema', categoria: 'acesso' },
   LOGOUT: { rotulo: 'Saída do sistema', categoria: 'acesso' },
+  SENHA_DEFINIDA: { rotulo: 'Senha criada por código no e-mail', categoria: 'acesso', sensivel: true },
   CONSULTA_CPF: { rotulo: 'Consulta de CPF', categoria: 'lgpd', sensivel: true },
   CONSULTA_MATRICULA: { rotulo: 'Consulta de matrícula', categoria: 'lgpd' },
   REGISTRO_ENTRADA: { rotulo: 'Registro de entrada', categoria: 'movimentacoes' },

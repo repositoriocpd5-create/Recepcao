@@ -20,6 +20,7 @@ import { ManualPage } from '@/pages/Manual';
 import { RamaisPage } from '@/pages/Ramais';
 import { CcoAjudaPage, CcoInicioPage, CcoOcorrenciasPage } from '@/pages/CCO';
 import { EscolherModuloPage } from '@/pages/EscolherModulo';
+import { PrimeiroAcessoPage } from '@/pages/PrimeiroAcesso';
 import { Modulo, acessaCco, acessaRecepcao, rotaInicial } from '@/lib/modulos';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string }> = ({
@@ -66,6 +67,7 @@ export const AppRoutes: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/primeiro-acesso" element={<PrimeiroAcessoPage />} />
 
       <Route path="/" element={<ProtectedRoute><RotaInicial /></ProtectedRoute>} />
       <Route path="/escolher-modulo" element={<ProtectedRoute><EscolherModuloPage /></ProtectedRoute>} />

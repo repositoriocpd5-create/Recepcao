@@ -12,6 +12,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   switchDemoRole: (role: UserRole) => void;
   updateUserProfile: (updatedProfile: Partial<UserProfile> & { id?: string; role?: UserRole; email?: string }) => void;
+  /** Carrega o perfil da sessão aberta fora do formulário de login (ex.: primeiro acesso por código). */
+  entrarComSessaoAtual: () => Promise<UserProfile | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -192,6 +194,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
+  const entrarComSessaoAtual = async (): Promise<UserProfile | null> => {
+    if (!isSupabaseConfigured) return null;
+    const { data } = await supabase.auth.getSession();
+    const authUser = data?.session?.user;
+    if (!authUser) return null;
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
+    if (!profile) return null;
+    const u: UserProfile = {
+      id: profile.id,
+      email: profile.email,
+      nome_completo: profile.nome_completo,
+      cargo: profile.cargo || 'Operador',
+      role: profile.role,
+      ativo: profile.ativo,
+      unidade_id: profile.unidade_id ?? null,
+      acesso_cco: profile.acesso_cco ?? false,
+      cco_unidades: profile.cco_unidades ?? null,
+    };
+    setUser(u);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(u));
+    return u;
+  };
+
   const logout = async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
@@ -243,6 +268,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         switchDemoRole,
         updateUserProfile,
+        entrarComSessaoAtual,
       }}
     >
       {children}

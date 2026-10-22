@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { AlertCircle, Download, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
+import { AlertCircle, Download, Eye, EyeOff, KeyRound, Loader2, Lock, Mail } from 'lucide-react';
 import { isInstallAvailable, openInstallSheet, usePwa } from '@/pwa/pwa';
 import { UserRole } from '@/types';
 
@@ -145,6 +145,13 @@ export const LoginPage: React.FC = () => {
               {isLoading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
+
+          <Link
+            to="/primeiro-acesso"
+            className="mt-4 flex min-h-10 items-center justify-center gap-1.5 rounded-md text-center text-[13px] font-semibold text-[#1366e8] hover:bg-[#eff5ff] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1366e8] dark:text-sky-300 dark:hover:bg-slate-800"
+          >
+            <KeyRound className="h-4 w-4" aria-hidden="true" /> Primeiro acesso ou esqueci minha senha
+          </Link>
 
           {/* Atalhos disponíveis somente quando não há conexão com o Supabase. */}
           {!isSupabaseLive && (
