@@ -41,7 +41,7 @@ const VALIDADE_CODIGO_MIN = 10;
 const VALIDADE_TOKEN_MIN = 15;
 const MAX_TENTATIVAS_CODIGO = 5;
 const JANELA_MINUTOS = 15;
-const MAX_POR_EMAIL = 3;
+const MAX_POR_EMAIL = 5;
 const MAX_POR_IP = 10;
 
 const chaveSecreta = () => {
@@ -276,7 +276,13 @@ Deno.serve(async (req) => {
           : Promise.resolve({ count: 0 }),
       ]);
       if ((porEmail.count ?? 0) >= MAX_POR_EMAIL || (porIp.count ?? 0) >= MAX_POR_IP) {
-        throw new HttpError(429, `Muitos pedidos de código. Aguarde ${JANELA_MINUTOS} minutos e tente novamente.`);
+        // Diz quanto falta de verdade: a janela libera quando o pedido mais antigo dela vence.
+        const { data: maisAntigo } = await admin.from("primeiro_acesso_tentativas").select("created_at")
+          .or(ip ? `email.eq.${email},ip.eq.${ip}` : `email.eq.${email}`).gte("created_at", desde)
+          .order("created_at", { ascending: true }).limit(1).maybeSingle();
+        const libera = maisAntigo ? new Date(maisAntigo.created_at).getTime() + JANELA_MINUTOS * 60_000 : Date.now() + JANELA_MINUTOS * 60_000;
+        const minutos = Math.max(1, Math.ceil((libera - Date.now()) / 60_000));
+        throw new HttpError(429, `Muitos pedidos de código seguidos. Aguarde ${minutos} minuto${minutos > 1 ? "s" : ""} e tente novamente. Se já recebeu um código, use o mais recente.`);
       }
       await admin.from("primeiro_acesso_tentativas").insert({ email, ip });
 
