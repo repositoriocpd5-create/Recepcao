@@ -39,7 +39,7 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
     <div>
       <div
         aria-hidden="true"
-        className={cn('hidden gap-4 border-b border-[#e6edf6] px-4 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#6b7f9b] lg:grid sm:px-6 dark:border-slate-800 dark:text-slate-500', colunas, acaoLinha && 'lg:pr-[148px]')}
+        className={cn('hidden gap-4 border-b border-[#e6edf6] px-4 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#6b7f9b] lg:grid sm:px-6 dark:border-slate-800 dark:text-slate-500', colunas, acaoLinha && 'lg:pr-[176px]')}
       >
         <span>Protocolo</span>
         <span>Data e horário</span>
@@ -88,7 +88,7 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
               <span className="hidden lg:block"><SituacaoBadge situacao={oc.situacao} /></span>
               <ChevronRight className="hidden h-5 w-5 text-[#9aaac0] transition-transform group-hover:translate-x-0.5 group-hover:text-[#0b63ce] lg:block" aria-hidden="true" />
             </button>
-            {acaoLinha && <div className="flex w-[52px] shrink-0 justify-center pr-3 lg:w-[148px] lg:pr-6">{acaoLinha(oc)}</div>}
+            {acaoLinha && <div className="flex w-[52px] shrink-0 justify-center pr-3 lg:w-[176px] lg:pr-6">{acaoLinha(oc)}</div>}
           </li>
         ))}
       </ul>

@@ -1,10 +1,12 @@
-import React, { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, LayoutDashboard, MessageSquarePlus, RefreshCw } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, CheckCircle2, LayoutDashboard, MessageSquarePlus, RefreshCw, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { dataService } from '@/services/dataService';
 import { ORDEM_SITUACOES, formatarDataHora } from '@/services/ccoService';
-import { UserProfile } from '@/types';
+import { CcoOcorrencia, UserProfile } from '@/types';
+import { perfilCco } from '@/lib/modulos';
+import { ExcluirOcorrencia } from './componentes/ExcluirOcorrencia';
 import { CabecalhoCco } from './componentes/Cabecalho';
 import { BarraFiltros, useFiltros } from './componentes/Filtros';
 import { ListaOcorrencias, ListaVazia } from './componentes/ListaOcorrencias';
@@ -20,6 +22,25 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
   const lista = ocorrencias.data || [];
   const { filtros, mudar, limpar, filtradas, contagem, totalSemSituacao, ativos } = useFiltros(lista);
   const detalhe = useDetalheNaUrl();
+  const queryClient = useQueryClient();
+  const admin = perfilCco(user) === 'admin';
+  const [excluir, setExcluir] = useState<CcoOcorrencia | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 5000);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  const aoExcluir = (oc: CcoOcorrencia) => {
+    setExcluir(null);
+    detalhe.fechar();
+    // Some da lista e dos contadores na hora; depois confirma com o servidor.
+    queryClient.setQueryData<CcoOcorrencia[]>(['cco', 'ocorrencias', user.id], (atual) => atual?.filter((item) => item.id !== oc.id));
+    void queryClient.invalidateQueries({ queryKey: ['cco'] });
+    setToast(`Ocorrência ${oc.protocolo} excluída. Uma cópia ficou registrada na auditoria.`);
+  };
 
   const unidadesCadastradas = useQuery({ queryKey: ['cco', 'unidades'], queryFn: () => dataService.getRamaisUnidades(), staleTime: 10 * 60_000 });
   const unidades = useMemo(() => {
@@ -113,7 +134,9 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
               ocorrencias={filtradas}
               mostrarUnidade
               onAbrir={(oc) => detalhe.abrir(oc.id)}
-              acaoLinha={(oc) => oc.situacao === 'concluida' ? (
+              acaoLinha={(oc) => (
+                <div className="flex items-center gap-1.5">
+                {oc.situacao === 'concluida' ? (
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400" title="Ocorrência finalizada">
                   <CheckCircle2 className="h-4 w-4" aria-hidden="true" /><span className="hidden lg:inline">Finalizada</span>
                 </span>
@@ -127,6 +150,19 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
                 >
                   <MessageSquarePlus className="h-4 w-4" aria-hidden="true" /><span className="hidden lg:inline">Andamento</span>
                 </button>
+                )}
+                {admin && (
+                  <button
+                    type="button"
+                    onClick={() => setExcluir(oc)}
+                    title={`Excluir ${oc.protocolo}`}
+                    aria-label={`Excluir a ocorrência ${oc.protocolo}`}
+                    className="hidden min-h-10 min-w-10 items-center justify-center rounded-xl text-[#8a9bb3] transition-colors hover:bg-rose-50 hover:text-rose-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600 lg:inline-flex dark:hover:bg-rose-950/30"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+                </div>
               )}
               vazio={<ListaVazia titulo={ativos ? 'Nenhuma ocorrência com estes filtros.' : 'Nenhuma ocorrência registrada.'} texto={ativos ? 'Ajuste ou limpe os filtros.' : undefined} />}
             />
@@ -134,7 +170,15 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
         )}
       </Cartao>
 
-      <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user} onFechar={detalhe.fechar} focarAndamento={detalhe.acao === 'andamento'} />
+      <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user} onFechar={detalhe.fechar} focarAndamento={detalhe.acao === 'andamento'} onExcluir={admin ? setExcluir : undefined} />
+      {admin && <ExcluirOcorrencia oc={excluir} user={user} onFechar={() => setExcluir(null)} onExcluida={aoExcluir} />}
+      {toast && (
+        <div role="status" className="fixed bottom-24 left-1/2 z-[70] flex w-[calc(100%-32px)] max-w-md -translate-x-1/2 items-center gap-3 rounded-2xl bg-[#0d2240] px-4 py-3 text-sm font-semibold text-white shadow-xl md:bottom-6 dark:bg-slate-800">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-green-400" aria-hidden="true" />
+          <span className="flex-1">{toast}</span>
+          <button type="button" onClick={() => setToast(null)} aria-label="Fechar aviso" className="grid h-8 w-8 place-items-center rounded-lg hover:bg-white/10"><X className="h-4 w-4" /></button>
+        </div>
+      )}
     </div>
   );
 };

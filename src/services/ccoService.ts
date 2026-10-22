@@ -501,6 +501,54 @@ export const ccoService = {
     return oc;
   },
 
+  /**
+   * Exclui a ocorrência (somente administrador). O banco guarda uma cópia com o motivo na
+   * auditoria (CCO_EXCLUSAO) antes de apagar; a foto é removida do Storage em seguida.
+   */
+  async excluirOcorrencia(user: UserProfile, id: string, motivo: string): Promise<void> {
+    const texto = motivo.trim();
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.rpc('cco_excluir_ocorrencia', { p_id: id, p_motivo: texto });
+      if (error) {
+        if (/cco_excluir_ocorrencia/.test(error.message) && /Could not find|does not exist|schema cache/i.test(error.message)) {
+          throw new Error('A exclusão ainda não foi instalada no banco. Aplique a migração 20261022160000_cco_exclusao.sql no Supabase.');
+        }
+        throw new Error(mensagemErro(error, 'Não foi possível excluir a ocorrência'));
+      }
+      // A ocorrência já foi apagada; se a foto falhar, sobra só o arquivo (sem acesso pela tela).
+      if (typeof data === 'string' && data) await supabase.storage.from(BUCKET).remove([data]);
+      return;
+    }
+
+    if (perfilCco(user) !== 'admin') throw new Error('Somente o administrador pode excluir ocorrências.');
+    if (texto.length < 5) throw new Error('Informe o motivo da exclusão.');
+    await esperar(400);
+    const lista = ocorrenciasDemo();
+    const oc = lista.find((item) => item.id === id);
+    if (!oc) throw new Error('Ocorrência não encontrada.');
+    const historico = historicoDemo();
+    await dataService.registrarLogAuditoria({
+      usuario_email: user.email,
+      acao: 'CCO_EXCLUSAO',
+      tabela: 'cco_ocorrencias',
+      registro_id: id,
+      detalhes: {
+        protocolo: oc.protocolo,
+        unidade: oc.unidade_nome,
+        motivo: texto,
+        ocorrencia: { ...oc },
+        historico: historico.filter((h) => h.ocorrencia_id === id),
+      },
+    });
+    gravar(CHAVES.OCORRENCIAS, lista.filter((item) => item.id !== id));
+    gravar(CHAVES.HISTORICO, historico.filter((h) => h.ocorrencia_id !== id));
+    if (oc.foto_path) {
+      const fotos = ler<Record<string, string>>(CHAVES.FOTOS, {});
+      delete fotos[oc.foto_path];
+      gravar(CHAVES.FOTOS, fotos);
+    }
+  },
+
   /** URL temporária da foto (bucket privado). */
   async urlFoto(caminho?: string | null): Promise<string | null> {
     if (!caminho) return null;

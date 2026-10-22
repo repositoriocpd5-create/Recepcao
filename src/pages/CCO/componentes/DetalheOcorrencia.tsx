@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Save,
   UserRound,
+  Trash2,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
@@ -40,6 +41,8 @@ interface Props {
   onFechar: () => void;
   /** Aberto pela ação "Andamento" da lista: leva o foco ao campo do andamento. */
   focarAndamento?: boolean;
+  /** Só administrador: pede ao painel para abrir a confirmação de exclusão. */
+  onExcluir?: (oc: CcoOcorrencia) => void;
 }
 
 const Dado: React.FC<{ icone: typeof Clock; rotulo: string; children: React.ReactNode }> = ({ icone: Icone, rotulo, children }) => (
@@ -179,7 +182,7 @@ const FotoOcorrencia: React.FC<{ caminho: string }> = ({ caminho }) => {
   );
 };
 
-export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFechar, focarAndamento }) => {
+export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFechar, focarAndamento, onExcluir }) => {
   const queryClient = useQueryClient();
   const [copiado, setCopiado] = useState(false);
   const perfil = perfilCco(user);
@@ -269,6 +272,19 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
             <Titulo>Histórico de atendimento</Titulo>
             {historico.isLoading ? <Carregando texto="Carregando o histórico…" /> : <Historico eventos={historico.data || []} />}
           </section>
+
+          {perfil === 'admin' && onExcluir && (
+            <div className="flex flex-col gap-2 border-t border-[#e6edf6] pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+              <p className="text-xs text-[#6b7f9b] dark:text-slate-500">Administração: excluir apaga a ocorrência para todos e guarda uma cópia na auditoria.</p>
+              <button
+                type="button"
+                onClick={() => onExcluir(oc)}
+                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-rose-200 px-3.5 text-sm font-bold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600 dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-950/30"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" /> Excluir ocorrência
+              </button>
+            </div>
+          )}
         </div>
       )}
     </Modal>
