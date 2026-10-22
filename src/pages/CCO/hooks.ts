@@ -8,9 +8,11 @@ export const useOcorrencias = (user: UserProfile, opcoes: { atualizarSozinho?: b
   useQuery({
     queryKey: ['cco', 'ocorrencias', user.id],
     queryFn: () => ccoService.listarOcorrencias(user),
-    staleTime: 30_000,
-    // Painel da equipe: novas ocorrências aparecem sem recarregar a página.
-    refetchInterval: opcoes.atualizarSozinho ? 60_000 : false,
+    staleTime: 15_000,
+    // Novas ocorrências (equipe) e mudanças de situação (escola) aparecem sem recarregar:
+    // atualiza de tempos em tempos e sempre que a pessoa volta para a aba.
+    refetchInterval: opcoes.atualizarSozinho ? 60_000 : 30_000,
+    refetchOnWindowFocus: true,
   });
 
 export const useUnidade = (id?: string | null) =>

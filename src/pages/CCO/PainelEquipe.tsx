@@ -12,7 +12,7 @@ import { Carregando, Cartao, ESTILO_SITUACAO } from './componentes/ui';
 import { useDetalheNaUrl, useOcorrencias } from './hooks';
 import { DetalheOcorrencia } from './componentes/DetalheOcorrencia';
 
-const INDICADOR: Record<string, string> = { registrada: 'Registradas', em_analise: 'Em análise', em_atendimento: 'Em atendimento', concluida: 'Concluídas' };
+const INDICADOR: Record<string, string> = { registrada: 'Registradas', em_analise: 'Em análise', em_atendimento: 'Em atendimento', concluida: 'Solucionadas' };
 
 /** Painel da equipe CCO (e do administrador): ocorrências das unidades autorizadas. */
 export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {

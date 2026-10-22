@@ -23,13 +23,14 @@ import {
   ORDEM_SITUACOES,
   SITUACOES,
   ccoService,
+  descreverEvento,
   descreverHorario,
   formatarData,
   formatarDataHora,
 } from '@/services/ccoService';
 import { CcoHistorico, CcoOcorrencia, CcoSituacao, UserProfile } from '@/types';
 import { Campo, CampoHora, caixaCampo, completarHora, horaValida } from './campos';
-import { Carregando, ESTILO_SITUACAO, SituacaoBadge, botaoPrimario } from './ui';
+import { Carregando, ESTILO_SITUACAO, SituacaoBadge, botaoPrimario, botaoSecundario } from './ui';
 
 interface Props {
   ocorrenciaId: string | null;
@@ -70,7 +71,7 @@ const Historico: React.FC<{ eventos: CcoHistorico[] }> = ({ eventos }) => (
             <Icone className="h-3 w-3" aria-hidden="true" />
           </span>
           <p className={cn('text-sm text-[#10233f] dark:text-slate-200', evento.tipo === 'observacao' && 'whitespace-pre-wrap rounded-lg bg-[#f5f8fc] px-3 py-2 dark:bg-slate-800/60')}>
-            {evento.descricao}
+            {descreverEvento(evento)}
           </p>
           <p className="mt-1 text-xs text-[#6b7f9b] dark:text-slate-500">
             {formatarDataHora(evento.created_at)}{evento.autor_nome ? ` · ${evento.autor_nome}` : ''}
@@ -149,6 +150,32 @@ const Atendimento: React.FC<{ oc: CcoOcorrencia; user: UserProfile; onSalvo: (oc
     setResponsavel(oc.responsavel_id || '');
   }, [oc.situacao, oc.responsavel_id]);
 
+  const [solucionar, setSolucionar] = useState(false);
+  const [obsSolucao, setObsSolucao] = useState('');
+  const [solucionando, setSolucionando] = useState(false);
+  const [erroSolucao, setErroSolucao] = useState('');
+
+  const confirmarSolucao = async () => {
+    setSolucionando(true);
+    setErroSolucao('');
+    try {
+      const atualizada = await ccoService.atualizarOcorrencia(user, oc.id, {
+        situacao: 'concluida',
+        // Sem responsável definido, quem soluciona fica como responsável.
+        responsavel_id: oc.responsavel_id ? undefined : user.id,
+        observacao: obsSolucao.trim() || undefined,
+      });
+      setSolucionar(false);
+      setObsSolucao('');
+      setMensagem({ tipo: 'ok', texto: 'Ocorrência marcada como solucionada. A unidade já vê a nova situação.' });
+      onSalvo(atualizada);
+    } catch (err) {
+      setErroSolucao(err instanceof Error ? err.message : 'Não foi possível solucionar.');
+    } finally {
+      setSolucionando(false);
+    }
+  };
+
   const alterado = situacao !== oc.situacao || responsavel !== (oc.responsavel_id || '') || observacao.trim().length > 0;
 
   const salvar = async (e: React.FormEvent) => {
@@ -174,7 +201,44 @@ const Atendimento: React.FC<{ oc: CcoOcorrencia; user: UserProfile; onSalvo: (oc
 
   return (
     <form onSubmit={salvar} className="space-y-4 rounded-2xl border border-[#d3e3f8] bg-[#f6faff] p-4 dark:border-slate-700 dark:bg-slate-900/40">
-      <Titulo>Atendimento do CCO</Titulo>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Titulo>Atendimento do CCO</Titulo>
+        {oc.situacao !== 'concluida' && (
+          <button
+            type="button"
+            onClick={() => { setSolucionar(true); setErroSolucao(''); }}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-green-600 px-4 text-sm font-bold text-white shadow-[0_10px_20px_-12px_rgba(22,163,74,.9)] transition-colors hover:bg-green-700 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-green-600"
+          >
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Marcar como solucionada
+          </button>
+        )}
+      </div>
+      <Modal isOpen={solucionar} onClose={() => !solucionando && setSolucionar(false)} title="Marcar como solucionada?" description={`${oc.protocolo} · ${oc.unidade_nome}`} maxWidth="md" icon={<CheckCircle2 className="h-6 w-6 text-green-600" />}>
+        <div className="space-y-4">
+          <p className="text-sm text-[#3b4d68] dark:text-slate-300">
+            A unidade passa a ver a situação <strong>Solucionada</strong> e o histórico registra quem solucionou e quando.
+            {!oc.responsavel_id && ' Você ficará como responsável pelo atendimento.'}
+          </p>
+          <Campo id="cco-obs-solucao" rotulo="Observação para a unidade (opcional)" erro={erroSolucao || null}>
+            <textarea
+              id="cco-obs-solucao"
+              value={obsSolucao}
+              onChange={(e) => setObsSolucao(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="Ex.: imagens conferidas, Guarda Municipal acionada, situação normalizada."
+              className={cn(caixaCampo(), 'resize-y py-2.5')}
+            />
+          </Campo>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" autoFocus disabled={solucionando} onClick={() => setSolucionar(false)} className={botaoSecundario}>Cancelar</button>
+            <button type="button" disabled={solucionando} onClick={() => void confirmarSolucao()} className={cn(botaoPrimario, 'bg-green-600 hover:bg-green-700 focus-visible:outline-green-600')}>
+              {solucionando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
+              {solucionando ? 'Salvando…' : 'Confirmar solução'}
+            </button>
+          </div>
+        </div>
+      </Modal>
       <fieldset>
         <legend className="mb-1.5 block text-sm font-bold text-[#10233f] dark:text-slate-200">Situação</legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -277,11 +341,13 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
     queryKey: ['cco', 'ocorrencia', ocorrenciaId],
     queryFn: () => ccoService.obterOcorrencia(user, ocorrenciaId!),
     enabled: Boolean(ocorrenciaId),
+    refetchInterval: 30_000,
   });
   const historico = useQuery({
     queryKey: ['cco', 'historico', ocorrenciaId],
     queryFn: () => ccoService.listarHistorico(ocorrenciaId!),
     enabled: Boolean(ocorrenciaId),
+    refetchInterval: 30_000,
   });
 
   const atualizar = () => queryClient.invalidateQueries({ queryKey: ['cco'] });

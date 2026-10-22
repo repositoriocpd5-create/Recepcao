@@ -111,9 +111,21 @@ export const SITUACOES: Record<CcoSituacao, { rotulo: string; descricao: string 
   registrada: { rotulo: 'Registrada', descricao: 'Recebida pelo CCO, aguardando análise.' },
   em_analise: { rotulo: 'Em análise', descricao: 'A equipe do CCO está verificando as imagens.' },
   em_atendimento: { rotulo: 'Em atendimento', descricao: 'Providências em andamento.' },
-  concluida: { rotulo: 'Concluída', descricao: 'Atendimento encerrado.' },
+  concluida: { rotulo: 'Solucionada', descricao: 'Ocorrência solucionada pelo CCO.' },
 };
 export const ORDEM_SITUACOES: CcoSituacao[] = ['registrada', 'em_analise', 'em_atendimento', 'concluida'];
+
+/**
+ * Texto do evento de situação montado pelos rótulos atuais (o banco grava 'concluida' e
+ * os registros antigos dizem "Concluída"; na tela vale sempre "Solucionada").
+ */
+export const descreverEvento = (evento: Pick<CcoHistorico, 'tipo' | 'descricao' | 'situacao_anterior' | 'situacao_nova'>) => {
+  if (evento.tipo !== 'situacao' || !evento.situacao_nova) return evento.descricao || '';
+  if (evento.situacao_nova === 'concluida') return 'Ocorrência marcada como solucionada.';
+  if (evento.situacao_anterior === 'concluida') return `Ocorrência reaberta: situação ${SITUACOES[evento.situacao_nova].rotulo}.`;
+  const de = evento.situacao_anterior ? SITUACOES[evento.situacao_anterior].rotulo : null;
+  return de ? `Situação alterada de ${de} para ${SITUACOES[evento.situacao_nova].rotulo}.` : `Situação: ${SITUACOES[evento.situacao_nova].rotulo}.`;
+};
 
 // ─── Erros com mensagem clara ───
 const mensagemErro = (error: { message?: string; code?: string } | null, padrao: string) => {
