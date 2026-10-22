@@ -1,4 +1,5 @@
-export type UserRole = 'admin' | 'recepcionista' | 'gestor' | 'atendente';
+/** unidade_escolar e cco são papéis do módulo CCO (Central Controle Operacional). */
+export type UserRole = 'admin' | 'recepcionista' | 'gestor' | 'atendente' | 'unidade_escolar' | 'cco';
 
 export type PessoaTipo = 'servidor' | 'visitante';
 
@@ -21,6 +22,12 @@ export interface UserProfile {
   ativo: boolean;
   /** Matrícula aceita no login no lugar do e-mail (fica no Supabase Auth). */
   matricula?: string | null;
+  /** Unidade escolar do usuário (papel unidade_escolar). */
+  unidade_id?: string | null;
+  /** Operador da recepção que também integra a equipe do CCO. */
+  acesso_cco?: boolean;
+  /** Unidades que a equipe CCO acompanha; vazio = todas. */
+  cco_unidades?: string[] | null;
   ultimo_acesso?: string;
   created_at?: string;
 }
@@ -254,4 +261,64 @@ export interface RegistroEntradaInput {
   requer_autorizacao?: boolean;
   observacoes?: string;
   destinos?: DestinoVisita[];
+}
+
+// ─── CCO — Central Controle Operacional ───
+
+export type CcoSituacao = 'registrada' | 'em_analise' | 'em_atendimento' | 'concluida';
+
+export interface CcoOcorrencia {
+  id: string;
+  protocolo: string;
+  unidade_id: string;
+  unidade_nome: string;
+  /** Quando aconteceu (informado pela unidade), separado do momento do cadastro. */
+  data_ocorrencia: string;
+  hora_inicio: string;
+  hora_fim?: string | null;
+  em_andamento: boolean;
+  termina_dia_seguinte: boolean;
+  descricao: string;
+  foto_path?: string | null;
+  situacao: CcoSituacao;
+  responsavel_id?: string | null;
+  responsavel_nome?: string | null;
+  criado_por?: string | null;
+  criado_por_nome?: string | null;
+  criado_por_email?: string | null;
+  client_request_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CcoHistoricoTipo = 'registro' | 'situacao' | 'responsavel' | 'observacao' | 'termino';
+
+export interface CcoHistorico {
+  id: string;
+  ocorrencia_id: string;
+  tipo: CcoHistoricoTipo;
+  situacao_anterior?: CcoSituacao | null;
+  situacao_nova?: CcoSituacao | null;
+  descricao?: string | null;
+  autor_id?: string | null;
+  autor_nome?: string | null;
+  created_at: string;
+}
+
+export interface CcoNovaOcorrencia {
+  client_request_id: string;
+  unidade_id: string;
+  data_ocorrencia: string;
+  hora_inicio: string;
+  hora_fim: string | null;
+  em_andamento: boolean;
+  termina_dia_seguinte: boolean;
+  descricao: string;
+  foto?: Blob | null;
+}
+
+export interface CcoAtualizacao {
+  situacao?: CcoSituacao;
+  responsavel_id?: string | null;
+  observacao?: string;
 }

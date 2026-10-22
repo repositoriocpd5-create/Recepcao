@@ -45,8 +45,9 @@ function getAvailableDemoUsers(): UserProfile[] {
   try {
     const raw = localStorage.getItem(ADMIN_USERS_STORAGE_KEY);
     if (raw) {
-      const list = JSON.parse(raw);
-      if (Array.isArray(list) && list.length > 0) return list;
+      const list = JSON.parse(raw) as UserProfile[];
+      // Listas salvas antes do CCO ganham os perfis de demonstração novos.
+      if (Array.isArray(list) && list.length > 0) return [...list, ...DEMO_USERS.filter((d) => !list.some((u) => u.id === d.id))];
     }
   } catch {}
   return DEMO_USERS;
@@ -83,6 +84,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 cargo: profile.cargo || 'Operador',
                 role: profile.role,
                 ativo: profile.ativo,
+                unidade_id: profile.unidade_id ?? null,
+                acesso_cco: profile.acesso_cco ?? false,
+                cco_unidades: profile.cco_unidades ?? null,
               };
               setUser(u);
               localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(u));
@@ -134,6 +138,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             cargo: profile?.cargo || 'Recepcionista',
             role: profile?.role || 'recepcionista',
             ativo: true,
+            unidade_id: profile?.unidade_id ?? null,
+            acesso_cco: profile?.acesso_cco ?? false,
+            cco_unidades: profile?.cco_unidades ?? null,
           };
           setUser(u);
           localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(u));

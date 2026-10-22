@@ -16,6 +16,9 @@ import {
   EyeOff,
   Mail,
   Briefcase,
+  Building2,
+  Camera,
+  Search,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -24,7 +27,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { dataService } from '@/services/dataService';
 import { DEMO_USERS } from '@/services/mockData';
-import { UserProfile, UserRole } from '@/types';
+import { RamalUnidade, UserProfile, UserRole } from '@/types';
 import { cn } from '@/lib/utils';
 import { GestaoUnidades } from '@/components/admin/GestaoUnidades';
 
@@ -70,9 +73,23 @@ const ROLE_CONFIG: Record<
     icon: <Users className="w-3.5 h-3.5" />,
     descricao: 'Consulta de informações e atendimento básico',
   },
+  unidade_escolar: {
+    label: 'UNIDADE ESCOLAR',
+    variant: 'neutral',
+    icon: <Building2 className="w-3.5 h-3.5" />,
+    descricao: 'CCO: registra e acompanha as ocorrências da própria escola',
+  },
+  cco: {
+    label: 'EQUIPE CCO',
+    variant: 'info',
+    icon: <Camera className="w-3.5 h-3.5" />,
+    descricao: 'CCO: acompanha e atende as ocorrências das unidades autorizadas',
+  },
 };
 
-const ROLES_OPTIONS: UserRole[] = ['admin', 'gestor', 'recepcionista', 'atendente'];
+const ROLES_OPTIONS: UserRole[] = ['admin', 'gestor', 'recepcionista', 'atendente', 'unidade_escolar', 'cco'];
+/** Papéis da recepção que podem, além disso, integrar a equipe do CCO. */
+const ROLES_RECEPCAO_COM_CCO: UserRole[] = ['gestor', 'recepcionista', 'atendente'];
 
 export const AdministracaoPage: React.FC = () => {
   const { user, switchDemoRole, updateUserProfile, isSupabaseLive } = useAuth();
@@ -109,6 +126,22 @@ export const AdministracaoPage: React.FC = () => {
   const [formSenha, setFormSenha] = useState('');
   const [showSenha, setShowSenha] = useState(false);
   const [formErro, setFormErro] = useState('');
+  // CCO: unidade do usuário escolar, acesso da equipe e unidades acompanhadas.
+  const [formUnidade, setFormUnidade] = useState('');
+  const [formAcessoCco, setFormAcessoCco] = useState(false);
+  const [formCcoRestrito, setFormCcoRestrito] = useState(false);
+  const [formCcoUnidades, setFormCcoUnidades] = useState<string[]>([]);
+  const [buscaUnidade, setBuscaUnidade] = useState('');
+  const [unidadesEscolares, setUnidadesEscolares] = useState<RamalUnidade[]>([]);
+
+  useEffect(() => {
+    dataService.getRamaisUnidades()
+      .then((lista) => setUnidadesEscolares(lista.filter((u) => u.tipo === 'unidade_escolar').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))))
+      .catch(() => setUnidadesEscolares([]));
+  }, []);
+
+  const nomeUnidade = (id?: string | null) => unidadesEscolares.find((u) => u.id === id)?.nome;
+  const equipeCcoNoForm = formRole === 'cco' || (ROLES_RECEPCAO_COM_CCO.includes(formRole) && formAcessoCco);
 
   // Toast
   const [toast, setToast] = useState<{ msg: string; tipo: 'sucesso' | 'erro' } | null>(null);
@@ -129,6 +162,11 @@ export const AdministracaoPage: React.FC = () => {
     setFormAtivo(true);
     setFormSenha('');
     setFormErro('');
+    setFormUnidade('');
+    setFormAcessoCco(false);
+    setFormCcoRestrito(false);
+    setFormCcoUnidades([]);
+    setBuscaUnidade('');
     setIsModalOpen(true);
   }
 
@@ -142,6 +180,11 @@ export const AdministracaoPage: React.FC = () => {
     setFormAtivo(u.ativo);
     setFormSenha('');
     setFormErro('');
+    setFormUnidade(u.unidade_id || '');
+    setFormAcessoCco(Boolean(u.acesso_cco));
+    setFormCcoRestrito(Boolean(u.cco_unidades?.length));
+    setFormCcoUnidades(u.cco_unidades || []);
+    setBuscaUnidade('');
     setIsModalOpen(true);
   }
 
@@ -181,6 +224,14 @@ export const AdministracaoPage: React.FC = () => {
       setFormErro('Este e-mail já está cadastrado no sistema.');
       return;
     }
+    if (formRole === 'unidade_escolar' && !formUnidade) {
+      setFormErro('Selecione a unidade escolar deste usuário.');
+      return;
+    }
+    if (equipeCcoNoForm && formCcoRestrito && formCcoUnidades.length === 0) {
+      setFormErro('Selecione ao menos uma unidade que este usuário acompanha no CCO, ou marque "Todas as unidades".');
+      return;
+    }
     if (editingUser && editingUser.id === user?.id && (formRole !== 'admin' || !formAtivo)) {
       setFormErro('Você não pode remover o próprio acesso de administrador nem desativar a própria conta.');
       return;
@@ -194,6 +245,9 @@ export const AdministracaoPage: React.FC = () => {
       ativo: formAtivo,
       // Sem a lista de matrículas carregada (undefined), um campo vazio não apaga a matrícula salva.
       matricula: matricula || (editingUser && editingUser.matricula === undefined ? undefined : null),
+      unidade_id: formRole === 'unidade_escolar' ? formUnidade : null,
+      acesso_cco: ROLES_RECEPCAO_COM_CCO.includes(formRole) && formAcessoCco,
+      cco_unidades: equipeCcoNoForm && formCcoRestrito ? formCcoUnidades : null,
     };
 
     setIsSaving(true);
@@ -203,7 +257,10 @@ export const AdministracaoPage: React.FC = () => {
         ? await dataService.salvarUsuarioSistema({ ...editingUser, ...dados }, formSenha || undefined)
         : await dataService.criarUsuarioSistema(dados, formSenha);
     } catch (err: any) {
-      setFormErro(err.message || 'Não foi possível salvar o usuário.');
+      const papelNovo = formRole === 'unidade_escolar' || formRole === 'cco';
+      setFormErro(papelNovo && /papel \(role\) inválido/i.test(err.message || '')
+        ? 'O Supabase ainda não conhece os papéis do CCO: publique a nova versão da função "admin-manage-user" e aplique as migrações do CCO.'
+        : err.message || 'Não foi possível salvar o usuário.');
       return;
     } finally {
       setIsSaving(false);
@@ -216,7 +273,9 @@ export const AdministracaoPage: React.FC = () => {
     setUsuarios(updated);
     setIsModalOpen(false);
     // A versão antiga da função admin-manage-user não conhece a matrícula e a ignora.
-    if (isSupabaseLive && dados.matricula && userSalvo.matricula === undefined) {
+    if (isSupabaseLive && (dados.unidade_id || dados.acesso_cco || dados.cco_unidades) && userSalvo.unidade_id === undefined && userSalvo.acesso_cco === undefined) {
+      exibirToast('Dados salvos, mas o vínculo com o CCO não foi gravado: publique a nova versão da função "admin-manage-user" e aplique as migrações do CCO.', 'erro');
+    } else if (isSupabaseLive && dados.matricula && userSalvo.matricula === undefined) {
       exibirToast('Dados salvos, mas a matrícula não foi gravada: publique a nova versão da função "admin-manage-user" no Supabase.', 'erro');
     } else exibirToast(editingUser ? `Usuário "${userSalvo.nome_completo}" atualizado com sucesso!` : `Usuário "${userSalvo.nome_completo}" cadastrado no Supabase com acesso liberado!`);
 
@@ -237,6 +296,9 @@ export const AdministracaoPage: React.FC = () => {
         cargo: userSalvo.cargo,
         role: userSalvo.role,
         ativo: userSalvo.ativo,
+        unidade: nomeUnidade(userSalvo.unidade_id) ?? null,
+        acesso_cco: userSalvo.acesso_cco ?? false,
+        cco_unidades: userSalvo.cco_unidades?.length ?? 'todas',
         senha_alterada: Boolean(editingUser && formSenha),
       },
     });
@@ -383,7 +445,15 @@ export const AdministracaoPage: React.FC = () => {
                       {u.email}
                       {u.matricula && <span className="mt-0.5 block text-[10px] text-slate-500">Matrícula {u.matricula}</span>}
                     </td>
-                    <td className="py-3 px-4 text-slate-400">{u.cargo}</td>
+                    <td className="py-3 px-4 text-slate-400">
+                      {u.cargo}
+                      {u.role === 'unidade_escolar' && (
+                        <span className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500"><Building2 className="h-3 w-3" />{nomeUnidade(u.unidade_id) || 'Sem unidade vinculada'}</span>
+                      )}
+                      {(u.role === 'cco' || u.acesso_cco) && (
+                        <span className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500"><Camera className="h-3 w-3" />CCO · {u.cco_unidades?.length ? `${u.cco_unidades.length} unidade(s)` : 'todas as unidades'}</span>
+                      )}
+                    </td>
                     <td className="py-3 px-4">
                       <span className={cn(
                         'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase border',
@@ -608,6 +678,80 @@ export const AdministracaoPage: React.FC = () => {
               })}
             </div>
           </div>
+
+          {/* CCO — Central Controle Operacional */}
+          {formRole === 'unidade_escolar' && (
+            <div>
+              <label htmlFor="form-unidade" className="block text-xs font-semibold text-[#37475e] dark:text-slate-300 mb-1.5">Unidade escolar *</label>
+              <select
+                id="form-unidade"
+                value={formUnidade}
+                onChange={(e) => setFormUnidade(e.target.value)}
+                className="w-full min-h-11 rounded-lg border border-[#cfdbea] bg-white px-3 text-sm text-[#10233f] focus:outline-none focus:ring-2 focus:ring-[#0877c9]/40 dark:border-slate-700 dark:bg-[#121826] dark:text-slate-100"
+              >
+                <option value="">Selecione a unidade…</option>
+                {unidadesEscolares.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+              </select>
+              <p className="mt-1 text-[11px] text-[#627fa5] dark:text-slate-400">O usuário entra direto no CCO e só vê as ocorrências desta unidade. O nome da escola e o responsável são preenchidos automaticamente.</p>
+            </div>
+          )}
+
+          {ROLES_RECEPCAO_COM_CCO.includes(formRole) && (
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#dce6f3] p-3 dark:border-slate-800">
+              <input type="checkbox" checked={formAcessoCco} onChange={(e) => setFormAcessoCco(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#0b63ce]" />
+              <span>
+                <span className="block text-xs font-bold text-[#0d1f45] dark:text-slate-100">Também integra a equipe do CCO</span>
+                <span className="block text-[11px] text-slate-500 dark:text-slate-400">Acessa a Recepção e o painel de ocorrências do CCO, com o seletor entre os dois módulos.</span>
+              </span>
+            </label>
+          )}
+
+          {equipeCcoNoForm && (
+            <fieldset className="rounded-xl border-2 border-[#dce6f3] p-3 dark:border-slate-800">
+              <legend className="px-1 text-xs font-bold text-[#0d1f45] dark:text-slate-100">Unidades acompanhadas no CCO</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {[{ v: false, r: 'Todas as unidades' }, { v: true, r: 'Somente as selecionadas' }].map(({ v, r }) => (
+                  <label key={r} className={cn('flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-2.5 text-xs font-semibold', formCcoRestrito === v ? 'border-[#0b63ce] bg-[#eaf3ff] text-[#0b4fa3] dark:bg-sky-500/10 dark:text-sky-200' : 'border-[#dce6f3] text-slate-600 dark:border-slate-700 dark:text-slate-300')}>
+                    <input type="radio" name="form-cco-restrito" checked={formCcoRestrito === v} onChange={() => setFormCcoRestrito(v)} className="accent-[#0b63ce]" />
+                    {r}
+                  </label>
+                ))}
+              </div>
+              {formCcoRestrito && (
+                <div className="mt-3">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={buscaUnidade}
+                      onChange={(e) => setBuscaUnidade(e.target.value)}
+                      placeholder="Buscar unidade"
+                      aria-label="Buscar unidade"
+                      className="w-full min-h-10 rounded-lg border border-[#cfdbea] bg-white pl-8 pr-3 text-xs dark:border-slate-700 dark:bg-[#121826] dark:text-slate-100"
+                    />
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-slate-500">{formCcoUnidades.length} selecionada(s)</p>
+                  <ul className="mt-1 max-h-44 space-y-0.5 overflow-y-auto rounded-lg border border-[#e3ebf5] p-1 dark:border-slate-800">
+                    {unidadesEscolares
+                      .filter((u) => u.nome.toLowerCase().includes(buscaUnidade.trim().toLowerCase()))
+                      .map((u) => (
+                        <li key={u.id}>
+                          <label className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-xs text-[#10233f] hover:bg-[#f2f7fd] dark:text-slate-200 dark:hover:bg-slate-800">
+                            <input
+                              type="checkbox"
+                              checked={formCcoUnidades.includes(u.id)}
+                              onChange={(e) => setFormCcoUnidades((atual) => (e.target.checked ? [...atual, u.id] : atual.filter((id) => id !== u.id)))}
+                              className="accent-[#0b63ce]"
+                            />
+                            {u.nome}
+                          </label>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+            </fieldset>
+          )}
 
           {/* Toggle Ativo */}
           <div

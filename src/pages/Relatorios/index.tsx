@@ -29,6 +29,7 @@ import {
   Check,
   Activity,
   Eye,
+  Camera,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { dataService } from '@/services/dataService';
@@ -37,7 +38,7 @@ import { cn, formatDateTime } from '@/lib/utils';
 
 // ─── Catálogo de ações ───────────────────────────────────────────────────────
 
-type CategoriaId = 'acesso' | 'lgpd' | 'movimentacoes' | 'crachas' | 'cadastros' | 'usuarios' | 'autorizacoes' | 'outros';
+type CategoriaId = 'acesso' | 'lgpd' | 'movimentacoes' | 'crachas' | 'cadastros' | 'usuarios' | 'autorizacoes' | 'cco' | 'outros';
 
 const CATEGORIAS: Record<CategoriaId, { rotulo: string; icone: typeof LogIn; cor: string; chipAtivo: string }> = {
   acesso: { rotulo: 'Acesso ao sistema', icone: LogIn, cor: 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700', chipAtivo: 'from-slate-600 to-slate-800' },
@@ -47,6 +48,7 @@ const CATEGORIAS: Record<CategoriaId, { rotulo: string; icone: typeof LogIn; cor
   cadastros: { rotulo: 'Cadastros', icone: UserPlus, cor: 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-500/30', chipAtivo: 'from-violet-500 to-violet-700' },
   usuarios: { rotulo: 'Usuários e permissões', icone: Users, cor: 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30', chipAtivo: 'from-rose-500 to-rose-700' },
   autorizacoes: { rotulo: 'Autorizações', icone: CheckCircle2, cor: 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30', chipAtivo: 'from-amber-500 to-amber-600' },
+  cco: { rotulo: 'CCO — ocorrências', icone: Camera, cor: 'bg-indigo-50 text-indigo-700 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/30', chipAtivo: 'from-indigo-500 to-indigo-700' },
   outros: { rotulo: 'Outros', icone: CircleDot, cor: 'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700', chipAtivo: 'from-slate-500 to-slate-700' },
 };
 
@@ -73,6 +75,9 @@ const ACOES: Record<string, { rotulo: string; categoria: CategoriaId; sensivel?:
   ATUALIZAR_USUARIO: { rotulo: 'Usuário alterado', categoria: 'usuarios', sensivel: true },
   EXCLUIR_USUARIO: { rotulo: 'Usuário removido', categoria: 'usuarios', sensivel: true },
   RESPOSTA_AUTORIZACAO: { rotulo: 'Resposta de autorização', categoria: 'autorizacoes' },
+  CCO_REGISTRO: { rotulo: 'Ocorrência registrada (CCO)', categoria: 'cco' },
+  CCO_ATUALIZACAO: { rotulo: 'Atendimento de ocorrência (CCO)', categoria: 'cco' },
+  CCO_TERMINO: { rotulo: 'Horário final de ocorrência (CCO)', categoria: 'cco' },
 };
 
 /** Ação desconhecida: deduz a categoria pelo código e deixa o rótulo legível. */
@@ -81,7 +86,8 @@ const infoAcao = (codigo: string) => {
   if (conhecida) return conhecida;
   const c = codigo.toUpperCase();
   const categoria: CategoriaId =
-    c.includes('CONSULTA') ? 'lgpd'
+    c.startsWith('CCO') ? 'cco'
+    : c.includes('CONSULTA') ? 'lgpd'
     : c.includes('ENTRADA') || c.includes('SAIDA') || c.includes('MOVIMENT') ? 'movimentacoes'
     : c.includes('CRACHA') || c.includes('QR') ? 'crachas'
     : c.includes('USUARIO') ? 'usuarios'
@@ -104,6 +110,7 @@ const TABELAS: Record<string, string> = {
   setores: 'Setores',
   departamentos: 'Departamentos',
   ramais_unidades: 'Ramais',
+  cco_ocorrencias: 'Ocorrências do CCO',
 };
 const nomeTabela = (tabela?: string) => (tabela ? TABELAS[tabela] || tabela : 'Sem entidade');
 

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { BadgeCheck, BookOpen, Briefcase, Building2, Calendar, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Home, LayoutDashboard, MoreHorizontal, ShieldCheck, Users, ArrowRightLeft, Phone, X } from 'lucide-react';
+import { FileText, HelpCircle, BadgeCheck, BookOpen, Briefcase, Building2, Calendar, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Home, LayoutDashboard, MoreHorizontal, ShieldCheck, Users, ArrowRightLeft, Phone, X } from 'lucide-react';
 import { isInstallAvailable, openInstallSheet, usePwa } from '@/pwa/pwa';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTecladoVirtual } from '@/hooks/useTecladoVirtual';
+import { moduloDaRota, perfilCco } from '@/lib/modulos';
 
 const primaryItems = [
   { label: 'Recepção', path: '/recepcao', icon: Home },
@@ -62,6 +63,31 @@ export const MobileBottomNav = () => {
   useEffect(() => setMoreOpen(false), [location.pathname]);
 
   if (tecladoAberto) return null;
+
+  // CCO: poucos itens, todos visíveis (sem "Mais").
+  if (moduloDaRota(location.pathname) === 'cco') {
+    const perfil = perfilCco(user);
+    const itensCco = [
+      { label: perfil === 'unidade' ? 'Início' : 'Painel', path: '/cco', icon: Home, end: true },
+      ...(perfil === 'unidade' ? [{ label: 'Ocorrências', path: '/cco/ocorrencias', icon: FileText, end: false }] : []),
+      ...(user?.role === 'admin'
+        ? [
+            { label: 'Usuários', path: '/administracao', icon: ShieldCheck, end: false },
+            { label: 'Auditoria', path: '/relatorios', icon: FileSpreadsheet, end: false },
+          ]
+        : []),
+      { label: 'Ajuda', path: '/cco/ajuda', icon: HelpCircle, end: false },
+    ];
+    return (
+      <nav aria-label="Navegação do CCO" className="fixed inset-x-0 bottom-0 z-50 flex min-h-[72px] items-start gap-1 border-t border-[#0a71bb] bg-[linear-gradient(160deg,#075fa7_0%,#005a9c_48%,#043c74_100%)] px-1.5 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_24px_-14px_rgba(4,60,116,.6)] md:hidden">
+        {itensCco.map(({ label, path, icon: Icon, end }) => (
+          <NavLink key={path} to={path} end={end} className={({ isActive }) => `flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 text-[11px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${isActive ? 'bg-white text-[#005a9c] shadow-[0_8px_18px_-10px_rgba(0,0,0,.55)]' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}>
+            <Icon className="h-5 w-5 shrink-0" /><span className="max-w-full truncate">{label}</span>
+          </NavLink>
+        ))}
+      </nav>
+    );
+  }
 
   return (
     <>

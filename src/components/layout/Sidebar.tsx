@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   UserCheck,
   ArrowRightLeft,
@@ -18,12 +18,18 @@ import {
   X,
   LogOut,
   Shield,
+  Home,
+  FileText,
+  HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { cn } from '@/lib/utils';
+import { ROTULO_PAPEL, moduloDaRota, perfilCco } from '@/lib/modulos';
+import { SeletorModulo } from './SeletorModulo';
 
-const PAPEL: Record<string, string> = { admin: 'Administrador', gestor: 'Gestor', recepcionista: 'Recepcionista', atendente: 'Atendente' };
+type ItemMenu = { name: string; path: string; icon: typeof Home; badge?: string; end?: boolean };
+type SecaoMenu = { titulo: string; itens: ItemMenu[]; seta?: boolean };
 
 /** Item do menu: no celular é maior (toque confortável); no computador segue compacto. */
 const itemClass = (isActive: boolean, isCollapsed: boolean) =>
@@ -41,6 +47,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
   onClose,
 }) => {
   const { user, logout } = useAuth();
+  const modulo = moduloDaRota(useLocation().pathname);
 
   // Celular com o menu aberto: trava a rolagem da página e fecha no Esc.
   useEffect(() => {
@@ -78,6 +85,36 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
       : []),
   ];
 
+  // CCO — Central Controle Operacional: a unidade registra; equipe e admin acompanham no painel.
+  const perfil = perfilCco(user);
+  const secoesCco: SecaoMenu[] = [
+    {
+      titulo: 'Central Operacional',
+      itens: [
+        { name: perfil === 'unidade' ? 'Início' : 'Painel de ocorrências', path: '/cco', icon: Home, end: true },
+        ...(perfil === 'unidade' ? [{ name: 'Minhas ocorrências', path: '/cco/ocorrencias', icon: FileText }] : []),
+        { name: 'Ajuda', path: '/cco/ajuda', icon: HelpCircle },
+      ],
+    },
+    ...(user?.role === 'admin'
+      ? [{
+          titulo: 'Gestão',
+          seta: true,
+          itens: [
+            { name: 'Usuários e unidades', path: '/administracao', icon: ShieldCheck },
+            { name: 'Relatórios & Auditoria', path: '/relatorios', icon: FileSpreadsheet },
+          ],
+        }]
+      : []),
+  ];
+
+  const secoes: SecaoMenu[] = modulo === 'cco'
+    ? secoesCco
+    : [
+        { titulo: 'Operação da Recepção', itens: operationalNav },
+        { titulo: 'Gestão & Controle', itens: managementNav, seta: true },
+      ];
+
   return (
     <aside
       aria-label="Menu de navegação"
@@ -101,7 +138,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
             <p className="flex items-center gap-1.5 text-base">
               <span className="font-extrabold tracking-tight">SMEDU</span>
               <span aria-hidden="true" className="h-4 w-px bg-white/60" />
-              <span className="font-light tracking-wide">Recepção</span>
+              <span className="font-light tracking-wide">{modulo === 'cco' ? 'CCO' : 'Recepção'}</span>
             </p>
             <p className="mt-0.5 truncate text-[11px] text-blue-100/80">Secretaria de Educação · Itaguaí</p>
           </div>
@@ -121,73 +158,57 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold">{user.nome_completo}</p>
               <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-200 ring-1 ring-emerald-300/30">
-                <Shield className="h-3 w-3" />{PAPEL[user.role] || user.role}
+                <Shield className="h-3 w-3" />{ROTULO_PAPEL[user.role] || user.role}
               </p>
             </div>
           </div>
         )}
+        <SeletorModulo variante="azul" className="mt-3 flex w-full" onTrocar={onClose} />
       </div>
       <div aria-hidden="true" className="mx-4 h-px shrink-0 bg-gradient-to-r from-transparent via-white/25 to-transparent md:hidden" />
 
       <div className={cn('flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 py-4 [scrollbar-width:none] md:p-3 md:[scrollbar-width:auto] [&::-webkit-scrollbar]:hidden md:[&::-webkit-scrollbar]:block', isCollapsed && 'md:px-2')}>
-        {/* Seção Operacional */}
-        <div>
-          {!isCollapsed && <div className="px-3 mb-2 text-[11px] font-bold tracking-wider text-blue-100/80 uppercase">
-            Operação da Recepção
-          </div>}
-          <nav className="space-y-1">
-            {operationalNav.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  onClick={onClose}
-                  title={isCollapsed ? item.name : undefined}
-                  className={({ isActive }) => itemClass(isActive, isCollapsed)}
-                >
-                  <div className="flex items-center gap-3 md:gap-2.5">
-                    <Icon className="h-5 w-5 text-inherit md:h-4 md:w-4" />
-                    {!isCollapsed && <span>{item.name}</span>}
-                  </div>
-                  {item.badge && !isCollapsed && (
-                    <span className="text-[10px] bg-[#d9efff] text-[#005a9c] px-1.5 py-0.5 rounded border border-white/60">
-                      {item.badge}
-                    </span>
-                  )}
-                </NavLink>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Seção de Gestão & Auditoria */}
-        <div>
-          {!isCollapsed && <div className="px-3 mb-2 text-[11px] font-bold tracking-wider text-blue-100/80 uppercase">
-            Gestão & Controle
-          </div>}
-          <nav className="space-y-1">
-            {managementNav.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  onClick={onClose}
-                  title={isCollapsed ? item.name : undefined}
-                  className={({ isActive }) => itemClass(isActive, isCollapsed)}
-                >
-                  <div className="flex items-center gap-3 md:gap-2.5">
-                    <Icon className="h-5 w-5 text-inherit md:h-4 md:w-4" />
-                    {!isCollapsed && <span>{item.name}</span>}
-                  </div>
-                  {!isCollapsed && <ChevronRight className="w-3.5 h-3.5 text-blue-100/70 group-hover:text-white transition-colors" />}
-                </NavLink>
-              );
-            })}
-          </nav>
-        </div>
+        {secoes.map((secao) => (
+          <div key={secao.titulo}>
+            {!isCollapsed && <div className="px-3 mb-2 text-[11px] font-bold tracking-wider text-blue-100/80 uppercase">
+              {secao.titulo}
+            </div>}
+            <nav aria-label={secao.titulo} className="space-y-1">
+              {secao.itens.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.end}
+                    onClick={onClose}
+                    title={isCollapsed ? item.name : undefined}
+                    className={({ isActive }) => itemClass(isActive, isCollapsed)}
+                  >
+                    <div className="flex items-center gap-3 md:gap-2.5">
+                      <Icon className="h-5 w-5 text-inherit md:h-4 md:w-4" />
+                      {!isCollapsed && <span>{item.name}</span>}
+                    </div>
+                    {item.badge && !isCollapsed && (
+                      <span className="text-[10px] bg-[#d9efff] text-[#005a9c] px-1.5 py-0.5 rounded border border-white/60">
+                        {item.badge}
+                      </span>
+                    )}
+                    {secao.seta && !isCollapsed && <ChevronRight className="w-3.5 h-3.5 text-blue-100/70 group-hover:text-white transition-colors" />}
+                  </NavLink>
+                );
+              })}
+            </nav>
+          </div>
+        ))}
       </div>
+
+      {/* Rodapé institucional (computador, CCO) */}
+      {modulo === 'cco' && !isCollapsed && (
+        <div className="mx-4 hidden shrink-0 border-t border-white/20 py-4 text-[11px] font-bold tracking-wider text-blue-100/80 md:block">
+          SMEDU <span aria-hidden="true">•</span> ITAGUAÍ
+        </div>
+      )}
 
       {/* Rodapé da gaveta (só no celular) */}
       <div className="shrink-0 border-t border-white/10 px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3 md:hidden">

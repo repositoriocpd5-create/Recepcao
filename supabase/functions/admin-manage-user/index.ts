@@ -15,7 +15,8 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-const ROLES = ["admin", "gestor", "recepcionista", "atendente"];
+const ROLES = ["admin", "gestor", "recepcionista", "atendente", "unidade_escolar", "cco"];
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // "Banimento" longo = conta suspensa (não consegue entrar); "none" reativa.
 const BAN_SUSPENSO = "876000h";
@@ -29,6 +30,29 @@ class HttpError extends Error {
 const texto = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 // Matrícula usada como login alternativo ao e-mail; fica em app_metadata (só o servidor altera).
 const MATRICULA_REGEX = /^\d{3,10}$/;
+
+/**
+ * Campos do CCO: unidade da escola (papel unidade_escolar), acesso da equipe da recepção
+ * ao CCO e unidades que a equipe acompanha (vazio = todas). Só entram os campos enviados.
+ */
+const camposCco = (payload: Record<string, unknown>, role: string) => {
+  const campos: Record<string, unknown> = {};
+  if ("unidade_id" in payload) {
+    const unidade = texto(payload.unidade_id);
+    if (unidade && !UUID_REGEX.test(unidade)) throw new HttpError(400, "Unidade escolar inválida.");
+    campos.unidade_id = unidade || null;
+  }
+  if (typeof payload.acesso_cco === "boolean") campos.acesso_cco = payload.acesso_cco;
+  if ("cco_unidades" in payload) {
+    const lista = Array.isArray(payload.cco_unidades) ? payload.cco_unidades.map(texto).filter(Boolean) : [];
+    if (lista.some((id) => !UUID_REGEX.test(id))) throw new HttpError(400, "Lista de unidades inválida.");
+    campos.cco_unidades = lista.length ? lista : null;
+  }
+  if (role === "unidade_escolar" && "unidade_id" in campos && !campos.unidade_id) {
+    throw new HttpError(400, "Vincule o usuário da unidade escolar a uma unidade.");
+  }
+  return campos;
+};
 
 type Admin = ReturnType<typeof createClient>;
 
@@ -108,6 +132,8 @@ Deno.serve(async (req) => {
       if (password.length < 8) throw new HttpError(400, "A senha precisa ter pelo menos 8 caracteres.");
       if (!ROLES.includes(role)) throw new HttpError(400, "Papel (role) inválido.");
       await conferirMatricula(admin, matricula);
+      const cco = camposCco(payload, role);
+      if (role === "unidade_escolar" && !cco.unidade_id) throw new HttpError(400, "Vincule o usuário da unidade escolar a uma unidade.");
 
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email,
@@ -127,7 +153,7 @@ Deno.serve(async (req) => {
       // O gatilho on_auth_user_created já cria o perfil; aqui gravamos cargo/papel/situação definitivos.
       const { data: profile, error: profileError } = await admin
         .from("profiles")
-        .upsert({ id, email, nome_completo, cargo, role, ativo, updated_at: new Date().toISOString() }, { onConflict: "id" })
+        .upsert({ id, email, nome_completo, cargo, role, ativo, ...cco, updated_at: new Date().toISOString() }, { onConflict: "id" })
         .select()
         .single();
       if (profileError) {
@@ -182,6 +208,7 @@ Deno.serve(async (req) => {
       if (cargo) profileUpdate.cargo = cargo;
       if (role) profileUpdate.role = role;
       if (ativo !== undefined) profileUpdate.ativo = ativo;
+      Object.assign(profileUpdate, camposCco(payload, role));
 
       const { data: profile, error: profileError } = await admin.from("profiles").update(profileUpdate).eq("id", id).select().single();
       if (profileError) throw new HttpError(500, `Falha ao atualizar o perfil: ${profileError.message}`);

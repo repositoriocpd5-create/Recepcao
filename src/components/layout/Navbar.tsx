@@ -10,6 +10,9 @@ import { resetTestData } from '@/services/dataService';
 import { ThemeToggle, useTheme } from './ThemeToggle';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { isInstallAvailable, openInstallSheet, usePwa } from '@/pwa/pwa';
+import { useLocation } from 'react-router-dom';
+import { ROTULO_PAPEL, moduloDaRota } from '@/lib/modulos';
+import { SeletorModulo } from './SeletorModulo';
 
 interface NavbarProps {
   sidebarCollapsed: boolean;
@@ -22,6 +25,8 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
   const { theme, setTheme } = useTheme();
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const pwa = usePwa();
+  const noCco = moduloDaRota(useLocation().pathname) === 'cco';
+  const subtitulo = noCco ? 'CCO • Central Controle Operacional' : 'Sistema de Recepção e Controle de Acesso';
 
   // Painel de conta: Esc fecha e a página não rola por trás.
   useEffect(() => {
@@ -57,6 +62,8 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
     admin: { label: 'Admin', email: getRoleEmail('admin', 'admin@sme.gov.br') },
     gestor: { label: 'Gestor', email: getRoleEmail('gestor', 'gestor@sme.gov.br') },
     atendente: { label: 'Atendente', email: getRoleEmail('atendente', '') },
+    unidade_escolar: { label: 'Unidade escolar', email: getRoleEmail('unidade_escolar', 'unidade@sme.gov.br') },
+    cco: { label: 'Equipe CCO', email: getRoleEmail('cco', 'cco@sme.gov.br') },
   };
 
   const openProfileLogin = (role: UserRole) => {
@@ -104,7 +111,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
           <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-[#b9d9f3] bg-white shadow-sm min-[380px]:h-11 min-[380px]:w-11 min-[380px]:rounded-2xl"><img src="/assets/brasao_itaguai.png" alt="Brasão do Município de Itaguaí" className="h-8 w-8 object-contain min-[380px]:h-9 min-[380px]:w-9" /></div>
           <div className="min-w-0 flex-1 leading-tight">
             <div className="flex items-start gap-1.5"><h1 className="text-[11px] font-extrabold leading-[1.05] tracking-wide text-[#082b57] min-[380px]:text-[13px]">SECRETARIA MUNICIPAL<br />DE EDUCAÇÃO</h1><span className="mt-0.5 hidden rounded border border-[#b9d9f3] bg-[#edf5ff] px-1.5 py-0.5 text-[9px] font-bold text-[#087ef5] min-[420px]:inline">SMEDU</span></div>
-            <p className="mt-1 truncate text-[10px] text-[#68809f] min-[380px]:text-[11px]">Sistema de Recepção e Controle de Acesso</p>
+            <p className="mt-1 truncate text-[10px] text-[#68809f] min-[380px]:text-[11px]">{subtitulo}</p>
           </div>
           <ThemeToggle size="xs" className="min-[380px]:hidden" />
           <ThemeToggle size="sm" className="max-[379px]:hidden" />
@@ -141,7 +148,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
               </span>
             </div>
             <p className="text-xs text-[#627289] dark:text-slate-400">
-              Sistema de Recepção e Controle de Acesso
+              {subtitulo}
             </p>
           </div>
         </div>
@@ -152,7 +159,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
           {user && !isSupabaseLive && (
             <div className="hidden md:flex items-center gap-1 bg-[#151c2c] border border-slate-700/80 rounded-lg p-0.5 text-xs">
               <span className="px-2 text-slate-400 text-[11px]">Perfil teste:</span>
-              {(['recepcionista', 'admin', 'gestor'] as UserRole[]).map((r) => (
+              {(['recepcionista', 'admin', 'gestor', 'unidade_escolar', 'cco'] as UserRole[]).map((r) => (
                 <button
                   key={r}
                   onClick={() => switchDemoRole(r)}
@@ -162,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  {r}
+                  {r === 'unidade_escolar' ? 'unidade' : r}
                 </button>
               ))}
               <button
@@ -175,6 +182,8 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
             </div>
           )}
 
+          <SeletorModulo />
+
           <ThemeToggle size="sm" />
 
           {/* User profile dropdown & logout */}
@@ -186,7 +195,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
                 <div className="text-[10px] text-slate-400 font-mono truncate max-w-[180px]">{user.email}</div>
                 <div className="text-[11px] text-emerald-400 flex items-center justify-end gap-1">
                   <Shield className="w-3 h-3" />
-                  <span className="capitalize">{user.role}</span>
+                  <span>{ROTULO_PAPEL[user.role] || user.role}</span>
                 </div>
               </div>
 
@@ -217,11 +226,13 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
                 <div className="min-w-0">
                   <h2 id="conta-titulo" className="truncate text-sm font-extrabold text-[#082b57] dark:text-slate-100">{user?.nome_completo || 'Operador SMEDU'}</h2>
                   <p className="truncate text-xs text-[#68809f] dark:text-slate-400">{user?.email}</p>
-                  {user?.role && <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold capitalize text-[#16a34a] dark:text-emerald-400"><Shield className="h-3 w-3" />{user.role}</p>}
+                  {user?.role && <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-[#16a34a] dark:text-emerald-400"><Shield className="h-3 w-3" />{ROTULO_PAPEL[user.role] || user.role}</p>}
                 </div>
               </div>
               <button type="button" onClick={() => setIsAccountOpen(false)} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#526d91] hover:bg-[#f2f7ff] dark:text-slate-400 dark:hover:bg-slate-800" aria-label="Fechar"><X className="h-5 w-5" /></button>
             </div>
+
+            <SeletorModulo className="mt-5 flex w-full" onTrocar={() => setIsAccountOpen(false)} />
 
             <div className="mt-5">
               <p id="aparencia-titulo" className="mb-2 text-xs font-bold uppercase tracking-wider text-[#68809f] dark:text-slate-400">Aparência</p>

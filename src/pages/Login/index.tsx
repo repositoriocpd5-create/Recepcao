@@ -24,7 +24,7 @@ export const LoginPage: React.FC = () => {
 
   // Se já logado, redirecionar
   React.useEffect(() => {
-    if (user) navigate('/recepcao');
+    if (user) navigate('/');
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,7 +33,7 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     try {
       await login(email.trim(), password);
-      navigate('/recepcao');
+      navigate('/');
     } catch (err: any) {
       setErrorMsg(err.message || 'Credenciais inválidas. Verifique o e-mail ou a matrícula e a senha.');
     } finally {
@@ -45,7 +45,8 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      let demoEmail = role === 'admin' ? 'admin@sme.gov.br' : role === 'gestor' ? 'gestor@sme.gov.br' : 'recepcao@sme.gov.br';
+      const EMAILS_DEMO: Partial<Record<UserRole, string>> = { admin: 'admin@sme.gov.br', gestor: 'gestor@sme.gov.br', unidade_escolar: 'unidade@sme.gov.br', cco: 'cco@sme.gov.br' };
+      let demoEmail = EMAILS_DEMO[role] || 'recepcao@sme.gov.br';
       try {
         const raw = localStorage.getItem('sme_admin_users');
         if (raw) {
@@ -54,7 +55,7 @@ export const LoginPage: React.FC = () => {
         }
       } catch {}
       await login(demoEmail, '', role);
-      navigate('/recepcao');
+      navigate('/');
     } catch (err: any) {
       setErrorMsg(err.message);
     } finally {
@@ -150,7 +151,7 @@ export const LoginPage: React.FC = () => {
             <div className="mt-5 border-t border-[#e5e7eb] pt-4 dark:border-slate-800">
               <p className="mb-2 text-center text-[11px] text-[#6b7280] dark:text-slate-400">Ambiente de testes — acesso rápido por perfil</p>
               <div className="grid grid-cols-3 gap-2">
-                {([['recepcionista', 'Recepção'], ['admin', 'Admin'], ['gestor', 'Gestor']] as [UserRole, string][]).map(([role, label]) => (
+                {([['recepcionista', 'Recepção'], ['admin', 'Admin'], ['gestor', 'Gestor'], ['unidade_escolar', 'Escola (CCO)'], ['cco', 'Equipe CCO']] as [UserRole, string][]).map(([role, label]) => (
                   <button
                     key={role}
                     type="button"

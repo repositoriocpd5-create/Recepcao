@@ -1418,6 +1418,7 @@ export const dataService = {
       const { profile } = await invokeAdminUsuarios<{ profile: UserProfile }>('create_operator', {
         email: u.email, password: senha, nome_completo: u.nome_completo, cargo: u.cargo, role: u.role, ativo: u.ativo,
         matricula: u.matricula || '',
+        unidade_id: u.unidade_id || null, acesso_cco: Boolean(u.acesso_cco), cco_unidades: u.cco_unidades || [],
       });
       return profile;
     }
@@ -1432,6 +1433,7 @@ export const dataService = {
       const { profile } = await invokeAdminUsuarios<{ profile: UserProfile }>('update_operator', {
         id: u.id, email: u.email, nome_completo: u.nome_completo, cargo: u.cargo, role: u.role, ativo: u.ativo,
         ...(u.matricula !== undefined ? { matricula: u.matricula || '' } : {}),
+        unidade_id: u.unidade_id || null, acesso_cco: Boolean(u.acesso_cco), cco_unidades: u.cco_unidades || [],
         ...(novaSenha ? { password: novaSenha } : {}),
       });
       return profile;

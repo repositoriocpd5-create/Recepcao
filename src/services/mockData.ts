@@ -9,6 +9,7 @@ import {
   AuditoriaLog,
   UserProfile,
 } from '@/types';
+import { RAMAIS_UNIDADES_INICIAIS } from './ramaisUnidades';
 
 export const INITIAL_DEPARTAMENTOS: Departamento[] = [
   {
@@ -412,6 +413,24 @@ export const DEMO_USERS: UserProfile[] = [
     nome_completo: 'Roberto Albuquerque',
     cargo: 'Gestor Predial',
     role: 'gestor',
+    ativo: true,
+  },
+  // CCO — Central Controle Operacional
+  {
+    id: 'u-demo-unidade',
+    email: 'unidade@sme.gov.br',
+    nome_completo: 'Luciana Ferreira',
+    cargo: 'Diretora',
+    role: 'unidade_escolar',
+    ativo: true,
+    unidade_id: RAMAIS_UNIDADES_INICIAIS.find((u) => u.nome === 'E. M. ALEXANDRE IGNÁCIO')?.id ?? null,
+  },
+  {
+    id: 'u-demo-cco',
+    email: 'cco@sme.gov.br',
+    nome_completo: 'Marcos Vinícius Rocha',
+    cargo: 'Operador do CCO',
+    role: 'cco',
     ativo: true,
   },
 ];

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -18,6 +18,8 @@ import { AdministracaoPage } from '@/pages/Administracao';
 import { CrachasPage } from '@/pages/Crachas';
 import { ManualPage } from '@/pages/Manual';
 import { RamaisPage } from '@/pages/Ramais';
+import { CcoAjudaPage, CcoInicioPage, CcoOcorrenciasPage } from '@/pages/CCO';
+import { Modulo, acessaCco, acessaRecepcao, rotaInicial } from '@/lib/modulos';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string }> = ({
   children,
@@ -34,10 +36,22 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: strin
   }
 
   if (requiredRole && user.role !== requiredRole && user.role !== 'admin') {
-    return <Navigate to="/recepcao" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
+};
+
+/** Recepção e CCO: cada perfil só entra no módulo que pode acessar. */
+const ExigeModulo: React.FC<{ modulo: Modulo }> = ({ modulo }) => {
+  const { user } = useAuth();
+  const permitido = modulo === 'cco' ? acessaCco(user) : acessaRecepcao(user);
+  return permitido ? <Outlet /> : <Navigate to={rotaInicial(user)} replace />;
+};
+
+const RotaInicial: React.FC = () => {
+  const { user } = useAuth();
+  return <Navigate to={rotaInicial(user)} replace />;
 };
 
 export const AppRoutes: React.FC = () => {
@@ -53,32 +67,39 @@ export const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/recepcao" replace />} />
-        <Route path="recepcao" element={<RecepcaoPage />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="movimentacoes" element={<MovimentacoesPage />} />
-        <Route path="ramais" element={<RamaisPage />} />
-        <Route path="visitantes" element={<VisitantesPage />} />
-        <Route path="servidores" element={<ServidoresPage />} />
-        <Route path="autorizacoes" element={<AutorizacoesPage />} />
-        {/* Agendamentos e Relatórios: somente administradores */}
-        <Route path="agendamentos" element={<ProtectedRoute requiredRole="admin"><AgendamentosPage /></ProtectedRoute>} />
-        <Route path="relatorios" element={<ProtectedRoute requiredRole="admin"><RelatoriosPage /></ProtectedRoute>} />
-        <Route path="departamentos" element={<DepartamentosPage />} />
-        <Route path="setores" element={<SetoresPage />} />
-        <Route path="crachas" element={<CrachasPage />} />
-        <Route path="manual" element={<ManualPage />} />
-        <Route
-          path="administracao"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <AdministracaoPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route index element={<RotaInicial />} />
+        <Route element={<ExigeModulo modulo="recepcao" />}>
+          <Route path="recepcao" element={<RecepcaoPage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="movimentacoes" element={<MovimentacoesPage />} />
+          <Route path="ramais" element={<RamaisPage />} />
+          <Route path="visitantes" element={<VisitantesPage />} />
+          <Route path="servidores" element={<ServidoresPage />} />
+          <Route path="autorizacoes" element={<AutorizacoesPage />} />
+          {/* Agendamentos e Relatórios: somente administradores */}
+          <Route path="agendamentos" element={<ProtectedRoute requiredRole="admin"><AgendamentosPage /></ProtectedRoute>} />
+          <Route path="relatorios" element={<ProtectedRoute requiredRole="admin"><RelatoriosPage /></ProtectedRoute>} />
+          <Route path="departamentos" element={<DepartamentosPage />} />
+          <Route path="setores" element={<SetoresPage />} />
+          <Route path="crachas" element={<CrachasPage />} />
+          <Route path="manual" element={<ManualPage />} />
+          <Route
+            path="administracao"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdministracaoPage />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+        <Route path="cco" element={<ExigeModulo modulo="cco" />}>
+          <Route index element={<CcoInicioPage />} />
+          <Route path="ocorrencias" element={<CcoOcorrenciasPage />} />
+          <Route path="ajuda" element={<CcoAjudaPage />} />
+        </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/recepcao" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
