@@ -5,7 +5,8 @@
 // 2. Se o e-mail está liberado (acessos_por_email) ou já tem conta ativa, a função cria a conta
 //    quando ainda não existe (sem senha; papel e unidade vêm do gatilho de perfis) e pede ao
 //    Supabase Auth o envio do código de uso único (modelo "Magic Link" com {{ .Token }}).
-// 3. O navegador confirma o código (auth.verifyOtp) e grava a senha nova (auth.updateUser).
+// 3. O navegador confirma o código (auth.verifyOtp) — ou a pessoa toca no link do e-mail, que
+//    volta para /primeiro-acesso?etapa=senha já com a sessão — e grava a senha (auth.updateUser).
 //
 // A resposta é sempre a mesma para e-mail cadastrado ou não, para a tela não revelar quem tem
 // acesso. Há limite de pedidos por e-mail e por endereço de origem.
@@ -51,13 +52,20 @@ Deno.serve(async (req) => {
     const opcoes = { auth: { persistSession: false, autoRefreshToken: false } };
     const admin = createClient(url, serviceKey, opcoes);
 
-    let body: { email?: unknown };
+    let body: { email?: unknown; retorno?: unknown };
     try {
       body = await req.json();
     } catch {
       return json({ error: "Requisição inválida." }, 400);
     }
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    // Para onde o link do e-mail leva (tela de criar senha). Só http(s); o Supabase ainda
+    // confere com o Site URL / Redirect URLs do projeto.
+    let retorno: string | undefined;
+    try {
+      const u = new URL(typeof body.retorno === "string" ? body.retorno : "");
+      if (u.protocol === "https:" || u.protocol === "http:") retorno = u.toString();
+    } catch { /* sem retorno: usa o Site URL */ }
     if (!EMAIL_REGEX.test(email) || email.length > 254) return json({ error: "Informe um e-mail válido." }, 400);
 
     // Limite de pedidos (por e-mail e por origem) nos últimos minutos.
@@ -94,7 +102,7 @@ Deno.serve(async (req) => {
     }
 
     const envio = createClient(url, serviceKey, opcoes);
-    const { error } = await envio.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    const { error } = await envio.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: retorno } });
     if (error) {
       if (error.status === 429 || /rate|seconds|security purposes/i.test(error.message)) {
         return json({ error: "Um código acabou de ser enviado. Aguarde 1 minuto para pedir outro." }, 429);

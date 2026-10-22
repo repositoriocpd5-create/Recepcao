@@ -80,7 +80,9 @@ const Etapas: React.FC<{ atual: Etapa }> = ({ atual }) => {
 export const PrimeiroAcessoPage: React.FC = () => {
   const navigate = useNavigate();
   const { isSupabaseLive, user, entrarComSessaoAtual } = useAuth();
-  const [etapa, setEtapa] = useState<Etapa>('email');
+  // Voltando pelo link do e-mail: a sessão chega na URL e a pessoa vai direto criar a senha.
+  const [veioDoLink] = useState(() => new URLSearchParams(window.location.search).get('etapa') === 'senha');
+  const [etapa, setEtapa] = useState<Etapa>(veioDoLink ? 'senha' : 'email');
   const [email, setEmail] = useState('');
   const [codigo, setCodigo] = useState('');
   const [senha, setSenha] = useState('');
@@ -93,9 +95,33 @@ export const PrimeiroAcessoPage: React.FC = () => {
   const titulo = useRef<HTMLHeadingElement>(null);
 
   // Já logado (e não no meio deste fluxo): vai para o sistema.
+  // Link do e-mail: confere a sessão; link vencido ou já usado volta para o início com aviso.
   useEffect(() => {
-    if (user && etapa === 'email') navigate('/', { replace: true });
-  }, [user, etapa, navigate]);
+    if (!veioDoLink || !isSupabaseLive) return;
+    let ativo = true;
+    void (async () => {
+      const erroNaUrl = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('error_description');
+      let { data } = await supabase.auth.getSession();
+      if (!data.session && !erroNaUrl) {
+        await new Promise((r) => setTimeout(r, 800));
+        ({ data } = await supabase.auth.getSession());
+      }
+      if (!ativo) return;
+      window.history.replaceState(null, '', '/primeiro-acesso');
+      if (data.session?.user?.email) {
+        setEmail(data.session.user.email);
+        setEtapa('senha');
+      } else {
+        setEtapa('email');
+        setErro('O link do e-mail expirou ou já foi usado. Peça um novo código.');
+      }
+    })();
+    return () => { ativo = false; };
+  }, [veioDoLink, isSupabaseLive]);
+
+  useEffect(() => {
+    if (user && etapa === 'email' && !veioDoLink) navigate('/', { replace: true });
+  }, [user, etapa, navigate, veioDoLink]);
 
   // Cada etapa abre com o foco no campo dela (autoFocus); na conclusão, no título.
   useEffect(() => { if (etapa === 'pronto') titulo.current?.focus(); }, [etapa]);
@@ -120,7 +146,9 @@ export const PrimeiroAcessoPage: React.FC = () => {
     setAviso('');
     try {
       if (isSupabaseLive) {
-        const { data, error } = await supabase.functions.invoke('primeiro-acesso', { body: { email: alvo } });
+        const { data, error } = await supabase.functions.invoke('primeiro-acesso', {
+          body: { email: alvo, retorno: `${window.location.origin}/primeiro-acesso?etapa=senha` },
+        });
         if (error) throw new Error(await erroDaFuncao(error));
         setAviso(data?.mensagem || 'Se o e-mail estiver cadastrado, você receberá um código em instantes.');
       } else {
@@ -269,7 +297,8 @@ export const PrimeiroAcessoPage: React.FC = () => {
               <div>
                 <h1 ref={titulo} tabIndex={-1} className={tituloClasse}>Digite o código</h1>
                 <p className="mt-1.5 text-center text-xs leading-relaxed text-[#6b7280] dark:text-slate-400">
-                  Enviado para <strong className="text-[#374151] dark:text-slate-200">{mascarar(email)}</strong>. O código vale por 10 minutos.
+                  Enviamos um e-mail para <strong className="text-[#374151] dark:text-slate-200">{mascarar(email)}</strong>.
+                  Digite o código da mensagem ou toque no link <strong className="text-[#374151] dark:text-slate-200">Entrar</strong> (ou <em>Sign in</em>) para criar sua senha. Vale por 10 minutos.
                 </p>
               </div>
               {aviso && (
