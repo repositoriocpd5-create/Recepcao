@@ -11,6 +11,8 @@ interface Props {
   /** Painel da equipe: mostra a unidade e o responsável. */
   mostrarUnidade?: boolean;
   vazio?: React.ReactNode;
+  /** Ação rápida ao lado da linha (ex.: registrar andamento no painel da equipe). */
+  acaoLinha?: (ocorrencia: CcoOcorrencia) => React.ReactNode;
 }
 
 export const ListaVazia: React.FC<{ titulo: string; texto?: string }> = ({ titulo, texto }) => (
@@ -26,7 +28,7 @@ export const ListaVazia: React.FC<{ titulo: string; texto?: string }> = ({ titul
 );
 
 /** Lista de ocorrências: tabela no computador, cartões no celular. */
-export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostrarUnidade, vazio }) => {
+export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostrarUnidade, vazio, acaoLinha }) => {
   if (!ocorrencias.length) return <>{vazio ?? <ListaVazia titulo="Nenhuma ocorrência registrada." />}</>;
 
   const colunas = mostrarUnidade
@@ -37,7 +39,7 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
     <div>
       <div
         aria-hidden="true"
-        className={cn('hidden gap-4 border-b border-[#e6edf6] px-4 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#6b7f9b] lg:grid sm:px-6 dark:border-slate-800 dark:text-slate-500', colunas)}
+        className={cn('hidden gap-4 border-b border-[#e6edf6] px-4 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#6b7f9b] lg:grid sm:px-6 dark:border-slate-800 dark:text-slate-500', colunas, acaoLinha && 'lg:pr-[148px]')}
       >
         <span>Protocolo</span>
         <span>Data e horário</span>
@@ -48,13 +50,13 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
       </div>
       <ul className="divide-y divide-[#edf2f8] dark:divide-slate-800">
         {ocorrencias.map((oc) => (
-          <li key={oc.id}>
+          <li key={oc.id} className={cn(acaoLinha && 'flex items-center')}>
             <button
               type="button"
               onClick={() => onAbrir(oc)}
               aria-label={`Abrir ocorrência ${oc.protocolo}, ${formatarData(oc.data_ocorrencia)}, situação ${SITUACOES[oc.situacao].rotulo}`}
               className={cn(
-                'group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 px-4 py-3.5 text-left transition-colors hover:bg-[#f5f9fe] focus-visible:bg-[#f5f9fe] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#0b63ce] sm:px-6 lg:gap-4 dark:hover:bg-slate-800/40 dark:focus-visible:bg-slate-800/40',
+                'group grid w-full min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 px-4 py-3.5 text-left transition-colors hover:bg-[#f5f9fe] focus-visible:bg-[#f5f9fe] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#0b63ce] sm:px-6 lg:gap-4 dark:hover:bg-slate-800/40 dark:focus-visible:bg-slate-800/40',
                 colunas,
               )}
             >
@@ -86,6 +88,7 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
               <span className="hidden lg:block"><SituacaoBadge situacao={oc.situacao} /></span>
               <ChevronRight className="hidden h-5 w-5 text-[#9aaac0] transition-transform group-hover:translate-x-0.5 group-hover:text-[#0b63ce] lg:block" aria-hidden="true" />
             </button>
+            {acaoLinha && <div className="flex w-[52px] shrink-0 justify-center pr-3 lg:w-[148px] lg:pr-6">{acaoLinha(oc)}</div>}
           </li>
         ))}
       </ul>

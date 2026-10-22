@@ -13,6 +13,7 @@ import {
   Loader2,
   MessageSquare,
   MoonStar,
+  RotateCcw,
   Save,
   UserRound,
 } from 'lucide-react';
@@ -30,12 +31,15 @@ import {
 } from '@/services/ccoService';
 import { CcoHistorico, CcoOcorrencia, CcoSituacao, UserProfile } from '@/types';
 import { Campo, CampoHora, caixaCampo, completarHora, horaValida } from './campos';
-import { Carregando, ESTILO_SITUACAO, SituacaoBadge, botaoPrimario, botaoSecundario } from './ui';
+import { Carregando, ESTILO_SITUACAO, SituacaoBadge, botaoPrimario } from './ui';
+import { Atendimento } from './Atendimento';
 
 interface Props {
   ocorrenciaId: string | null;
   user: UserProfile;
   onFechar: () => void;
+  /** Aberto pela ação "Andamento" da lista: leva o foco ao campo do andamento. */
+  focarAndamento?: boolean;
 }
 
 const Dado: React.FC<{ icone: typeof Clock; rotulo: string; children: React.ReactNode }> = ({ icone: Icone, rotulo, children }) => (
@@ -58,21 +62,37 @@ const ICONE_HISTORICO: Record<CcoHistorico['tipo'], typeof Clock> = {
   responsavel: UserRound,
   observacao: MessageSquare,
   termino: Clock,
+  andamento: MessageSquare,
+  solucao: CheckCircle2,
+  reabertura: RotateCcw,
+};
+
+/** Textos livres do histórico: aparecem em destaque, com o tipo escrito. */
+const ROTULO_TEXTO: Partial<Record<CcoHistorico['tipo'], string>> = {
+  observacao: 'Andamento',
+  andamento: 'Andamento',
+  solucao: 'Solução',
+  reabertura: 'Motivo da reabertura',
 };
 
 const Historico: React.FC<{ eventos: CcoHistorico[] }> = ({ eventos }) => (
   <ol className="relative ml-3 space-y-4 border-l-2 border-[#e2eaf4] pl-5 dark:border-slate-800">
     {eventos.map((evento) => {
       const Icone = ICONE_HISTORICO[evento.tipo];
-      const cor = evento.situacao_nova ? ESTILO_SITUACAO[evento.situacao_nova].ponto : 'bg-[#6b7f9b]';
+      const cor = evento.situacao_nova ? ESTILO_SITUACAO[evento.situacao_nova].ponto : evento.tipo === 'solucao' ? 'bg-green-600' : 'bg-[#6b7f9b]';
       return (
         <li key={evento.id} className="relative">
           <span className={cn('absolute -left-[31px] top-0 grid h-5 w-5 place-items-center rounded-full text-white ring-4 ring-white dark:ring-[#121826]', cor)}>
             <Icone className="h-3 w-3" aria-hidden="true" />
           </span>
-          <p className={cn('text-sm text-[#10233f] dark:text-slate-200', evento.tipo === 'observacao' && 'whitespace-pre-wrap rounded-lg bg-[#f5f8fc] px-3 py-2 dark:bg-slate-800/60')}>
-            {descreverEvento(evento)}
-          </p>
+          {ROTULO_TEXTO[evento.tipo] ? (
+            <div className={cn('rounded-lg px-3 py-2', evento.tipo === 'solucao' ? 'bg-green-50 ring-1 ring-green-200 dark:bg-green-950/20 dark:ring-green-500/30' : 'bg-[#f5f8fc] dark:bg-slate-800/60')}>
+              <p className={cn('text-[11px] font-bold uppercase tracking-wider', evento.tipo === 'solucao' ? 'text-green-800 dark:text-green-300' : 'text-[#6b7f9b] dark:text-slate-400')}>{ROTULO_TEXTO[evento.tipo]}</p>
+              <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-[#10233f] dark:text-slate-200">{evento.descricao}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-[#10233f] dark:text-slate-200">{descreverEvento(evento)}</p>
+          )}
           <p className="mt-1 text-xs text-[#6b7f9b] dark:text-slate-500">
             {formatarDataHora(evento.created_at)}{evento.autor_nome ? ` · ${evento.autor_nome}` : ''}
           </p>
@@ -136,178 +156,6 @@ const InformarTermino: React.FC<{ oc: CcoOcorrencia; user: UserProfile; onSalvo:
   );
 };
 
-/** Painel de atendimento (equipe CCO e administrador). */
-const Atendimento: React.FC<{ oc: CcoOcorrencia; user: UserProfile; onSalvo: (oc: CcoOcorrencia) => void }> = ({ oc, user, onSalvo }) => {
-  const [situacao, setSituacao] = useState<CcoSituacao>(oc.situacao);
-  const [responsavel, setResponsavel] = useState(oc.responsavel_id || '');
-  const [observacao, setObservacao] = useState('');
-  const [salvando, setSalvando] = useState(false);
-  const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
-  const equipe = useQuery({ queryKey: ['cco', 'equipe'], queryFn: () => ccoService.listarEquipe(), staleTime: 5 * 60_000 });
-
-  useEffect(() => {
-    setSituacao(oc.situacao);
-    setResponsavel(oc.responsavel_id || '');
-  }, [oc.situacao, oc.responsavel_id]);
-
-  const [solucionar, setSolucionar] = useState(false);
-  const [obsSolucao, setObsSolucao] = useState('');
-  const [solucionando, setSolucionando] = useState(false);
-  const [erroSolucao, setErroSolucao] = useState('');
-
-  const confirmarSolucao = async () => {
-    setSolucionando(true);
-    setErroSolucao('');
-    try {
-      const atualizada = await ccoService.atualizarOcorrencia(user, oc.id, {
-        situacao: 'concluida',
-        // Sem responsável definido, quem soluciona fica como responsável.
-        responsavel_id: oc.responsavel_id ? undefined : user.id,
-        observacao: obsSolucao.trim() || undefined,
-      });
-      setSolucionar(false);
-      setObsSolucao('');
-      setMensagem({ tipo: 'ok', texto: 'Ocorrência marcada como solucionada. A unidade já vê a nova situação.' });
-      onSalvo(atualizada);
-    } catch (err) {
-      setErroSolucao(err instanceof Error ? err.message : 'Não foi possível solucionar.');
-    } finally {
-      setSolucionando(false);
-    }
-  };
-
-  const alterado = situacao !== oc.situacao || responsavel !== (oc.responsavel_id || '') || observacao.trim().length > 0;
-
-  const salvar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!alterado || salvando) return;
-    setSalvando(true);
-    setMensagem(null);
-    try {
-      const atualizada = await ccoService.atualizarOcorrencia(user, oc.id, {
-        situacao: situacao !== oc.situacao ? situacao : undefined,
-        responsavel_id: responsavel !== (oc.responsavel_id || '') ? responsavel || null : undefined,
-        observacao: observacao.trim() || undefined,
-      });
-      setObservacao('');
-      setMensagem({ tipo: 'ok', texto: 'Atendimento atualizado.' });
-      onSalvo(atualizada);
-    } catch (err) {
-      setMensagem({ tipo: 'erro', texto: err instanceof Error ? err.message : 'Não foi possível salvar.' });
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  return (
-    <form onSubmit={salvar} className="space-y-4 rounded-2xl border border-[#d3e3f8] bg-[#f6faff] p-4 dark:border-slate-700 dark:bg-slate-900/40">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Titulo>Atendimento do CCO</Titulo>
-        {oc.situacao !== 'concluida' && (
-          <button
-            type="button"
-            onClick={() => { setSolucionar(true); setErroSolucao(''); }}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-green-600 px-4 text-sm font-bold text-white shadow-[0_10px_20px_-12px_rgba(22,163,74,.9)] transition-colors hover:bg-green-700 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-green-600"
-          >
-            <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Marcar como solucionada
-          </button>
-        )}
-      </div>
-      <Modal isOpen={solucionar} onClose={() => !solucionando && setSolucionar(false)} title="Marcar como solucionada?" description={`${oc.protocolo} · ${oc.unidade_nome}`} maxWidth="md" icon={<CheckCircle2 className="h-6 w-6 text-green-600" />}>
-        <div className="space-y-4">
-          <p className="text-sm text-[#3b4d68] dark:text-slate-300">
-            A unidade passa a ver a situação <strong>Solucionada</strong> e o histórico registra quem solucionou e quando.
-            {!oc.responsavel_id && ' Você ficará como responsável pelo atendimento.'}
-          </p>
-          <Campo id="cco-obs-solucao" rotulo="Observação para a unidade (opcional)" erro={erroSolucao || null}>
-            <textarea
-              id="cco-obs-solucao"
-              value={obsSolucao}
-              onChange={(e) => setObsSolucao(e.target.value)}
-              rows={3}
-              maxLength={2000}
-              placeholder="Ex.: imagens conferidas, Guarda Municipal acionada, situação normalizada."
-              className={cn(caixaCampo(), 'resize-y py-2.5')}
-            />
-          </Campo>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button type="button" autoFocus disabled={solucionando} onClick={() => setSolucionar(false)} className={botaoSecundario}>Cancelar</button>
-            <button type="button" disabled={solucionando} onClick={() => void confirmarSolucao()} className={cn(botaoPrimario, 'bg-green-600 hover:bg-green-700 focus-visible:outline-green-600')}>
-              {solucionando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
-              {solucionando ? 'Salvando…' : 'Confirmar solução'}
-            </button>
-          </div>
-        </div>
-      </Modal>
-      <fieldset>
-        <legend className="mb-1.5 block text-sm font-bold text-[#10233f] dark:text-slate-200">Situação</legend>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {ORDEM_SITUACOES.map((valor) => {
-            const ativo = situacao === valor;
-            return (
-              <label
-                key={valor}
-                className={cn(
-                  'flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border px-2 text-center text-[13px] font-bold transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#0b63ce]',
-                  ativo ? cn('ring-1', ESTILO_SITUACAO[valor].classe, 'border-transparent') : 'border-[#cfdbea] bg-white text-[#3b4d68] hover:border-[#a9c1de] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
-                )}
-              >
-                <input type="radio" name="cco-situacao" value={valor} checked={ativo} onChange={() => setSituacao(valor)} className="sr-only" />
-                <span className={cn('h-2.5 w-2.5 rounded-full', ESTILO_SITUACAO[valor].ponto)} aria-hidden="true" />
-                {SITUACOES[valor].rotulo}
-              </label>
-            );
-          })}
-        </div>
-      </fieldset>
-
-      <Campo id="cco-responsavel" rotulo="Responsável pelo atendimento">
-        <select
-          id="cco-responsavel"
-          value={responsavel}
-          onChange={(e) => setResponsavel(e.target.value)}
-          className={caixaCampo()}
-        >
-          <option value="">Sem responsável</option>
-          {(equipe.data || []).map((membro) => (
-            <option key={membro.id} value={membro.id}>{membro.nome_completo}{membro.id === user.id ? ' (você)' : ''}</option>
-          ))}
-          {oc.responsavel_id && !equipe.data?.some((m) => m.id === oc.responsavel_id) && (
-            <option value={oc.responsavel_id}>{oc.responsavel_nome}</option>
-          )}
-        </select>
-        {!oc.responsavel_id && responsavel !== user.id && equipe.data?.some((m) => m.id === user.id) && (
-          <button type="button" onClick={() => setResponsavel(user.id)} className="mt-1.5 text-xs font-bold text-[#0b63ce] underline underline-offset-2 hover:text-[#0a56b4] dark:text-sky-300">
-            Assumir este atendimento
-          </button>
-        )}
-      </Campo>
-
-      <Campo id="cco-observacao" rotulo="Observação" ajuda="Fica no histórico e é visível para a unidade escolar.">
-        <textarea
-          id="cco-observacao"
-          value={observacao}
-          onChange={(e) => setObservacao(e.target.value)}
-          rows={3}
-          maxLength={2000}
-          placeholder="Ex.: imagens conferidas; Guarda Municipal acionada."
-          className={cn(caixaCampo(), 'resize-y py-2.5')}
-        />
-      </Campo>
-
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p aria-live="polite" className={cn('text-sm font-semibold', mensagem?.tipo === 'erro' ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400')}>
-          {mensagem?.texto}
-        </p>
-        <button type="submit" disabled={!alterado || salvando} className={botaoPrimario}>
-          {salvando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
-          {salvando ? 'Salvando…' : 'Salvar atendimento'}
-        </button>
-      </div>
-    </form>
-  );
-};
-
 const FotoOcorrencia: React.FC<{ caminho: string }> = ({ caminho }) => {
   const [ampliada, setAmpliada] = useState(false);
   const url = useQuery({ queryKey: ['cco', 'foto', caminho], queryFn: () => ccoService.urlFoto(caminho), staleTime: 20 * 60_000 });
@@ -331,7 +179,7 @@ const FotoOcorrencia: React.FC<{ caminho: string }> = ({ caminho }) => {
   );
 };
 
-export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFechar }) => {
+export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFechar, focarAndamento }) => {
   const queryClient = useQueryClient();
   const [copiado, setCopiado] = useState(false);
   const perfil = perfilCco(user);
@@ -415,7 +263,7 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
             </section>
           )}
 
-          {equipe && <Atendimento oc={oc} user={user} onSalvo={() => void atualizar()} />}
+          {equipe && <Atendimento oc={oc} user={user} focarAndamento={focarAndamento} onSalvo={() => void atualizar()} />}
 
           <section>
             <Titulo>Histórico de atendimento</Titulo>

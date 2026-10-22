@@ -78,6 +78,8 @@ const ACOES: Record<string, { rotulo: string; categoria: CategoriaId; sensivel?:
   CCO_REGISTRO: { rotulo: 'Ocorrência registrada (CCO)', categoria: 'cco' },
   CCO_ATUALIZACAO: { rotulo: 'Atendimento de ocorrência (CCO)', categoria: 'cco' },
   CCO_TERMINO: { rotulo: 'Horário final de ocorrência (CCO)', categoria: 'cco' },
+  CCO_FINALIZACAO: { rotulo: 'Ocorrência finalizada (CCO)', categoria: 'cco' },
+  CCO_REABERTURA: { rotulo: 'Ocorrência reaberta (CCO)', categoria: 'cco', sensivel: true },
 };
 
 /** Ação desconhecida: deduz a categoria pelo código e deixa o rótulo legível. */

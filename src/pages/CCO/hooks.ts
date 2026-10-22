@@ -27,7 +27,12 @@ export const useUnidade = (id?: string | null) =>
 export const useDetalheNaUrl = () => {
   const [params, setParams] = useSearchParams();
   const id = params.get('ocorrencia');
-  const abrir = useCallback((novo: string) => setParams((atual) => { atual.set('ocorrencia', novo); return atual; }), [setParams]);
-  const fechar = useCallback(() => setParams((atual) => { atual.delete('ocorrencia'); return atual; }, { replace: true }), [setParams]);
-  return { id, abrir, fechar };
+  const acao = params.get('acao');
+  const abrir = useCallback((novo: string, novaAcao?: 'andamento') => setParams((atual) => {
+    atual.set('ocorrencia', novo);
+    if (novaAcao) atual.set('acao', novaAcao); else atual.delete('acao');
+    return atual;
+  }), [setParams]);
+  const fechar = useCallback(() => setParams((atual) => { atual.delete('ocorrencia'); atual.delete('acao'); return atual; }, { replace: true }), [setParams]);
+  return { id, acao, abrir, fechar };
 };

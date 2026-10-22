@@ -121,7 +121,7 @@ export const ORDEM_SITUACOES: CcoSituacao[] = ['registrada', 'em_analise', 'em_a
  */
 export const descreverEvento = (evento: Pick<CcoHistorico, 'tipo' | 'descricao' | 'situacao_anterior' | 'situacao_nova'>) => {
   if (evento.tipo !== 'situacao' || !evento.situacao_nova) return evento.descricao || '';
-  if (evento.situacao_nova === 'concluida') return 'Ocorrência marcada como solucionada.';
+  if (evento.situacao_nova === 'concluida') return 'Ocorrência finalizada como Solucionada.';
   if (evento.situacao_anterior === 'concluida') return `Ocorrência reaberta: situação ${SITUACOES[evento.situacao_nova].rotulo}.`;
   const de = evento.situacao_anterior ? SITUACOES[evento.situacao_anterior].rotulo : null;
   return de ? `Situação alterada de ${de} para ${SITUACOES[evento.situacao_nova].rotulo}.` : `Situação: ${SITUACOES[evento.situacao_nova].rotulo}.`;
@@ -423,11 +423,26 @@ export const ccoService = {
     const oc = { ...lista[indice] };
     const alteracoes: Record<string, unknown> = {};
     const autor = { autor_id: user.id, autor_nome: user.nome_completo, ocorrencia_id: id };
+    const observacao = alteracao.observacao?.trim();
+
+    // Mesmas regras da função cco_atualizar_ocorrencia do banco.
+    const finalizando = alteracao.situacao === 'concluida' && oc.situacao !== 'concluida';
+    const reabrindo = oc.situacao === 'concluida' && Boolean(alteracao.situacao) && alteracao.situacao !== 'concluida';
+    if (oc.situacao === 'concluida' && !reabrindo && (observacao || alteracao.responsavel_id !== undefined)) {
+      throw new Error('Ocorrência finalizada: reabra para registrar novos andamentos.');
+    }
+    if (reabrindo && perfil !== 'admin') throw new Error('Somente o administrador reabre uma ocorrência finalizada.');
+    if (finalizando && (!observacao || observacao.length < 5)) throw new Error('Descreva a solução para finalizar a ocorrência.');
+    if (reabrindo && (!observacao || observacao.length < 5)) throw new Error('Informe o motivo da reabertura.');
+    let acao = 'CCO_ATUALIZACAO';
+    let tipoTexto: 'andamento' | 'solucao' | 'reabertura' = 'andamento';
 
     if (alteracao.situacao && alteracao.situacao !== oc.situacao) {
       adicionarHistoricoDemo({ ...autor, tipo: 'situacao', situacao_anterior: oc.situacao, situacao_nova: alteracao.situacao, descricao: `Situação alterada de ${SITUACOES[oc.situacao].rotulo} para ${SITUACOES[alteracao.situacao].rotulo}.` });
       alteracoes.situacao = { de: oc.situacao, para: alteracao.situacao };
       oc.situacao = alteracao.situacao;
+      if (finalizando) { acao = 'CCO_FINALIZACAO'; tipoTexto = 'solucao'; }
+      if (reabrindo) { acao = 'CCO_REABERTURA'; tipoTexto = 'reabertura'; }
     }
     if (alteracao.responsavel_id === null && oc.responsavel_id) {
       adicionarHistoricoDemo({ ...autor, tipo: 'responsavel', descricao: `Responsável removido (${oc.responsavel_nome}).` });
@@ -442,10 +457,9 @@ export const ccoService = {
       oc.responsavel_id = responsavel.id;
       oc.responsavel_nome = responsavel.nome_completo;
     }
-    const observacao = alteracao.observacao?.trim();
     if (observacao) {
-      adicionarHistoricoDemo({ ...autor, tipo: 'observacao', descricao: observacao });
-      alteracoes.observacao = observacao;
+      adicionarHistoricoDemo({ ...autor, tipo: tipoTexto, descricao: observacao });
+      alteracoes[tipoTexto] = observacao;
     }
     if (!Object.keys(alteracoes).length) return oc;
 
@@ -454,7 +468,7 @@ export const ccoService = {
     gravar(CHAVES.OCORRENCIAS, lista);
     await dataService.registrarLogAuditoria({
       usuario_email: user.email,
-      acao: 'CCO_ATUALIZACAO',
+      acao,
       tabela: 'cco_ocorrencias',
       registro_id: id,
       detalhes: { protocolo: oc.protocolo, unidade: oc.unidade_nome, ...alteracoes },

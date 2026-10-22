@@ -291,7 +291,7 @@ export interface CcoOcorrencia {
   updated_at: string;
 }
 
-export type CcoHistoricoTipo = 'registro' | 'situacao' | 'responsavel' | 'observacao' | 'termino';
+export type CcoHistoricoTipo = 'registro' | 'situacao' | 'responsavel' | 'observacao' | 'termino' | 'andamento' | 'solucao' | 'reabertura';
 
 export interface CcoHistorico {
   id: string;

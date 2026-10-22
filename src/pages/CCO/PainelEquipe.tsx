@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, LayoutDashboard, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, LayoutDashboard, MessageSquarePlus, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { dataService } from '@/services/dataService';
 import { ORDEM_SITUACOES, formatarDataHora } from '@/services/ccoService';
@@ -113,13 +113,28 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
               ocorrencias={filtradas}
               mostrarUnidade
               onAbrir={(oc) => detalhe.abrir(oc.id)}
+              acaoLinha={(oc) => oc.situacao === 'concluida' ? (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400" title="Ocorrência finalizada">
+                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" /><span className="hidden lg:inline">Finalizada</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => detalhe.abrir(oc.id, 'andamento')}
+                  title={`Adicionar andamento à ${oc.protocolo}`}
+                  aria-label={`Adicionar andamento à ocorrência ${oc.protocolo}`}
+                  className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-xl border border-[#b9cfe9] bg-white px-2.5 text-xs font-bold text-[#0b4fa3] transition-colors hover:bg-[#f0f6fe] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] dark:border-slate-700 dark:bg-slate-900 dark:text-sky-200"
+                >
+                  <MessageSquarePlus className="h-4 w-4" aria-hidden="true" /><span className="hidden lg:inline">Andamento</span>
+                </button>
+              )}
               vazio={<ListaVazia titulo={ativos ? 'Nenhuma ocorrência com estes filtros.' : 'Nenhuma ocorrência registrada.'} texto={ativos ? 'Ajuste ou limpe os filtros.' : undefined} />}
             />
           </div>
         )}
       </Cartao>
 
-      <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user} onFechar={detalhe.fechar} />
+      <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user} onFechar={detalhe.fechar} focarAndamento={detalhe.acao === 'andamento'} />
     </div>
   );
 };
