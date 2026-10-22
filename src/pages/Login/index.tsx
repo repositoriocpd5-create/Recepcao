@@ -24,7 +24,7 @@ export const LoginPage: React.FC = () => {
 
   // Se já logado, redirecionar
   React.useEffect(() => {
-    if (user) navigate('/');
+    if (user) navigate('/', { replace: true });
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,7 +33,7 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     try {
       await login(email.trim(), password);
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (err: any) {
       setErrorMsg(err.message || 'Credenciais inválidas. Verifique o e-mail ou a matrícula e a senha.');
     } finally {
@@ -55,7 +55,7 @@ export const LoginPage: React.FC = () => {
         }
       } catch {}
       await login(demoEmail, '', role);
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (err: any) {
       setErrorMsg(err.message);
     } finally {

@@ -6,7 +6,7 @@ export type Modulo = 'recepcao' | 'cco';
 /** Como o usuário enxerga o CCO: a unidade vê só as próprias ocorrências; equipe e admin, as das unidades autorizadas. */
 export type PerfilCco = 'unidade' | 'equipe' | 'admin';
 
-type Usuario = Pick<UserProfile, 'role' | 'acesso_cco'> | null | undefined;
+type Usuario = (Pick<UserProfile, 'role' | 'acesso_cco'> & { id?: string }) | null | undefined;
 
 export const acessaRecepcao = (user: Usuario) =>
   Boolean(user && user.role !== 'unidade_escolar' && user.role !== 'cco');
@@ -26,8 +26,38 @@ export const acessaDoisModulos = (user: Usuario) => acessaRecepcao(user) && aces
 
 export const moduloDaRota = (pathname: string): Modulo => (pathname === '/cco' || pathname.startsWith('/cco/') ? 'cco' : 'recepcao');
 
-/** Tela inicial depois do login. */
-export const rotaInicial = (user: Usuario) => (acessaRecepcao(user) ? '/recepcao' : acessaCco(user) ? '/cco' : '/login');
+// Último módulo usado (por usuário, neste aparelho): quem acessa os dois volta para onde parou.
+const chaveModulo = (id: string) => `smedu-ultimo-modulo:${id}`;
+
+export const lembrarModulo = (user: Usuario, modulo: Modulo) => {
+  if (!user?.id) return;
+  try { localStorage.setItem(chaveModulo(user.id), modulo); } catch {}
+};
+
+export const ultimoModulo = (user: Usuario): Modulo | null => {
+  if (!user?.id) return null;
+  try {
+    const salvo = localStorage.getItem(chaveModulo(user.id));
+    return salvo === 'recepcao' || salvo === 'cco' ? salvo : null;
+  } catch {
+    return null;
+  }
+};
+
+export const ROTA_DO_MODULO: Record<Modulo, string> = { recepcao: '/recepcao', cco: '/cco' };
+
+/**
+ * Para onde cada pessoa vai depois do login (ou ao abrir "/"):
+ * só Recepção → /recepcao; só CCO (escola ou equipe) → /cco;
+ * os dois → último módulo usado ou, na primeira vez, a tela de escolha.
+ */
+export const rotaInicial = (user: Usuario) => {
+  if (acessaDoisModulos(user)) {
+    const ultimo = ultimoModulo(user);
+    return ultimo ? ROTA_DO_MODULO[ultimo] : '/escolher-modulo';
+  }
+  return acessaRecepcao(user) ? '/recepcao' : acessaCco(user) ? '/cco' : '/login';
+};
 
 export const ROTULO_PAPEL: Record<string, string> = {
   admin: 'Administrador',

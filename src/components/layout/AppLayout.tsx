@@ -1,5 +1,7 @@
-import React, { useCallback, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { acessaCco, acessaRecepcao, lembrarModulo, moduloDaRota } from '@/lib/modulos';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import { MobileBottomNav } from './MobileBottomNav';
@@ -9,6 +11,14 @@ export const AppLayout: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('smedu-sidebar-collapsed') === 'true'
   );
+
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  // Guarda o módulo em uso: no próximo login, quem acessa os dois volta para ele.
+  useEffect(() => {
+    const modulo = moduloDaRota(pathname);
+    if (modulo === 'cco' ? acessaCco(user) : acessaRecepcao(user)) lembrarModulo(user, modulo);
+  }, [pathname, user]);
 
   const fecharMenu = useCallback(() => setMobileMenuOpen(false), []);
 

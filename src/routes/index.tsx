@@ -19,6 +19,7 @@ import { CrachasPage } from '@/pages/Crachas';
 import { ManualPage } from '@/pages/Manual';
 import { RamaisPage } from '@/pages/Ramais';
 import { CcoAjudaPage, CcoInicioPage, CcoOcorrenciasPage } from '@/pages/CCO';
+import { EscolherModuloPage } from '@/pages/EscolherModulo';
 import { Modulo, acessaCco, acessaRecepcao, rotaInicial } from '@/lib/modulos';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string }> = ({
@@ -49,9 +50,16 @@ const ExigeModulo: React.FC<{ modulo: Modulo }> = ({ modulo }) => {
   return permitido ? <Outlet /> : <Navigate to={rotaInicial(user)} replace />;
 };
 
+/** "/" e pós-login: cada perfil vai direto ao seu módulo, com a tela de carregamento no lugar do branco. */
 const RotaInicial: React.FC = () => {
   const { user } = useAuth();
-  return <Navigate to={rotaInicial(user)} replace />;
+  const destino = rotaInicial(user);
+  return (
+    <>
+      <LoadingScreen mensagem={destino === '/cco' ? 'Abrindo a Central Controle Operacional' : 'Abrindo o sistema'} marca={destino === '/cco' ? 'CCO' : 'RECEPÇÃO'} />
+      <Navigate to={destino} replace />
+    </>
+  );
 };
 
 export const AppRoutes: React.FC = () => {
@@ -59,17 +67,18 @@ export const AppRoutes: React.FC = () => {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
 
+      <Route path="/" element={<ProtectedRoute><RotaInicial /></ProtectedRoute>} />
+      <Route path="/escolher-modulo" element={<ProtectedRoute><EscolherModuloPage /></ProtectedRoute>} />
+
       <Route
-        path="/"
         element={
           <ProtectedRoute>
             <AppLayout />
           </ProtectedRoute>
         }
       >
-        <Route index element={<RotaInicial />} />
         <Route element={<ExigeModulo modulo="recepcao" />}>
-          <Route path="recepcao" element={<RecepcaoPage />} />
+          <Route path="/recepcao" element={<RecepcaoPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="movimentacoes" element={<MovimentacoesPage />} />
           <Route path="ramais" element={<RamaisPage />} />
@@ -92,7 +101,7 @@ export const AppRoutes: React.FC = () => {
             }
           />
         </Route>
-        <Route path="cco" element={<ExigeModulo modulo="cco" />}>
+        <Route path="/cco" element={<ExigeModulo modulo="cco" />}>
           <Route index element={<CcoInicioPage />} />
           <Route path="ocorrencias" element={<CcoOcorrenciasPage />} />
           <Route path="ajuda" element={<CcoAjudaPage />} />
