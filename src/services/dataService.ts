@@ -1298,17 +1298,24 @@ export const dataService = {
   },
 
   // 11. Auditoria
-  async getLogsAuditoria(): Promise<AuditoriaLog[]> {
+  /** Trilha de auditoria do período (mais recentes primeiro), limitada a `limite` eventos. */
+  async getLogsAuditoria(periodo: { desde?: string; ate?: string; limite?: number } = {}): Promise<AuditoriaLog[]> {
+    const limite = periodo.limite ?? 500;
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
+      let query = supabase
         .from('auditoria_logs')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(500);
+        .limit(limite);
+      if (periodo.desde) query = query.gte('created_at', periodo.desde);
+      if (periodo.ate) query = query.lte('created_at', periodo.ate);
+      const { data, error } = await query;
       return requireLiveResult(data, error, 'Não foi possível carregar logs de auditoria') as AuditoriaLog[];
-
     }
-    return getStorage<AuditoriaLog[]>(STORAGE_KEYS.AUDITORIA, INITIAL_AUDITORIA_LOGS);
+    return getStorage<AuditoriaLog[]>(STORAGE_KEYS.AUDITORIA, INITIAL_AUDITORIA_LOGS)
+      .filter((log) => (!periodo.desde || log.created_at >= periodo.desde) && (!periodo.ate || log.created_at <= periodo.ate))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, limite);
   },
 
   async registrarLogAuditoria(log: Partial<AuditoriaLog>): Promise<void> {
