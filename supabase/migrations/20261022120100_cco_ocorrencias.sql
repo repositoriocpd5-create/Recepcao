@@ -242,7 +242,7 @@ begin
   values (new.id, 'registro', 'registrada', 'Ocorrência registrada pela unidade.', new.criado_por, new.criado_por_nome);
 
   insert into public.auditoria_logs (usuario_id, usuario_email, acao, tabela, registro_id, detalhes)
-  values (new.criado_por, new.criado_por_email, 'CCO_REGISTRO', 'cco_ocorrencias', new.id::text, jsonb_build_object(
+  values (new.criado_por, new.criado_por_email, 'CCO_REGISTRO', 'cco_ocorrencias', new.id, jsonb_build_object(
     'protocolo', new.protocolo,
     'unidade', new.unidade_nome,
     'data_ocorrencia', new.data_ocorrencia,
@@ -368,7 +368,7 @@ begin
   returning * into v_oc;
 
   insert into public.auditoria_logs (usuario_id, usuario_email, acao, tabela, registro_id, detalhes)
-  values (v_autor.id, v_autor.email, 'CCO_ATUALIZACAO', 'cco_ocorrencias', v_oc.id::text,
+  values (v_autor.id, v_autor.email, 'CCO_ATUALIZACAO', 'cco_ocorrencias', v_oc.id,
     jsonb_build_object('protocolo', v_oc.protocolo, 'unidade', v_oc.unidade_nome) || v_alteracoes);
 
   return v_oc;
@@ -423,7 +423,7 @@ begin
     v_autor.id, v_autor.nome_completo);
 
   insert into public.auditoria_logs (usuario_id, usuario_email, acao, tabela, registro_id, detalhes)
-  values (v_autor.id, v_autor.email, 'CCO_TERMINO', 'cco_ocorrencias', v_oc.id::text, jsonb_build_object(
+  values (v_autor.id, v_autor.email, 'CCO_TERMINO', 'cco_ocorrencias', v_oc.id, jsonb_build_object(
     'protocolo', v_oc.protocolo, 'unidade', v_oc.unidade_nome,
     'hora_fim', to_char(p_hora_fim, 'HH24:MI'), 'termina_dia_seguinte', v_oc.termina_dia_seguinte));
 
