@@ -668,9 +668,9 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
               type="button"
               disabled={ocupado}
               onClick={() => (edicao ? onCancelarEdicao?.() : temDados ? setConfirmarLimpar(true) : limpar())}
-              className={cn(botaoSecundario, 'min-w-[198px] border-[#3b8cf0]/70 text-lg text-[#0b5fd0]')}
+              className={cn(botaoSecundario, 'w-full sm:w-auto sm:min-w-[140px]')}
             >
-              {edicao ? <><X className="h-5 w-5" aria-hidden="true" /> Cancelar edição</> : <><RotateCcw className="h-5 w-5" aria-hidden="true" /> Limpar</>}
+              {edicao ? <><X className="h-4 w-4" aria-hidden="true" /> Cancelar edição</> : <><RotateCcw className="h-4 w-4" aria-hidden="true" /> Limpar</>}
             </button>
             <button
               type="submit"
@@ -678,21 +678,21 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
               aria-busy={ocupado}
               className={cn(
                 botaoPrimario,
-                'min-w-[246px] bg-[#0b6be8] text-lg',
+                'w-full sm:w-auto sm:min-w-[200px]',
                 estado === 'sucesso' && 'bg-green-600 hover:bg-green-600 shadow-[0_10px_20px_-12px_rgba(5,150,105,.9)]',
                 estado === 'erro' && 'bg-rose-600 hover:bg-rose-700 shadow-none',
               )}
             >
               {estado === 'enviando' ? (
-                <><Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> {edicao ? 'Salvando…' : 'Enviando…'}</>
+                <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> {edicao ? 'Salvando…' : 'Enviando…'}</>
               ) : estado === 'sucesso' ? (
-                <><Check className="h-5 w-5" aria-hidden="true" /> {edicao ? 'Alterações salvas' : camera ? 'Relato enviado' : 'Ocorrência registrada'}</>
+                <><Check className="h-4 w-4" aria-hidden="true" /> {edicao ? 'Alterações salvas' : camera ? 'Relato enviado' : 'Ocorrência registrada'}</>
               ) : estado === 'erro' ? (
-                <><RotateCcw className="h-5 w-5" aria-hidden="true" /> Tentar novamente</>
+                <><RotateCcw className="h-4 w-4" aria-hidden="true" /> Tentar novamente</>
               ) : (
                 edicao
-                  ? <><Save className="h-5 w-5" aria-hidden="true" /> Salvar alterações</>
-                  : <><Send className="h-5 w-5" aria-hidden="true" /> {camera ? 'Enviar relato' : 'Enviar ocorrência'}</>
+                  ? <><Save className="h-4 w-4" aria-hidden="true" /> Salvar alterações</>
+                  : <><Send className="h-4 w-4" aria-hidden="true" /> {camera ? 'Enviar relato' : 'Enviar ocorrência'}</>
               )}
             </button>
           </div>
