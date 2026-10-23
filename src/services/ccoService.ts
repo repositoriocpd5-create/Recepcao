@@ -12,6 +12,7 @@ import { dataService } from '@/services/dataService';
 import { RAMAIS_UNIDADES_INICIAIS } from '@/services/ramaisUnidades';
 import { DEMO_USERS } from '@/services/mockData';
 import { ResultadoGravidade, classificarPorPalavras } from '@/lib/gravidadeCco';
+import { SugestaoSituacao, sugerirSituacaoPorPalavras } from '@/lib/sugestaoSituacao';
 import {
   CcoAtualizacao,
   CcoEdicao,
@@ -692,6 +693,20 @@ export const ccoService = {
       registro_id: id,
       detalhes: { protocolo: oc.protocolo, unidade: oc.unidade_nome, grave: resultado.grave, categoria: resultado.categoria, origem: 'palavras-chave' },
     });
+  },
+
+  /**
+   * Sugestão de situação para o andamento (JEV → Gemini → palavras-chave, na Edge Function).
+   * Se a função falhar ou no modo demonstração, usa a regra de palavras-chave aqui mesmo.
+   */
+  async sugerirSituacao(oc: CcoOcorrencia, texto: string): Promise<SugestaoSituacao> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase.functions.invoke('cco-sugerir-situacao', { body: { id: oc.id, texto } });
+        if (!error && data && 'origem' in data) return data as SugestaoSituacao;
+      } catch { /* cai para a regra local */ }
+    }
+    return sugerirSituacaoPorPalavras(texto, oc.situacao);
   },
 
   /** O administrador abriu a ocorrência: a partir daqui a unidade não edita mais. */

@@ -1,15 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, CheckCircle2, Loader2, Lock, MessageSquarePlus, RotateCcw, Undo2, X } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Loader2, Lock, MessageSquarePlus, RotateCcw, Sparkles, Undo2, X } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 import { perfilCco } from '@/lib/modulos';
 import { SITUACOES, ccoService, hojeBrasilia } from '@/services/ccoService';
+import { ROTULO_ORIGEM_SUGESTAO, SugestaoSituacao } from '@/lib/sugestaoSituacao';
 import { CcoOcorrencia, CcoSituacao, UserProfile } from '@/types';
 import { Campo, caixaCampo } from './campos';
 import { ESTILO_SITUACAO, botaoPrimario, botaoSecundario } from './ui';
 
 const TEXTO_MINIMO = 5;
+/** A sugestão de situação começa a partir deste tamanho de texto, após uma pausa na digitação. */
+const TEXTO_SUGESTAO = 12;
+const ESPERA_SUGESTAO_MS = 900;
 const SUGESTOES_SOLUCAO = [
   'Imagens verificadas; nenhuma irregularidade confirmada.',
   'Guarda Municipal acionada; situação normalizada.',
@@ -61,6 +65,10 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
   // Andamento
   const [texto, setTexto] = useState('');
   const [situacao, setSituacao] = useState<CcoSituacao | ''>('');
+  // Sugestão da IA: pré-seleciona a situação até a pessoa escolher manualmente.
+  const [sugestao, setSugestao] = useState<SugestaoSituacao | null>(null);
+  const [analisando, setAnalisando] = useState(false);
+  const [escolhaManual, setEscolhaManual] = useState(false);
   const [responsavel, setResponsavel] = useState(oc.responsavel_id || '');
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
@@ -91,6 +99,34 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
     }, 250);
     return () => window.clearTimeout(t);
   }, [focarAndamento, finalizada, oc.id]);
+
+  useEffect(() => {
+    const t = texto.trim();
+    if (finalizada || t.length < TEXTO_SUGESTAO) {
+      setSugestao(null);
+      setAnalisando(false);
+      if (!escolhaManual) setSituacao('');
+      return;
+    }
+    let cancelado = false;
+    setAnalisando(true);
+    const espera = window.setTimeout(() => {
+      ccoService.sugerirSituacao(oc, t)
+        .then((resultado) => {
+          if (cancelado) return;
+          setSugestao(resultado);
+          if (!escolhaManual) setSituacao(resultado.situacao ?? '');
+        })
+        .catch(() => { if (!cancelado) setSugestao(null); })
+        .finally(() => { if (!cancelado) setAnalisando(false); });
+    }, ESPERA_SUGESTAO_MS);
+    return () => {
+      cancelado = true;
+      window.clearTimeout(espera);
+    };
+    // A escolha manual não refaz a consulta; só deixa de sobrescrever a opção.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [texto, oc.id, oc.situacao, finalizada]);
 
   const trocouResponsavel = responsavel !== (oc.responsavel_id || '');
   const trocouSituacao = Boolean(situacao) && situacao !== oc.situacao;
@@ -151,6 +187,8 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
       });
       setTexto('');
       setSituacao('');
+      setSugestao(null);
+      setEscolhaManual(false);
       setCancelarVisita(false);
       fecharVisita();
       setMensagem({
@@ -350,8 +388,29 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
             )}
           </div>
 
-          <fieldset>
+          <fieldset aria-describedby="cco-sugestao-situacao">
             <legend className="mb-1.5 block text-sm font-bold text-[#10233f] dark:text-slate-200">Situação após o andamento</legend>
+            <div id="cco-sugestao-situacao" aria-live="polite" className="mb-2 min-h-0">
+              {analisando ? (
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Analisando o texto para sugerir a situação…
+                </p>
+              ) : sugestao ? (
+                <div className="flex items-start gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs dark:border-violet-500/30 dark:bg-violet-500/10">
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-300" aria-hidden="true" />
+                  <p className="min-w-0 flex-1 text-violet-900 dark:text-violet-100">
+                    <span className="font-extrabold">{ROTULO_ORIGEM_SUGESTAO[sugestao.origem]}:</span>{' '}
+                    <span className="font-bold">{sugestao.situacao ? SITUACOES[sugestao.situacao].rotulo : `manter (${SITUACOES[oc.situacao].rotulo})`}</span>
+                    <span className="text-violet-800/90 dark:text-violet-200/80"> — {sugestao.motivo}</span>
+                    {escolhaManual && situacao !== (sugestao.situacao ?? '') && (
+                      <button type="button" onClick={() => { setSituacao(sugestao.situacao ?? ''); setEscolhaManual(false); }} className="ml-1.5 font-bold text-violet-700 underline underline-offset-2 hover:text-violet-900 dark:text-violet-300">
+                        Usar sugestão
+                      </button>
+                    )}
+                  </p>
+                </div>
+              ) : null}
+            </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {(['', ...SITUACOES_ANDAMENTO] as (CcoSituacao | '')[]).map((valor) => {
                 const ativo = situacao === valor;
@@ -366,9 +425,12 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
                         : 'border-[#cfdbea] bg-white text-[#3b4d68] hover:border-[#a9c1de] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
                     )}
                   >
-                    <input type="radio" name="cco-situacao-andamento" checked={ativo} onChange={() => setSituacao(valor)} className="sr-only" />
+                    <input type="radio" name="cco-situacao-andamento" checked={ativo} onChange={() => { setSituacao(valor); setEscolhaManual(true); }} className="sr-only" />
                     {valor && <span className={cn('h-2.5 w-2.5 rounded-full', ESTILO_SITUACAO[valor].ponto)} aria-hidden="true" />}
                     {rotulo}
+                    {sugestao && !analisando && (sugestao.situacao ?? '') === valor && (
+                      <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-300" aria-label="sugerida" />
+                    )}
                   </label>
                 );
               })}
