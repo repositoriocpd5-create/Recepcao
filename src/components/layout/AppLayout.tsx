@@ -5,6 +5,7 @@ import { acessaCco, acessaRecepcao, lembrarModulo, moduloDaRota } from '@/lib/mo
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import { MobileBottomNav } from './MobileBottomNav';
+import { Rodape } from './Rodape';
 
 export const AppLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -48,13 +49,14 @@ export const AppLayout: React.FC = () => {
         />
 
         {/* Conteúdo principal */}
-        <main className="min-w-0 flex-1 overflow-x-clip p-4 pb-28 md:pb-6 lg:px-7 lg:py-6">
+        <main className="min-w-0 flex-1 overflow-x-clip p-4 pb-6 lg:px-7 lg:py-6">
           {/* Painel do CCO: tabela com muitas colunas, usa mais largura da tela. */}
           <div className={`mx-auto w-full min-w-0 ${pathname === '/cco' ? 'max-w-[1680px]' : 'max-w-[1240px]'}`}>
             <Outlet />
           </div>
         </main>
       </div>
+      <Rodape />
       <MobileBottomNav />
     </div>
   );
