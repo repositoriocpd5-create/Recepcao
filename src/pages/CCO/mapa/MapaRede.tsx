@@ -7,6 +7,8 @@ interface Props {
   unidades: UnidadeMapa[];
   selecionada: string | null;
   rota: UnidadeMapa[];
+  /** Trajeto pelas ruas; sem ele, a rota aparece em linha reta tracejada. */
+  trajeto?: [number, number][] | null;
   onSelecionar: (id: string) => void;
 }
 
@@ -41,7 +43,7 @@ const iconeSede = L.divIcon({
 });
 
 /** Mapa (Leaflet + OpenStreetMap/CARTO) com as unidades, a sede e a rota escolhida. */
-export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, onSelecionar }) => {
+export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto, onSelecionar }) => {
   const caixa = useRef<HTMLDivElement>(null);
   const mapa = useRef<L.Map | null>(null);
   const camadaMarcadores = useRef<L.LayerGroup | null>(null);
@@ -54,7 +56,13 @@ export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, onSelec
     if (!caixa.current || mapa.current) return;
     const m = L.map(caixa.current, { zoomControl: false, attributionControl: true }).setView([SEDE.lat, SEDE.lng], 12);
     L.control.zoom({ position: 'topright', zoomInTitle: 'Aproximar', zoomOutTitle: 'Afastar' }).addTo(m);
-    tiles.current = L.tileLayer(TILE_OSM, { attribution: ATRIBUICAO, maxZoom: 19 }).addTo(m);
+    tiles.current = L.tileLayer(TILE_OSM, { attribution: ATRIBUICAO, maxZoom: 19, className: 'cco-tiles-mapa' }).addTo(m);
+    // Satélite (Esri): confere visualmente o prédio de cada escola.
+    const satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Imagens &copy; Esri, Maxar, Earthstar Geographics',
+      maxZoom: 19,
+    });
+    L.control.layers({ Mapa: tiles.current, 'Satélite': satelite }, undefined, { position: 'topright', collapsed: false }).addTo(m);
     camadaRota.current = L.layerGroup().addTo(m);
     camadaMarcadores.current = L.layerGroup().addTo(m);
     L.marker([SEDE.lat, SEDE.lng], { icon: iconeSede, zIndexOffset: 1000, keyboard: false, title: SEDE.nome }).addTo(m);
@@ -87,7 +95,7 @@ export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, onSelec
         zIndexOffset: u.id === selecionada ? 900 : u.criticidade === 'ok' ? 0 : 500 + u.prioridade / 100,
       });
       marcador.bindTooltip(
-        `<strong>${escapar(u.nome)}</strong><br/>${escapar(u.bairro ?? 'Bairro não identificado')} · ${escapar(CRITICIDADES[u.criticidade].rotulo)}${u.abertas.length ? ` · ${u.abertas.length} pendência(s)` : ''}`,
+        `<strong>${escapar(u.nome)}</strong><br/>${escapar(u.bairro ?? 'Itaguaí')} · ${escapar(CRITICIDADES[u.criticidade].rotulo)}${u.abertas.length ? ` · ${u.abertas.length} pendência(s)` : ''}`,
         { direction: 'top', offset: [0, -14] },
       );
       marcador.on('click', () => onSelecionar(u.id));
@@ -107,9 +115,15 @@ export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, onSelec
     if (!camada) return;
     camada.clearLayers();
     if (!rota.length) return;
+    if (trajeto?.length) {
+      // Contorno branco por baixo para a linha aparecer sobre qualquer fundo.
+      L.polyline(trajeto, { color: '#ffffff', weight: 8, opacity: 0.9 }).addTo(camada);
+      L.polyline(trajeto, { color: '#0b63ce', weight: 5, opacity: 0.95 }).addTo(camada);
+      return;
+    }
     const pontos: [number, number][] = [[SEDE.lat, SEDE.lng], ...rota.map((u) => [u.lat, u.lng] as [number, number])];
-    L.polyline(pontos, { color: '#0b63ce', weight: 4, opacity: 0.85, dashArray: '8 8' }).addTo(camada);
-  }, [rota]);
+    L.polyline(pontos, { color: '#0b63ce', weight: 4, opacity: 0.6, dashArray: '8 8' }).addTo(camada);
+  }, [rota, trajeto]);
 
   // Leva a unidade escolhida para o centro.
   useEffect(() => {

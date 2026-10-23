@@ -129,6 +129,44 @@ export function ordenarRota(paradas: UnidadeMapa[]): { ordem: UnidadeMapa[]; km:
   return { ordem, km };
 }
 
+export interface RotaPorRuas {
+  ordem: UnidadeMapa[];
+  /** Trajeto pelas ruas, em [lat, lng]. */
+  trajeto: [number, number][];
+  km: number;
+  minutos: number;
+}
+
+/**
+ * Rota de carro pelas ruas (OSRM, dados do OpenStreetMap): escolhe a melhor ordem de visita
+ * saindo da sede e devolve o trajeto, a distância e o tempo estimado.
+ */
+export async function buscarRotaPorRuas(paradas: UnidadeMapa[], sinal?: AbortSignal): Promise<RotaPorRuas> {
+  const pontos = [SEDE, ...paradas].map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
+  const url = `https://router.project-osrm.org/trip/v1/driving/${pontos}?source=first&roundtrip=false&geometries=geojson&overview=full`;
+  const resposta = await fetch(url, { signal: sinal });
+  if (!resposta.ok) throw new Error('Serviço de rotas indisponível.');
+  const dados = await resposta.json();
+  if (dados.code !== 'Ok' || !dados.trips?.length) throw new Error('Não foi possível calcular a rota pelas ruas.');
+  // waypoints na ordem enviada; waypoint_index = posição na viagem (0 = sede).
+  const ordem = (dados.waypoints as { waypoint_index: number }[])
+    .slice(1)
+    .map((w, i) => ({ unidade: paradas[i], posicao: w.waypoint_index }))
+    .sort((a, b) => a.posicao - b.posicao)
+    .map((x) => x.unidade);
+  const viagem = dados.trips[0];
+  return {
+    ordem,
+    trajeto: (viagem.geometry.coordinates as [number, number][]).map(([lng, lat]) => [lat, lng]),
+    km: viagem.distance / 1000,
+    minutos: Math.round(viagem.duration / 60),
+  };
+}
+
+/** "Como chegar" no Google Maps, da sede até uma unidade. */
+export const comoChegar = (u: UnidadeMapa) =>
+  `https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=${SEDE.lat},${SEDE.lng}&destination=${u.lat},${u.lng}`;
+
 /** Rota no Google Maps (carro), saindo da sede e terminando na última unidade. */
 export const linkGoogleMaps = (ordem: UnidadeMapa[]) => {
   if (!ordem.length) return '';
@@ -142,8 +180,8 @@ export const linkGoogleMaps = (ordem: UnidadeMapa[]) => {
 export function exportarCsv(unidades: UnidadeMapa[]) {
   const celula = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const linhas = [
-    ['Unidade', 'Bairro', 'Endereço', 'Criticidade', 'Pendências', 'Urgentes', 'Prazos vencidos', 'Em atendimento', 'Latitude', 'Longitude', 'Link do mapa'],
-    ...unidades.map((u) => [u.nome, u.bairro, u.endereco, CRITICIDADES[u.criticidade].rotulo, u.abertas.length, u.urgentes, u.vencidas, u.emAtendimento, u.lat, u.lng, u.mapaUrl]),
+    ['Unidade', 'Bairro', 'Criticidade', 'Pendências', 'Urgentes', 'Prazos vencidos', 'Em atendimento', 'Latitude', 'Longitude', 'Link do mapa'],
+    ...unidades.map((u) => [u.nome, u.bairro, CRITICIDADES[u.criticidade].rotulo, u.abertas.length, u.urgentes, u.vencidas, u.emAtendimento, u.lat, u.lng, u.mapaUrl]),
   ];
   const conteudo = '﻿' + linhas.map((l) => l.map(celula).join(';')).join('\r\n');
   const url = URL.createObjectURL(new Blob([conteudo], { type: 'text/csv;charset=utf-8' }));

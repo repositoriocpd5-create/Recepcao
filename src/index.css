@@ -493,5 +493,7 @@ html.dark ::placeholder { color: #64748b; }
 .cco-mapa .leaflet-control-zoom a { width: 34px; height: 34px; line-height: 32px; font-size: 18px; color: #10233f; }
 .cco-mapa .leaflet-tooltip { font-family: inherit; font-size: 12px; border-radius: 8px; }
 /* Fundo do mapa em tons neutros (claro) ou escuros, para os marcadores se destacarem. */
-.cco-mapa .leaflet-tile-pane { filter: grayscale(.85) brightness(1.04) contrast(.92); }
-.dark .cco-mapa .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) grayscale(.7) brightness(.85) contrast(.9); }
+.cco-mapa .cco-tiles-mapa { filter: grayscale(.85) brightness(1.04) contrast(.92); }
+.dark .cco-mapa .cco-tiles-mapa { filter: invert(1) hue-rotate(180deg) grayscale(.7) brightness(.85) contrast(.9); }
+.cco-mapa .leaflet-control-layers { border-radius: 10px; border: 1px solid #dbe6f3; box-shadow: 0 6px 16px -10px rgba(16,35,63,.5); font-size: 12px; padding: 4px 8px; }
+.dark .cco-mapa .leaflet-control-layers { background: #121826; color: #e2e8f0; border-color: #334155; }

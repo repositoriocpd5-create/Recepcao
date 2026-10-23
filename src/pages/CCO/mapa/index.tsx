@@ -41,6 +41,8 @@ import {
   ordenarRota,
   resumoUnidade,
   SEDE,
+  buscarRotaPorRuas,
+  comoChegar,
 } from './dados';
 
 type FiltroCriticidade = '' | 'critica' | 'atencao' | 'estavel';
@@ -118,7 +120,7 @@ export const MapaRedePage: React.FC = () => {
   const filtradas = useMemo(() => {
     const termo = normalizar(busca.trim());
     return comLocal.filter((u) => {
-      if (termo && !normalizar(`${u.nome} ${u.bairro ?? ''} ${u.endereco ?? ''}`).includes(termo)) return false;
+      if (termo && !normalizar(`${u.nome} ${u.bairro ?? ''}`).includes(termo)) return false;
       if (bairro === '__sem' ? u.bairro : bairro && u.bairro !== bairro) return false;
       if (filtroCriticidade && !GRUPO_CRITICIDADE[filtroCriticidade].includes(u.criticidade)) return false;
       if (filtroStatus === 'pendencias' && !u.abertas.length) return false;
@@ -137,7 +139,18 @@ export const MapaRedePage: React.FC = () => {
   }), [comLocal, semLocal]);
 
   const prioridades = useMemo(() => filtradas.filter((u) => u.abertas.length), [filtradas]);
-  const rota = useMemo(() => ordenarRota(paradas.map((id) => comLocal.find((u) => u.id === id)).filter(Boolean) as UnidadeMapa[]), [paradas, comLocal]);
+  const unidadesDaRota = useMemo(() => paradas.map((id) => comLocal.find((u) => u.id === id)).filter(Boolean) as UnidadeMapa[], [paradas, comLocal]);
+  // Rota pelas ruas (melhor ordem, distância e tempo); enquanto calcula ou se falhar, ordem pela mais próxima em linha reta.
+  const porRuas = useQuery({
+    queryKey: ['cco', 'rota-ruas', [...paradas].sort().join(',')],
+    queryFn: ({ signal }) => buscarRotaPorRuas(unidadesDaRota, signal),
+    enabled: unidadesDaRota.length > 0,
+    staleTime: 30 * 60_000,
+    retry: 1,
+  });
+  const retaAprox = useMemo(() => ordenarRota(unidadesDaRota), [unidadesDaRota]);
+  const rotaPorRuas = porRuas.data && porRuas.data.ordem.length === unidadesDaRota.length ? porRuas.data : null;
+  const rota = { ordem: rotaPorRuas?.ordem ?? retaAprox.ordem, km: rotaPorRuas?.km ?? retaAprox.km };
   const unidadeSelecionada = comLocal.find((u) => u.id === selecionada) || null;
   const filtrosAtivos = Boolean(busca || bairro || filtroCriticidade || filtroStatus);
 
@@ -203,9 +216,9 @@ export const MapaRedePage: React.FC = () => {
       {/* Barra de filtros e ações */}
       <div className="flex flex-wrap items-center gap-2">
         <label className="relative min-w-[200px] flex-1 lg:max-w-[240px]">
-          <span className="sr-only">Buscar escola ou endereço</span>
+          <span className="sr-only">Buscar escola ou bairro</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7f9b]" aria-hidden="true" />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar escola ou endereço" className={cn(campo, 'w-full pl-9')} />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar escola ou bairro" className={cn(campo, 'w-full pl-9')} />
         </label>
         <select aria-label="Bairro" value={bairro} onChange={(e) => setBairro(e.target.value)} className={cn(campo, 'w-[170px]')}>
           <option value="">Bairro (todos)</option>
@@ -287,7 +300,7 @@ export const MapaRedePage: React.FC = () => {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         {/* Mapa */}
         <div className={cn('relative overflow-hidden rounded-2xl border border-[#e2eaf4] bg-white shadow-[0_10px_30px_-22px_rgba(16,48,96,.45)] dark:border-slate-800', telaCheia ? 'h-[calc(100vh-260px)]' : 'h-[460px] sm:h-[560px]')}>
-          <MapaRede unidades={filtradas} selecionada={selecionada} rota={rota.ordem} onSelecionar={setSelecionada} />
+          <MapaRede unidades={filtradas} selecionada={selecionada} rota={rota.ordem} trajeto={rotaPorRuas?.trajeto} onSelecionar={setSelecionada} />
           {/* Legenda */}
           <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-xl bg-white/95 px-3 py-2 text-[11px] shadow-md dark:bg-[#121826]/95">
             <ul className="space-y-1">
@@ -311,7 +324,7 @@ export const MapaRedePage: React.FC = () => {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <h2 className="text-[15px] font-extrabold leading-snug text-[#0d2240] dark:text-slate-100">{unidadeSelecionada.nome}</h2>
-                  <p className="mt-0.5 text-xs text-[#5f7391] dark:text-slate-400">{unidadeSelecionada.endereco || unidadeSelecionada.bairro || 'Endereço não identificado'}</p>
+                  <p className="mt-0.5 text-xs text-[#5f7391] dark:text-slate-400">{unidadeSelecionada.bairro ? `${unidadeSelecionada.bairro} · Itaguaí` : 'Itaguaí'}</p>
                 </div>
                 <button type="button" onClick={() => setSelecionada(null)} aria-label="Fechar unidade" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[#6b7f9b] hover:bg-[#eef5fe] dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
               </div>
@@ -337,9 +350,12 @@ export const MapaRedePage: React.FC = () => {
                 <button type="button" onClick={() => alternarParada(unidadeSelecionada.id)} className={cn(botaoBarra, 'h-9 border border-[#b9cfe9] text-[#0b4fa3] hover:bg-[#eef5fe] dark:border-slate-700 dark:text-sky-200')}>
                   {paradas.includes(unidadeSelecionada.id) ? <><X className="h-4 w-4" /> Tirar da rota</> : <><Plus className="h-4 w-4" /> Rota</>}
                 </button>
+                <a href={comoChegar(unidadeSelecionada)} target="_blank" rel="noreferrer" className={cn(botaoBarra, 'h-9 text-[#0b63ce] hover:bg-[#eef5fe] dark:text-sky-300 dark:hover:bg-slate-800')}>
+                  <Navigation className="h-4 w-4" aria-hidden="true" /> Como chegar
+                </a>
                 {unidadeSelecionada.mapaUrl && (
                   <a href={unidadeSelecionada.mapaUrl} target="_blank" rel="noreferrer" className={cn(botaoBarra, 'h-9 text-[#0b63ce] hover:bg-[#eef5fe] dark:text-sky-300 dark:hover:bg-slate-800')}>
-                    <ExternalLink className="h-4 w-4" aria-hidden="true" /> Google Maps
+                    <ExternalLink className="h-4 w-4" aria-hidden="true" /> Endereço no Google Maps
                   </a>
                 )}
               </div>
@@ -352,8 +368,14 @@ export const MapaRedePage: React.FC = () => {
                 <h2 id="rota-titulo" className="flex items-center gap-2 text-sm font-extrabold text-[#0d2240] dark:text-slate-100"><Route className="h-4 w-4 text-[#0b63ce]" aria-hidden="true" /> Rota de vistoria</h2>
                 <button type="button" onClick={() => setParadas([])} className="text-xs font-bold text-[#6b7f9b] hover:text-rose-600">Limpar</button>
               </div>
-              <p className="mt-0.5 text-xs text-[#5f7391] dark:text-slate-400">
-                Saindo da sede · {rota.ordem.length} parada(s) · ~{rota.km.toFixed(1).replace('.', ',')} km em linha reta
+              <p className="mt-0.5 text-xs text-[#5f7391] dark:text-slate-400" aria-live="polite">
+                {porRuas.isFetching ? (
+                  <>Calculando a rota pelas ruas…</>
+                ) : rotaPorRuas ? (
+                  <>Saindo da sede · {rota.ordem.length} parada(s) · <strong className="text-[#10233f] dark:text-slate-200">{rotaPorRuas.km.toFixed(1).replace('.', ',')} km</strong> · cerca de <strong className="text-[#10233f] dark:text-slate-200">{rotaPorRuas.minutos >= 60 ? `${Math.floor(rotaPorRuas.minutos / 60)} h ${rotaPorRuas.minutos % 60} min` : `${rotaPorRuas.minutos} min`}</strong> de carro, na melhor ordem</>
+                ) : (
+                  <>Rota pelas ruas indisponível agora: ordem pela unidade mais próxima (~{rota.km.toFixed(1).replace('.', ',')} km em linha reta). O Google Maps calcula o trajeto completo.</>
+                )}
               </p>
               <ol className="mt-2 space-y-1">
                 {rota.ordem.map((u, i) => (
