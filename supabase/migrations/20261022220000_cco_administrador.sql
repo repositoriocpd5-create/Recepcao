@@ -110,8 +110,11 @@ begin
     if v_acesso.responsavel is not null and (new.nome_completo is null or new.nome_completo = split_part(new.email, '@', 1)) then
       new.nome_completo := v_acesso.responsavel;
     end if;
-  elsif v_acesso.role = 'admin' and (new.cargo is null or new.cargo = 'Recepcionista') then
-    new.cargo := 'Administrador';
+  elsif v_acesso.role = 'admin' then
+    new.cargo := coalesce(v_acesso.cargo, case when new.cargo is null or new.cargo = 'Recepcionista' then 'Administrador' else new.cargo end);
+    if v_acesso.responsavel is not null and (new.nome_completo is null or new.nome_completo = split_part(new.email, '@', 1)) then
+      new.nome_completo := v_acesso.responsavel;
+    end if;
   end if;
   return new;
 end;
