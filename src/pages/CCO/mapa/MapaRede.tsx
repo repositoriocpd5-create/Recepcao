@@ -17,7 +17,13 @@ const TILE_OSM = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const ATRIBUICAO = '&copy; <a href="https://www.openstreetmap.org/copyright">colaboradores do OpenStreetMap</a>';
 const CHECK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
 
-const escapar = (texto: string) => texto.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+const svg = (corpo: string) =>
+  `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${corpo}</svg>`;
+const ICONE_TELA_CHEIA = svg('<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>');
+const ICONE_SAIR_TELA_CHEIA = svg('<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>');
+const ICONE_ENQUADRAR = svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/>');
+
+const escapar =(texto: string) => texto.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
 /** Marcador: verde com ✓ sem pendências; cor da criticidade com o número de pendências. */
 const iconeUnidade = (u: UnidadeMapa, ativo: boolean, ordemRota?: number) => {
@@ -51,12 +57,58 @@ export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto
   const camadaRota = useRef<L.LayerGroup | null>(null);
   const tiles = useRef<L.TileLayer | null>(null);
   const enquadrou = useRef(false);
+  const unidadesAtuais = useRef(unidades);
+  unidadesAtuais.current = unidades;
 
   // Cria o mapa uma vez.
   useEffect(() => {
     if (!caixa.current || mapa.current) return;
     const m = L.map(caixa.current, { zoomControl: false, attributionControl: true }).setView([SEDE.lat, SEDE.lng], 12);
     L.control.zoom({ position: 'topright', zoomInTitle: 'Aproximar', zoomOutTitle: 'Afastar' }).addTo(m);
+
+    // Abaixo do zoom: enquadrar todas as unidades e tela cheia só do mapa.
+    const area = caixa.current.parentElement ?? caixa.current;
+    let botaoTelaCheia: HTMLAnchorElement | null = null;
+    const atualizarBotao = () => {
+      if (!botaoTelaCheia) return;
+      const cheia = document.fullscreenElement === area;
+      botaoTelaCheia.innerHTML = cheia ? ICONE_SAIR_TELA_CHEIA : ICONE_TELA_CHEIA;
+      botaoTelaCheia.title = cheia ? 'Sair da tela cheia (Esc)' : 'Tela cheia do mapa';
+      botaoTelaCheia.setAttribute('aria-label', botaoTelaCheia.title);
+      botaoTelaCheia.setAttribute('aria-pressed', String(cheia));
+    };
+    const Ferramentas = L.Control.extend({
+      onAdd() {
+        const barra = L.DomUtil.create('div', 'leaflet-bar cco-ferramentas');
+        const criar = (html: string, titulo: string, acao: () => void) => {
+          const botao = L.DomUtil.create('a', '', barra) as HTMLAnchorElement;
+          botao.href = '#';
+          botao.role = 'button';
+          botao.innerHTML = html;
+          botao.title = titulo;
+          botao.setAttribute('aria-label', titulo);
+          L.DomEvent.on(botao, 'click', (e) => {
+            L.DomEvent.preventDefault(e);
+            L.DomEvent.stopPropagation(e);
+            acao();
+          });
+          return botao;
+        };
+        criar(ICONE_ENQUADRAR, 'Ver todas as unidades', () => {
+          const pontos = unidadesAtuais.current.map((u) => [u.lat, u.lng] as [number, number]);
+          m.fitBounds(L.latLngBounds(pontos.concat([[SEDE.lat, SEDE.lng]])), { padding: [30, 30] });
+        });
+        botaoTelaCheia = criar(ICONE_TELA_CHEIA, 'Tela cheia do mapa', () => {
+          if (document.fullscreenElement === area) void document.exitFullscreen();
+          else void area.requestFullscreen?.();
+        });
+        atualizarBotao();
+        return barra;
+      },
+    });
+    new Ferramentas({ position: 'topright' }).addTo(m);
+    document.addEventListener('fullscreenchange', atualizarBotao);
+
     tiles.current = L.tileLayer(TILE_OSM, { attribution: ATRIBUICAO, maxZoom: 19, className: 'cco-tiles-mapa' }).addTo(m);
     // Satélite (Esri): confere visualmente o prédio de cada escola.
     const satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -76,6 +128,7 @@ export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto
     redimensionar.observe(caixa.current);
 
     return () => {
+      document.removeEventListener('fullscreenchange', atualizarBotao);
       redimensionar.disconnect();
       m.remove();
       mapa.current = null;

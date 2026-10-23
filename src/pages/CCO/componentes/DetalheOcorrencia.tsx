@@ -21,6 +21,8 @@ import {
   Save,
   UserRound,
   Trash2,
+  MapPin,
+  ExternalLink,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
@@ -41,6 +43,47 @@ import { CcoHistorico, CcoOcorrencia, CcoSituacao, UserProfile } from '@/types';
 import { Campo, CampoHora, caixaCampo, completarHora, horaValida } from './campos';
 import { Carregando, ESTILO_SITUACAO, SituacaoBadge, botaoPrimario } from './ui';
 import { Atendimento } from './Atendimento';
+import { useUnidade } from '../hooks';
+import { LOCALIZACOES_UNIDADES } from '@/services/localizacoesUnidades';
+
+/**
+ * Nome da unidade e, ao lado, a localização do Mapa da Rede: bairro e link para o ponto exato
+ * no Google Maps (o mesmo do mapa). O endereço de rua não é exibido porque a base de ruas
+ * disponível é imprecisa em Itaguaí.
+ */
+const UnidadeComEndereco: React.FC<{ oc: CcoOcorrencia }> = ({ oc }) => {
+  const unidade = useUnidade(oc.unidade_id);
+  const padrao = LOCALIZACOES_UNIDADES[unidade.data?.nome ?? oc.unidade_nome];
+  const bairro = unidade.data?.bairro ?? padrao?.bairro ?? null;
+  const lat = unidade.data?.latitude ?? padrao?.lat;
+  const lng = unidade.data?.longitude ?? padrao?.lng;
+  const link = unidade.data?.mapa_url ?? padrao?.mapa_url ?? (lat != null && lng != null ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}` : null);
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      <span className="font-semibold">{oc.unidade_nome}</span>
+      {(bairro || link) && (
+        <>
+          <span aria-hidden="true" className="text-[#b6c3d4] dark:text-slate-600">·</span>
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-[#0b63ce] dark:text-sky-300" aria-hidden="true" />
+            {bairro ? `${bairro}, Itaguaí - RJ` : 'Itaguaí - RJ'}
+          </span>
+          {link && (
+            <a
+              href={link}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-semibold text-[#0b63ce] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:text-sky-300"
+            >
+              Ver no mapa <ExternalLink className="h-3 w-3" aria-hidden="true" />
+              <span className="sr-only">(abre o Google Maps em outra aba)</span>
+            </a>
+          )}
+        </>
+      )}
+    </span>
+  );
+};
 
 interface Props {
   ocorrenciaId: string | null;
@@ -252,7 +295,7 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
       isOpen={Boolean(ocorrenciaId)}
       onClose={onFechar}
       title={oc ? `Ocorrência ${oc.protocolo}` : 'Ocorrência'}
-      description={oc ? oc.unidade_nome : undefined}
+      description={oc ? <UnidadeComEndereco oc={oc} /> : undefined}
       icon={<FileText className="h-6 w-6" />}
       maxWidth="6xl"
     >

@@ -502,3 +502,7 @@ html.dark ::placeholder { color: #64748b; }
   content: ''; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%);
   border: 6px solid transparent; border-top-color: #0b4fa3; border-bottom: 0;
 }
+.cco-ferramentas a { display: grid !important; place-items: center; width: 34px !important; height: 34px !important; color: #10233f; }
+.cco-ferramentas a:focus-visible { outline: 2px solid #0b63ce; outline-offset: 1px; }
+/* Mapa em tela cheia: ocupa a tela toda, sem bordas arredondadas. */
+:fullscreen:has(> .cco-mapa) { border-radius: 0 !important; border: 0 !important; background: #eef2f6; }

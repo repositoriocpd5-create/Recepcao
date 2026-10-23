@@ -276,7 +276,13 @@ export const MapaRedePage: React.FC = () => {
         <button type="button" onClick={() => exportarCsv(filtradas)} className={cn(botaoBarra, 'text-[#10233f] hover:bg-[#eef5fe] dark:text-slate-200 dark:hover:bg-slate-800')}>
           <Download className="h-4 w-4" aria-hidden="true" /> Exportar
         </button>
-        <button type="button" onClick={alternarTelaCheia} className={cn(botaoBarra, 'text-[#0b63ce] hover:bg-[#eef5fe] dark:text-sky-300 dark:hover:bg-slate-800')}>
+        <button
+          type="button"
+          onClick={alternarTelaCheia}
+          aria-pressed={telaCheia}
+          title={telaCheia ? 'Sair da tela cheia (Esc)' : 'Tela cheia: filtros, indicadores, mapa e prioridades'}
+          className={cn(botaoBarra, 'text-[#0b63ce] hover:bg-[#eef5fe] dark:text-sky-300 dark:hover:bg-slate-800')}
+        >
           {telaCheia ? <Minimize2 className="h-4 w-4" aria-hidden="true" /> : <Maximize2 className="h-4 w-4" aria-hidden="true" />}
           {telaCheia ? 'Sair da tela cheia' : 'Tela cheia'}
         </button>
