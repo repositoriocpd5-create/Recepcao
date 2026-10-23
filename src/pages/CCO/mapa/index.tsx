@@ -28,6 +28,8 @@ import { dataService } from '@/services/dataService';
 import { useOcorrencias } from '../hooks';
 import { Carregando } from '../componentes/ui';
 import { MapaRede } from './MapaRede';
+import { useTempoRealCco } from '../tempoReal';
+import { CcoOcorrencia } from '@/types';
 import {
   CRITICIDADES,
   Criticidade,
@@ -154,6 +156,16 @@ export const MapaRedePage: React.FC = () => {
   const unidadeSelecionada = comLocal.find((u) => u.id === selecionada) || null;
   const filtrosAtivos = Boolean(busca || bairro || filtroCriticidade || filtroStatus);
 
+  // Tempo real: cada nova ocorrência aparece na hora no mapa, com aviso e destaque no marcador.
+  const [novas, setNovas] = useState<CcoOcorrencia[]>([]);
+  const [destaques, setDestaques] = useState<string[]>([]);
+  const estadoTempoReal = useTempoRealCco(useCallback((oc: CcoOcorrencia) => {
+    setNovas((atual) => [oc, ...atual.filter((x) => x.id !== oc.id)].slice(0, 3));
+    setDestaques((atual) => [...new Set([...atual, oc.unidade_id])]);
+    window.setTimeout(() => setNovas((atual) => atual.filter((x) => x.id !== oc.id)), 15_000);
+    window.setTimeout(() => setDestaques((atual) => atual.filter((id) => id !== oc.unidade_id)), 60_000);
+  }, []));
+
   const mostrarAviso = (texto: string) => {
     setAviso(texto);
     window.setTimeout(() => setAviso(''), 3500);
@@ -208,10 +220,49 @@ export const MapaRedePage: React.FC = () => {
 
   return (
     <section ref={area} aria-labelledby="mapa-titulo" className={cn('space-y-4', telaCheia && 'overflow-auto bg-[#f4f8fd] p-4 dark:bg-[#0b0f19]')}>
-      <header>
-        <h1 id="mapa-titulo" className="text-2xl font-extrabold tracking-tight text-[#0d2240] sm:text-[28px] dark:text-slate-50">Mapa Operacional da Rede</h1>
-        <p className="text-sm text-[#5f7391] dark:text-slate-400">Visão territorial e roteirizador logístico de vistorias</p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 id="mapa-titulo" className="text-2xl font-extrabold tracking-tight text-[#0d2240] sm:text-[28px] dark:text-slate-50">Mapa Operacional da Rede</h1>
+          <p className="text-sm text-[#5f7391] dark:text-slate-400">Visão territorial e roteirizador logístico de vistorias</p>
+        </div>
+        <span
+          role="status"
+          title={estadoTempoReal === 'ao_vivo' ? 'Conectado: novas ocorrências aparecem na hora, sem recarregar.' : estadoTempoReal === 'demonstracao' ? 'Modo demonstração: atualiza quando outra aba registra.' : 'Reconectando… enquanto isso, o mapa se atualiza a cada minuto.'}
+          className={cn(
+            'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ring-1',
+            estadoTempoReal === 'ao_vivo' || estadoTempoReal === 'demonstracao'
+              ? 'bg-green-50 text-green-700 ring-green-200 dark:bg-green-500/10 dark:text-green-300 dark:ring-green-500/30'
+              : 'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30',
+          )}
+        >
+          <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
+            {estadoTempoReal === 'ao_vivo' && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-60 motion-reduce:animate-none" />}
+            <span className={cn('relative inline-flex h-2.5 w-2.5 rounded-full', estadoTempoReal === 'ao_vivo' || estadoTempoReal === 'demonstracao' ? 'bg-green-600' : 'bg-amber-500')} />
+          </span>
+          {estadoTempoReal === 'ao_vivo' ? 'Ao vivo' : estadoTempoReal === 'demonstracao' ? 'Ao vivo (demonstração)' : estadoTempoReal === 'conectando' ? 'Conectando…' : 'Reconectando…'}
+        </span>
       </header>
+
+      {/* Avisos de novas ocorrências (chegam pelo canal em tempo real). */}
+      {novas.length > 0 && (
+        <div aria-live="polite" className="fixed bottom-24 right-4 z-[1100] flex w-[min(92vw,360px)] flex-col gap-2 md:bottom-6">
+          {novas.map((oc) => (
+            <div key={oc.id} className="flex items-start gap-3 rounded-2xl border border-[#cfe0f5] bg-white p-3 shadow-[0_18px_40px_-18px_rgba(16,48,96,.6)] dark:border-slate-700 dark:bg-[#121826]">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300"><AlertTriangle className="h-5 w-5" aria-hidden="true" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-extrabold text-[#0d2240] dark:text-slate-100">Nova ocorrência · <span className="font-mono">{oc.protocolo}</span></p>
+                <p className="truncate text-xs font-semibold text-[#3b4d68] dark:text-slate-300">{oc.unidade_nome}</p>
+                <p className="line-clamp-2 text-xs text-[#5f7391] dark:text-slate-400">{oc.descricao}</p>
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={() => { setSelecionada(oc.unidade_id); setNovas((a) => a.filter((x) => x.id !== oc.id)); }} className="rounded-lg bg-[#0b63ce] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#0a56b4]">Ver no mapa</button>
+                  <button type="button" onClick={() => navigate(`/cco?ocorrencia=${oc.id}`)} className="rounded-lg border border-[#b9cfe9] px-3 py-1.5 text-xs font-bold text-[#0b4fa3] hover:bg-[#eef5fe] dark:border-slate-700 dark:text-sky-200">Abrir</button>
+                </div>
+              </div>
+              <button type="button" onClick={() => setNovas((a) => a.filter((x) => x.id !== oc.id))} aria-label="Fechar aviso" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[#9aaac0] hover:bg-[#eef5fe] dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Barra de filtros e ações */}
       <div className="flex flex-wrap items-center gap-2">
@@ -306,7 +357,7 @@ export const MapaRedePage: React.FC = () => {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         {/* Mapa */}
         <div className={cn('relative overflow-hidden rounded-2xl border border-[#e2eaf4] bg-white shadow-[0_10px_30px_-22px_rgba(16,48,96,.45)] dark:border-slate-800', telaCheia ? 'h-[calc(100vh-260px)]' : 'h-[460px] sm:h-[560px]')}>
-          <MapaRede unidades={filtradas} selecionada={selecionada} rota={rota.ordem} trajeto={rotaPorRuas?.trajeto} onSelecionar={setSelecionada} />
+          <MapaRede unidades={filtradas} selecionada={selecionada} rota={rota.ordem} trajeto={rotaPorRuas?.trajeto} destaques={destaques} onSelecionar={setSelecionada} />
           {/* Legenda */}
           <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-xl bg-white/95 px-3 py-2 text-[11px] shadow-md dark:bg-[#121826]/95">
             <ul className="space-y-1">

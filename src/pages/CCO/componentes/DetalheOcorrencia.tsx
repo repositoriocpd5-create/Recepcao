@@ -21,6 +21,8 @@ import {
   Save,
   UserRound,
   Trash2,
+  History,
+  ChevronDown,
   MapPin,
   ExternalLink,
 } from 'lucide-react';
@@ -127,6 +129,77 @@ const ROTULO_TEXTO: Partial<Record<CcoHistorico['tipo'], string>> = {
   andamento: 'Andamento',
   solucao: 'Solução',
   reabertura: 'Motivo da reabertura',
+};
+
+const CHAVE_HISTORICO_ABERTO = 'cco-historico-aberto';
+
+/**
+ * Histórico recolhível: fechado mostra quantos registros há e o último; ao clicar no título
+ * ele se expande para baixo (animação suave). A escolha fica lembrada neste aparelho.
+ */
+const HistoricoRecolhivel: React.FC<{ eventos: CcoHistorico[]; carregando: boolean }> = ({ eventos, carregando }) => {
+  const [aberto, setAberto] = useState(() => {
+    try { return localStorage.getItem(CHAVE_HISTORICO_ABERTO) === 'sim'; } catch { return false; }
+  });
+  const alternar = () => {
+    setAberto((atual) => {
+      try { localStorage.setItem(CHAVE_HISTORICO_ABERTO, atual ? 'nao' : 'sim'); } catch { /* sem armazenamento */ }
+      return !atual;
+    });
+  };
+  const ultimo = eventos[eventos.length - 1];
+  const idConteudo = 'cco-historico-conteudo';
+
+  return (
+    <section className="rounded-2xl border border-[#e2eaf4] bg-white dark:border-slate-800 dark:bg-transparent">
+      <h3>
+        <button
+          type="button"
+          onClick={alternar}
+          aria-expanded={aberto}
+          aria-controls={idConteudo}
+          className="group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors hover:bg-[#f5f9fe] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] dark:hover:bg-slate-800/50"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#eaf2fd] text-[#0b63ce] dark:bg-sky-500/10 dark:text-sky-300">
+            <History className="h-[18px] w-[18px]" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-[#4c6283] dark:text-slate-300">Histórico de atendimento</span>
+              {!carregando && (
+                <span className="rounded-full bg-[#eef4fb] px-2 py-0.5 text-[11px] font-bold tabular-nums text-[#3b4d68] dark:bg-slate-800 dark:text-slate-300">
+                  {eventos.length} {eventos.length === 1 ? 'registro' : 'registros'}
+                </span>
+              )}
+            </span>
+            {/* Fechado: prévia do último movimento, para saber se vale abrir. */}
+            {!aberto && ultimo && (
+              <span className="mt-0.5 block truncate text-[13px] text-[#5f7391] dark:text-slate-400">
+                Último: {descreverEvento(ultimo)} · {formatarDataHora(ultimo.created_at)}
+              </span>
+            )}
+          </span>
+          <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-[#0b63ce] dark:text-sky-300">
+            <span className="hidden sm:inline">{aberto ? 'Recolher' : 'Ver tudo'}</span>
+            <ChevronDown className={cn('h-5 w-5 transition-transform duration-300 motion-reduce:transition-none', aberto && 'rotate-180')} aria-hidden="true" />
+          </span>
+        </button>
+      </h3>
+      {/* grid-rows 0fr → 1fr anima a altura real do conteúdo. */}
+      <div
+        id={idConteudo}
+        className={cn('grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none', aberto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}
+        // Fechado: fora da navegação por teclado e leitores de tela (React 18 não tipa "inert").
+        {...((aberto ? {} : { inert: "" }) as React.HTMLAttributes<HTMLDivElement>)}
+      >
+        <div className="overflow-hidden">
+          <div className={cn('px-4 pb-4 pt-1 transition-opacity duration-300 motion-reduce:transition-none', aberto ? 'opacity-100' : 'opacity-0')}>
+            {carregando ? <Carregando texto="Carregando o histórico…" /> : <Historico eventos={eventos} />}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 };
 
 const Historico: React.FC<{ eventos: CcoHistorico[] }> = ({ eventos }) => (
@@ -284,10 +357,7 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
   };
 
   const secaoHistorico = (
-    <section>
-      <Titulo>Histórico de atendimento</Titulo>
-      {historico.isLoading ? <Carregando texto="Carregando o histórico…" /> : <Historico eventos={historico.data || []} />}
-    </section>
+    <HistoricoRecolhivel carregando={historico.isLoading} eventos={historico.data || []} />
   );
 
   return (

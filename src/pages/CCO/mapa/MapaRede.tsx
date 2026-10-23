@@ -9,6 +9,8 @@ interface Props {
   rota: UnidadeMapa[];
   /** Trajeto pelas ruas; sem ele, a rota aparece em linha reta tracejada. */
   trajeto?: [number, number][] | null;
+  /** Unidades com ocorrência que acabou de chegar (anel animado no marcador). */
+  destaques?: string[];
   onSelecionar: (id: string) => void;
 }
 
@@ -26,16 +28,17 @@ const ICONE_ENQUADRAR = svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 
 const escapar =(texto: string) => texto.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
 /** Marcador: verde com ✓ sem pendências; cor da criticidade com o número de pendências. */
-const iconeUnidade = (u: UnidadeMapa, ativo: boolean, ordemRota?: number) => {
+const iconeUnidade = (u: UnidadeMapa, ativo: boolean, ordemRota?: number, nova = false) => {
   const cor = CRITICIDADES[u.criticidade].cor;
   const tamanho = u.criticidade === 'ok' ? 26 : 30;
   const pulso = u.criticidade === 'critica' ? `<span class="cco-pulso" style="background:${cor}"></span>` : '';
   const conteudo = u.criticidade === 'ok' ? CHECK : String(u.abertas.length);
   const anel = ativo ? 'box-shadow:0 0 0 4px #fff,0 0 0 7px #0b63ce;' : 'box-shadow:0 0 0 3px #fff,0 4px 10px rgba(16,35,63,.35);';
   const selo = ordemRota ? `<span class="cco-ordem">${ordemRota}</span>` : '';
+  const aviso = nova ? '<span class="cco-nova" aria-hidden="true"></span>' : '';
   return L.divIcon({
     className: 'cco-marcador',
-    html: `<span class="cco-bolha" style="width:${tamanho}px;height:${tamanho}px;background:${cor};${anel}">${pulso}<span class="cco-conteudo">${conteudo}</span>${selo}</span>`,
+    html: `<span class="cco-bolha" style="width:${tamanho}px;height:${tamanho}px;background:${cor};${anel}">${pulso}${aviso}<span class="cco-conteudo">${conteudo}</span>${selo}</span>`,
     iconSize: [tamanho, tamanho],
     iconAnchor: [tamanho / 2, tamanho / 2],
   });
@@ -50,7 +53,7 @@ const iconeSede = L.divIcon({
 });
 
 /** Mapa (Leaflet + OpenStreetMap/CARTO) com as unidades, a sede e a rota escolhida. */
-export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto, onSelecionar }) => {
+export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto, destaques = [], onSelecionar }) => {
   const caixa = useRef<HTMLDivElement>(null);
   const mapa = useRef<L.Map | null>(null);
   const camadaMarcadores = useRef<L.LayerGroup | null>(null);
@@ -144,7 +147,7 @@ export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto
     const ordem = new Map(rota.map((u, i) => [u.id, i + 1]));
     unidades.forEach((u) => {
       const marcador = L.marker([u.lat, u.lng], {
-        icon: iconeUnidade(u, u.id === selecionada, ordem.get(u.id)),
+        icon: iconeUnidade(u, u.id === selecionada, ordem.get(u.id), destaques.includes(u.id)),
         title: u.nome,
         alt: u.nome,
         riseOnHover: true,
@@ -163,7 +166,7 @@ export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto
       m.fitBounds(L.latLngBounds(unidades.map((u) => [u.lat, u.lng] as [number, number]).concat([[SEDE.lat, SEDE.lng]])), { padding: [30, 30] });
       enquadrou.current = true;
     }
-  }, [unidades, selecionada, rota, onSelecionar]);
+  }, [unidades, selecionada, rota, destaques, onSelecionar]);
 
   // Rota: linha tracejada sede → paradas, na ordem de visita.
   useEffect(() => {
