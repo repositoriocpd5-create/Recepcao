@@ -1,14 +1,27 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { acessaCco, acessaRecepcao, lembrarModulo, moduloDaRota } from '@/lib/modulos';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
-import { Menu } from 'lucide-react';
+import { MobileBottomNav } from './MobileBottomNav';
+import { Rodape } from './Rodape';
 
 export const AppLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('smedu-sidebar-collapsed') === 'true'
   );
+
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  // Guarda o módulo em uso: no próximo login, quem acessa os dois volta para ele.
+  useEffect(() => {
+    const modulo = moduloDaRota(pathname);
+    if (modulo === 'cco' ? acessaCco(user) : acessaRecepcao(user)) lembrarModulo(user, modulo);
+  }, [pathname, user]);
+
+  const fecharMenu = useCallback(() => setMobileMenuOpen(false), []);
 
   const toggleSidebar = () => {
     setSidebarCollapsed((collapsed) => {
@@ -18,43 +31,33 @@ export const AppLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_88%_74%,#e9f5ff_0,transparent_26%),linear-gradient(135deg,#f7fbff_0%,#eef6ff_100%)] text-[#152238] dark:bg-[#0b0f19] dark:text-slate-100">
-      <Navbar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} />
-
-      {/* Barra de controle móvel para abrir menu */}
-      <div className="lg:hidden flex items-center justify-between px-4 py-2 bg-white border-b border-[#dce4f0] text-xs dark:bg-[#101625] dark:border-slate-800">
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="flex items-center gap-2 text-[#627289] hover:text-[#005a9c] dark:text-slate-300 dark:hover:text-white"
-        >
-          <Menu className="w-4 h-4" />
-          <span>Menu de navegação</span>
-        </button>
-        <span className="text-slate-400">SMEDU Recepção</span>
-      </div>
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_88%_74%,#e9f5ff_0,transparent_26%),linear-gradient(135deg,#f7fbff_0%,#eef6ff_100%)] text-[#152238] dark:bg-none dark:bg-[#0b0f19] dark:text-slate-100">
+      <Navbar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} onOpenMobileMenu={() => setMobileMenuOpen(true)} />
 
       <div className="flex flex-1 relative">
         <Sidebar
           isOpen={mobileMenuOpen}
           isCollapsed={sidebarCollapsed}
-          onClose={() => setMobileMenuOpen(false)}
+          onClose={fecharMenu}
         />
 
         {/* Backdrop para mobile */}
-        {mobileMenuOpen && (
-          <div
-            className="fixed inset-0 bg-black/60 z-20 lg:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-        )}
+        <div
+          aria-hidden="true"
+          className={`fixed inset-0 z-[55] bg-[#04162e]/55 backdrop-blur-[2px] transition-opacity duration-300 md:hidden ${mobileMenuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          onClick={() => setMobileMenuOpen(false)}
+        />
 
         {/* Conteúdo principal */}
-        <main className="flex-1 p-4 lg:px-7 lg:py-6 overflow-x-hidden">
-          <div className="max-w-[1240px] mx-auto">
+        <main className="min-w-0 flex-1 overflow-x-clip p-4 pb-6 lg:px-7 lg:py-6">
+          {/* Painel do CCO: tabela com muitas colunas, usa mais largura da tela. */}
+          <div className={`mx-auto w-full min-w-0 ${pathname === '/cco' ? 'max-w-[1680px]' : 'max-w-[1240px]'}`}>
             <Outlet />
           </div>
         </main>
       </div>
+      <Rodape />
+      <MobileBottomNav />
     </div>
   );
 };

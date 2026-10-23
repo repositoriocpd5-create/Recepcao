@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "SMEDU Recepção — Controle de Acesso",
+  "short_name": "SMEDU Recepção",
+  "description": "Sistema de recepção e controle de acesso da Secretaria Municipal de Educação de Itaguaí.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#043c74",
+  "theme_color": "#005a9c",
+  "categories": ["productivity", "business"],
+  "related_applications": [{ "platform": "webapp", "url": "https://smedurecep.netlify.app/manifest.webmanifest" }],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Balcão da Recepção", "short_name": "Recepção", "url": "/recepcao", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Movimentações", "url": "/movimentacoes", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

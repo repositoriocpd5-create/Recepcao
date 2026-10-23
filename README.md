@@ -124,24 +124,45 @@ VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## 5. Publicação no Netlify
 
-O repositório já conta com o arquivo `netlify.toml` pré-configurado:
+O repositório já conta com o arquivo `netlify.toml` pré-configurado com:
 
-```toml
-[build]
-  command = "npm run build"
-  publish = "dist"
+- **Build:** `npm run build` (TypeScript + Vite), publicação da pasta `dist`, Node 20.
+- **SPA:** todas as rotas abrem o `index.html`.
+- **Cache:** `sw.js`, `index.html` e `manifest.webmanifest` nunca ficam em cache (as atualizações da PWA chegam na hora); arquivos com hash em `/static/*` ficam em cache por 1 ano.
+- **Segurança:** cabeçalhos `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` e `Permissions-Policy` (câmera liberada para o leitor de crachá).
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-```
+Passo a passo:
 
-1. Vincule seu repositório GitHub ao painel do Netlify.
-2. Adicione as variáveis de ambiente:
+1. No painel do Netlify: **Add new site → Import an existing project → GitHub** e escolha este repositório.
+2. Confirme as configurações de build (já vêm do `netlify.toml`): comando `npm run build`, pasta `dist`.
+3. Em **Site configuration → Environment variables**, cadastre:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_PUBLISHABLE_KEY`
-3. O build é automático em cada push para a branch `main`.
+
+   > ⚠️ O arquivo `.env` não vai para o GitHub. Sem essas variáveis o site publicado abre em **modo demonstração** (dados fictícios). Depois de cadastrá-las, faça um novo deploy (**Deploys → Trigger deploy**).
+4. Em **Site configuration → Build & deploy → Branches**, escolha a branch de produção (`main`) e, se quiser uma prévia da `Dev_Rec`, ative os *branch deploys*.
+5. No Supabase, em **Authentication → URL Configuration**, adicione o endereço do site do Netlify em *Site URL* / *Redirect URLs*.
+
+### Cadastro de usuários (Edge Function `admin-manage-user`)
+
+O painel **Administração** cria, edita, ativa/desativa e remove operadores no **Supabase Auth** através da Edge Function `supabase/functions/admin-manage-user`. A chave `service_role` fica apenas no servidor do Supabase — nunca no site. Somente usuários com papel **admin** conseguem chamá-la.
+
+Publique (ou republique após alterações) por um dos caminhos:
+
+- **Painel do Supabase:** *Edge Functions → Deploy a new function → Via Editor*, nome `admin-manage-user`, cole o conteúdo de `supabase/functions/admin-manage-user/index.ts` e clique em *Deploy*.
+- **Terminal:**
+  ```bash
+  npx supabase login
+  npx supabase functions deploy admin-manage-user --project-ref abkbemsfjyzuwfapwuup --use-api
+  ```
+
+Enquanto a função não estiver publicada, o cadastro mostra o aviso *"A função admin-manage-user ainda não foi publicada no Supabase"* e nada é gravado.
+
+### Aplicativo instalável (PWA)
+
+- O sistema pode ser instalado no celular. No Android/Chrome aparece o convite **"Deseja instalar o App?"**; no iPhone o mesmo convite mostra o passo a passo pelo menu **Compartilhar → Adicionar à Tela de Início**. Também há a opção **Instalar aplicativo** no menu do perfil.
+- A cada deploy, o build gera um novo `sw.js`. Os aparelhos com o app aberto mostram **"Nova versão disponível → Atualizar"**.
+- A PWA exige **HTTPS** (o Netlify já fornece). Os ícones ficam em `public/icons/`.
 
 ---
 

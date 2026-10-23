@@ -18,10 +18,22 @@ import {
   Fingerprint,
   QrCode,
   Barcode,
+  Camera,
   FileDown,
   Plus,
   Trash2,
   CircleHelp,
+  LogIn,
+  User,
+  CheckCircle2,
+  Phone,
+  Building2,
+  ShieldCheck,
+  PhoneCall,
+  MessageSquare,
+  School,
+  Mail,
+  Smartphone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -39,14 +51,103 @@ import {
   Visitante,
   Departamento,
   Setor,
+  ServidorSetorVinculo,
   Movimentacao,
   DestinoVisita,
   ConsultaServidorResultado,
   ConsultaVisitanteResultado,
+  RamalUnidade,
 } from '@/types';
-import { formatDateTime, formatTime } from '@/lib/utils';
+import { cn, formatDateTime, formatTime } from '@/lib/utils';
 import { biometricProvider, isBiometricAgentConfigured, DeviceStatus, IdentificationMethod } from '@/services/identification';
 import { generateInstitutionalPdf } from '@/services/pdfService';
+import { ReceptionClock } from '@/components/recepcao/ReceptionClock';
+import { BarcodeCameraScanner } from '@/components/recepcao/BarcodeCameraScanner';
+import { BiometriaVisitante } from '@/components/recepcao/BiometriaVisitante';
+import { RoteiroDestinosModal, isRowBackgroundClick } from '@/components/movimentacoes/RoteiroDestinosModal';
+
+interface FichaPessoaIdentificadaProps {
+  nome: string;
+  /** Foto do rosto, quando cadastrada; sem ela, mostra a inicial do nome. */
+  fotoUrl?: string | null;
+  documentos: string;
+  /** Unidade escolar ou departamento onde a pessoa está lotada (mostrado abaixo dos documentos). */
+  unidade?: { nome: string; escola: boolean } | null;
+  status: { texto: string; tom: 'sucesso' | 'alerta' };
+  dados: Array<{ icone: React.ReactNode; rotulo: string; valor: string }>;
+  extra?: React.ReactNode;
+  acoes: React.ReactNode;
+}
+
+// Conteúdo do modal "Pessoa identificada" (servidor ou visitante).
+// No celular: dados em lista compacta e barra de ações fixa no rodapé (sempre visível).
+export const FichaPessoaIdentificada: React.FC<FichaPessoaIdentificadaProps> = ({ nome, fotoUrl, documentos, unidade, status, dados, extra, acoes }) => (
+  <>
+    <div className="space-y-4 px-4 pb-4 pt-5 sm:space-y-6 sm:px-7 sm:pb-6 sm:pt-6">
+      <div className="flex flex-col gap-3 rounded-2xl border border-[#dce6f3] bg-white p-3.5 shadow-[0_10px_30px_-18px_rgba(18,44,82,.35)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-5">
+          {fotoUrl ? (
+            <img
+              src={fotoUrl}
+              alt={`Foto de ${nome}`}
+              className="h-[74px] w-14 shrink-0 rounded-2xl object-cover shadow-[0_0_0_4px_#e6f1fd] sm:h-[106px] sm:w-20 dark:shadow-[0_0_0_4px_rgba(30,64,120,.5)]"
+            />
+          ) : (
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-2xl font-extrabold text-white shadow-[0_0_0_4px_#e6f1fd] sm:h-20 sm:w-20 sm:text-4xl dark:shadow-[0_0_0_4px_rgba(30,64,120,.5)]">
+              {nome.charAt(0)}
+            </div>
+          )}
+          <div className="min-w-0">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#627289] sm:text-xs dark:text-slate-400">Identificação</span>
+            <h4 className="line-clamp-2 break-words text-lg font-extrabold leading-tight text-[#0d1f45] sm:truncate sm:text-2xl dark:text-slate-100" title={nome}>{nome}</h4>
+            <p className="mt-0.5 text-xs text-[#627289] sm:text-base dark:text-slate-400">{documentos}</p>
+            {unidade && (
+              <p className="mt-1.5 flex items-start gap-1.5 text-xs font-semibold leading-snug text-[#0b5ed7] sm:text-sm dark:text-sky-300" title={unidade.nome}>
+                {unidade.escola ? <School className="mt-px h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" /> : <Building2 className="mt-px h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />}
+                <span className="line-clamp-2">{unidade.nome}</span>
+              </p>
+            )}
+          </div>
+        </div>
+        <span className={cn(
+          'inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border px-3 py-1 text-xs font-semibold sm:gap-2 sm:self-center sm:px-4 sm:py-2 sm:text-sm',
+          status.tom === 'sucesso'
+            ? 'border-[#bfe8cd] bg-[#eefbf2] text-[#15803d] dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300'
+            : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300'
+        )}>
+          {status.tom === 'sucesso' ? <CheckCircle2 className="h-4 w-4 fill-[#16a34a] text-white sm:h-5 sm:w-5" /> : <Clock className="h-4 w-4 sm:h-5 sm:w-5" />}
+          {status.texto}
+        </span>
+      </div>
+
+      <div className="space-y-2 sm:space-y-3">
+        <h3 className="text-sm font-extrabold text-[#0d1f45] sm:text-lg dark:text-slate-100">Dados cadastrais</h3>
+        <dl className="divide-y divide-[#e3eaf4] overflow-hidden rounded-2xl border border-[#dce6f3] bg-[#fbfdff] sm:grid sm:grid-cols-3 sm:gap-3 sm:divide-y-0 sm:overflow-visible sm:rounded-none sm:border-0 sm:bg-transparent dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900 sm:dark:bg-transparent">
+          {dados.map((item) => (
+            <div key={item.rotulo} className="flex items-center gap-3 px-3.5 py-2.5 sm:items-start sm:gap-3.5 sm:rounded-2xl sm:border sm:border-[#dce6f3] sm:bg-[#fbfdff] sm:p-4 sm:dark:border-slate-800 sm:dark:bg-slate-900">
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#e9f2fd] text-[#0b5ed7] sm:h-11 sm:w-11 sm:rounded-xl dark:bg-slate-800 dark:text-sky-300 [&>svg]:h-4 [&>svg]:w-4 sm:[&>svg]:h-5 sm:[&>svg]:w-5">{item.icone}</div>
+              <div className="flex min-w-0 flex-1 items-baseline justify-between gap-3 sm:block">
+                <dt className="shrink-0 text-[11px] text-[#627289] sm:block sm:text-xs dark:text-slate-400">{item.rotulo}</dt>
+                <dd className="min-w-0 break-words text-right text-sm font-bold leading-snug text-[#0d1f45] sm:text-left sm:text-base dark:text-slate-100">{item.valor}</dd>
+              </div>
+            </div>
+          ))}
+        </dl>
+      </div>
+      {extra}
+    </div>
+    <div className="sticky bottom-0 z-10 flex gap-2 border-t border-[#e3eaf4] bg-white/95 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:justify-end sm:gap-3 sm:px-7 sm:py-5 dark:border-slate-800 dark:bg-[#121826]/95 [&>*:last-child]:flex-1 sm:[&>*:last-child]:flex-none">{acoes}</div>
+  </>
+);
+
+const MOTIVOS_ACESSO = [
+  'Atendimento institucional',
+  'Reunião',
+  'Entrega de documentos',
+  'Visita técnica',
+  'Prestação de serviço',
+  'Outro',
+];
 
 export const RecepcaoPage: React.FC = () => {
   const { user } = useAuth();
@@ -74,6 +175,7 @@ export const RecepcaoPage: React.FC = () => {
   const [isBarcodeLoading, setIsBarcodeLoading] = useState(false);
   const [isBarcodeReturnModalOpen, setIsBarcodeReturnModalOpen] = useState(false);
   const [returnBarcodeInput, setReturnBarcodeInput] = useState('');
+  const [cameraTarget, setCameraTarget] = useState<'entrada' | 'devolucao' | null>(null);
   const [returnBarcodeFeedback, setReturnBarcodeFeedback] = useState<{ valid: boolean; message: string } | null>(null);
   const [isReturningBadge, setIsReturningBadge] = useState(false);
   const returnBarcodeInputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +188,9 @@ export const RecepcaoPage: React.FC = () => {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [setores, setSetores] = useState<Setor[]>([]);
   const [todosServidores, setTodosServidores] = useState<Servidor[]>([]);
+  const [vinculosServidorSetor, setVinculosServidorSetor] = useState<ServidorSetorVinculo[]>([]);
+  // Unidades da tela de Ramais: dão o nome amigável da lotação (escola ou departamento).
+  const [unidadesRamais, setUnidadesRamais] = useState<RamalUnidade[]>([]);
 
   // Pessoas no prédio em tempo real
   const [pessoasNoPredio, setPessoasNoPredio] = useState<Movimentacao[]>([]);
@@ -95,11 +200,18 @@ export const RecepcaoPage: React.FC = () => {
   // Modais
   const [isIdentificationModalOpen, setIsIdentificationModalOpen] = useState(false);
   const [isPersonDetailsModalOpen, setIsPersonDetailsModalOpen] = useState(false);
+  // Antes da entrada: oferece completar o contato do servidor que está "Não informado".
+  const [isContatoModalOpen, setIsContatoModalOpen] = useState(false);
+  const [contatoTelefone, setContatoTelefone] = useState('');
+  const [contatoEmail, setContatoEmail] = useState('');
+  const [contatoErro, setContatoErro] = useState('');
+  const [isSalvandoContato, setIsSalvandoContato] = useState(false);
   const [isEntradaModalOpen, setIsEntradaModalOpen] = useState(false);
   const [isNovoVisitanteModalOpen, setIsNovoVisitanteModalOpen] = useState(false);
   const [isNovoServidorModalOpen, setIsNovoServidorModalOpen] = useState(false);
   const [isSaidaModalOpen, setIsSaidaModalOpen] = useState(false);
   const [movimentacaoParaSaida, setMovimentacaoParaSaida] = useState<Movimentacao | null>(null);
+  const [routeMovement, setRouteMovement] = useState<Movimentacao | null>(null);
 
   // Formulário de Registro de Entrada
   const [formDestinoDepId, setFormDestinoDepId] = useState('');
@@ -112,6 +224,10 @@ export const RecepcaoPage: React.FC = () => {
   const [formMotivo, setFormMotivo] = useState('Atendimento institucional');
   const [formObservacoes, setFormObservacoes] = useState('');
   const [isSubmittingEntrada, setIsSubmittingEntrada] = useState(false);
+  const [isAutorizacaoModalOpen, setIsAutorizacaoModalOpen] = useState(false);
+  const [autorizacaoMeio, setAutorizacaoMeio] = useState('');
+  // Map de confirmações individuais: chave = servidor_destino_id (ou índice), valor = true/false
+  const [autorizacoesIndividuais, setAutorizacoesIndividuais] = useState<Record<string, boolean>>({});
   const [destinosVisita, setDestinosVisita] = useState<DestinoVisita[]>([{ departamento_destino_id: '', setor_destino_id: '' }]);
   const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
 
@@ -122,6 +238,10 @@ export const RecepcaoPage: React.FC = () => {
   const [novoVisTelefone, setNovoVisTelefone] = useState('');
   const [novoVisEmpresa, setNovoVisEmpresa] = useState('');
   const [novoVisObservacoes, setNovoVisObservacoes] = useState('');
+  const [novoVisFoto, setNovoVisFoto] = useState<Blob | null>(null);
+  const [novoVisColetarDigital, setNovoVisColetarDigital] = useState(false);
+  const [novoVisConsentimento, setNovoVisConsentimento] = useState(false);
+  const [visitanteFotoUrl, setVisitanteFotoUrl] = useState<string | null>(null);
   const [isSubmittingVisitante, setIsSubmittingVisitante] = useState(false);
 
   // Cadastro rápido de servidor não localizado
@@ -142,20 +262,44 @@ export const RecepcaoPage: React.FC = () => {
   const carregarDadosIniciais = async () => {
     setIsLoadingPredio(true);
     try {
-      const [deps, sets, servs, movs] = await Promise.all([
+      const resultados = await Promise.allSettled([
         dataService.getDepartamentos(),
         dataService.getSetores(),
         dataService.getServidores(),
         dataService.getMovimentacoes(),
+        dataService.getServidorSetorVinculos(),
+        dataService.getRamaisUnidades(),
       ]);
-      setDepartamentos(deps);
-      setSetores(sets);
-      setTodosServidores(servs);
-      setPessoasNoPredio(movs.filter((m) => m.status === 'no_predio' || m.status === 'pendente_autorizacao'));
 
-      if (deps.length > 0 && !formDestinoDepId) {
-        setFormDestinoDepId(deps[0].id);
+      const [depsResultado, setoresResultado, servidoresResultado, movimentacoesResultado, vinculosResultado, unidadesResultado] = resultados;
+      if (depsResultado.status === 'fulfilled') {
+        setDepartamentos(depsResultado.value);
+        if (depsResultado.value.length > 0 && !formDestinoDepId) {
+          setFormDestinoDepId(depsResultado.value[0].id);
+        }
+      } else {
+        console.error('Erro ao carregar departamentos:', depsResultado.reason);
       }
+
+      if (setoresResultado.status === 'fulfilled') {
+        setSetores(setoresResultado.value);
+      } else {
+        console.error('Erro ao carregar setores:', setoresResultado.reason);
+      }
+
+      if (servidoresResultado.status === 'fulfilled') {
+        setTodosServidores(servidoresResultado.value);
+      } else {
+        console.error('Erro ao carregar servidores:', servidoresResultado.reason);
+      }
+
+      if (movimentacoesResultado.status === 'fulfilled') {
+        setPessoasNoPredio(movimentacoesResultado.value.filter((m) => m.status === 'no_predio' || m.status === 'pendente_autorizacao'));
+      } else {
+        console.error('Erro ao carregar movimentações:', movimentacoesResultado.reason);
+      }
+      if (vinculosResultado.status === 'fulfilled') setVinculosServidorSetor(vinculosResultado.value);
+      if (unidadesResultado.status === 'fulfilled') setUnidadesRamais(unidadesResultado.value);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
     } finally {
@@ -175,7 +319,9 @@ export const RecepcaoPage: React.FC = () => {
           item.tipo_pessoa,
           item.servidor?.matricula || item.visitante?.cpf || '—',
           item.cracha_numero || 'S/C',
-          `${item.departamento_destino?.sigla || 'SMEDU'} - ${item.setor_destino?.sigla || 'Geral'}`,
+          item.destinos && item.destinos.length > 1
+            ? item.destinos.map((d) => `${d.departamento_destino?.sigla || ''} - ${d.setor_destino?.nome || ''}`).filter(Boolean).join(', ')
+            : `${item.departamento_destino?.sigla || 'SMEDU'} - ${item.setor_destino?.nome || 'Geral'}`,
           item.motivo,
           formatDateTime(item.data_hora_entrada),
           item.status === 'pendente_autorizacao' ? 'Pendente' : 'No prédio',
@@ -249,42 +395,127 @@ export const RecepcaoPage: React.FC = () => {
   };
 
   // Setores e responsáveis filtrados pelo destino selecionado.
-  const setoresFiltrados = setores.filter((s) => s.departamento_id === formDestinoDepId);
-  const servidoresDestinoFiltrados = todosServidores.filter((servidor) => {
-    const texto = formServidorDestinoBusca.trim().toLocaleLowerCase('pt-BR');
-    const pertenceAoDestino =
-      servidor.departamento_id === formDestinoDepId &&
-      servidor.setor_id === formDestinoSetorId;
-    return pertenceAoDestino && (!texto || `${servidor.nome} ${servidor.matricula} ${servidor.cargo}`.toLocaleLowerCase('pt-BR').includes(texto));
-  });
+  const normalizarNomeSetor = (nome?: string) => (nome || '').trim().toLocaleUpperCase('pt-BR');
 
-  useEffect(() => {
-    setFormDestinoSetorId('');
-  }, [formDestinoDepId]);
+  /**
+   * Onde o servidor está lotado: nome da unidade escolar ou do departamento (tela de Ramais)
+   * pela lotação do quadro; sem correspondência, a própria lotação, o setor ou o departamento.
+   */
+  const unidadeDoServidor = (servidor: Servidor): { nome: string; escola: boolean } | null => {
+    const chave = (texto?: string | null) =>
+      (texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const lotacao = chave(servidor.lotacao);
+    if (lotacao) {
+      const unidade = unidadesRamais.find((u) => chave(u.lotacao) === lotacao || chave(u.nome) === lotacao);
+      if (unidade) return { nome: unidade.nome, escola: unidade.tipo === 'unidade_escolar' };
+      return { nome: servidor.lotacao!.trim(), escola: !/^smedu\b/.test(lotacao) };
+    }
+    const setorId = servidor.setor_id || vinculosServidorSetor.find((v) => v.servidor_id === servidor.id)?.setor_id;
+    const setor = setorId ? setores.find((s) => s.id === setorId) : undefined;
+    if (setor) return { nome: setor.nome, escola: false };
+    const departamento = departamentos.find((d) => d.id === servidor.departamento_id);
+    return departamento ? { nome: departamento.nome, escola: false } : null;
+  };
+  const setoresDestinoOpcoes = Array.from(
+    setores
+      .filter((setor) => setor.ativo !== false)
+      .reduce((mapa, setor) => {
+        const chave = normalizarNomeSetor(setor.nome);
+        if (!mapa.has(chave)) mapa.set(chave, setor);
+        return mapa;
+      }, new Map<string, Setor>())
+      .values(),
+  ).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
-  useEffect(() => {
-    setFormServidorDestinoId('');
-    setFormServidorDestinoBusca('');
-    setIsServidorDestinoBuscaOpen(false);
-  }, [formDestinoDepId, formDestinoSetorId]);
+  // Retorna os servidores lotados ou vinculados ao setor informado
+  const obterServidoresPorSetor = (setorId?: string) => {
+    if (!setorId) return [];
+    const setorDestino = setores.find((s) => s.id === setorId);
+    const idsSetores = new Set(
+      setorDestino
+        ? setores.filter((s) => normalizarNomeSetor(s.nome) === normalizarNomeSetor(setorDestino.nome)).map((s) => s.id)
+        : [setorId]
+    );
+    return todosServidores.filter((servidor) => {
+      return idsSetores.has(servidor.setor_id || '') ||
+        vinculosServidorSetor.some((vinculo) => vinculo.servidor_id === servidor.id && idsSetores.has(vinculo.setor_id));
+    });
+  };
 
-  // Consulta de Servidor por Matrícula
-  const handleConsultarMatricula = async (e?: React.FormEvent) => {
+  // Verifica se o servidor no setor informado exige autorização formal prévia
+  const servidorExigeAutorizacaoNoSetor = (setorId?: string, servidorId?: string) => {
+    if (!servidorId || !setorId) return false;
+    const setorDestino = setores.find((s) => s.id === setorId);
+    const idsSetores = new Set(
+      setorDestino
+        ? setores.filter((s) => normalizarNomeSetor(s.nome) === normalizarNomeSetor(setorDestino.nome)).map((s) => s.id)
+        : [setorId]
+    );
+    return vinculosServidorSetor.some(
+      (vinculo) => vinculo.servidor_id === servidorId && idsSetores.has(vinculo.setor_id) && vinculo.requer_autorizacao
+    );
+  };
+
+  // Resumo de destinos que exigem autorização formal prévia
+  const destinosComAutorizacaoRequerida = destinosVisita.filter((d) =>
+    Boolean(d.setor_destino_id && d.servidor_destino_id && servidorExigeAutorizacaoNoSetor(d.setor_destino_id, d.servidor_destino_id))
+  );
+  const destinoRequerAutorizacao = destinosComAutorizacaoRequerida.length > 0;
+  const primeiroDestinoAut = destinosComAutorizacaoRequerida[0];
+  const servidorDestinoSelecionado = primeiroDestinoAut
+    ? todosServidores.find((s) => s.id === primeiroDestinoAut.servidor_destino_id)
+    : todosServidores.find((s) => s.id === destinosVisita[0]?.servidor_destino_id);
+  const setorDestinoSelecionado = primeiroDestinoAut
+    ? setores.find((s) => s.id === primeiroDestinoAut.setor_destino_id)
+    : setores.find((s) => s.id === destinosVisita[0]?.setor_destino_id);
+
+
+  // Busca de servidor por nome: sem dígitos, o texto digitado é tratado como nome.
+  const normalizarBusca = (texto: string) =>
+    texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const isBuscaPorNome = /[a-zà-ú]/i.test(matriculaInput) && !/\d/.test(matriculaInput);
+  const termosBuscaNome = isBuscaPorNome ? normalizarBusca(matriculaInput).split(' ').filter(Boolean) : [];
+  const servidoresPorNome = termosBuscaNome.length
+    ? todosServidores
+        .filter((servidor) => {
+          const nome = normalizarBusca(servidor.nome);
+          return termosBuscaNome.every((termo) => nome.includes(termo));
+        })
+        .slice(0, 8)
+    : [];
+
+  // Consulta de Servidor por Matrícula (ou pelo nome, quando há um único resultado)
+  const handleConsultarMatricula = async (e?: React.FormEvent, matriculaEscolhida?: string) => {
     if (e) e.preventDefault();
-    if (!matriculaInput.trim()) return;
+    if (!matriculaEscolhida && isBuscaPorNome) {
+      if (servidoresPorNome.length === 1) {
+        matriculaEscolhida = servidoresPorNome[0].matricula;
+      } else {
+        setSearchFeedback({
+          type: 'error',
+          message: servidoresPorNome.length
+            ? 'Mais de um servidor encontrado. Selecione um nome na lista.'
+            : `Nenhum servidor encontrado com o nome "${matriculaInput.trim()}".`,
+        });
+        return;
+      }
+    }
+    const matricula = matriculaEscolhida ?? matriculaInput;
+    if (!matricula.trim()) return;
+    if (matriculaEscolhida) setMatriculaInput(matriculaEscolhida);
 
     setIsLoadingSearch(true);
     setSearchFeedback({ type: null, message: '' });
     setServidorResultado(null);
 
     try {
-      const res = await dataService.consultarServidorPorMatricula(matriculaInput, user);
+      const res = await dataService.consultarServidorPorMatricula(matricula, user);
       setServidorResultado(res);
 
       if (!res.encontrado) {
         setSearchFeedback({
           type: 'error',
-          message: `Nenhum servidor encontrado com a matrícula "${matriculaInput.toUpperCase()}".`,
+          message: `Nenhum servidor encontrado com a matrícula "${matricula.toUpperCase()}".`,
         });
       } else if (res.no_predio) {
         setSearchFeedback({
@@ -351,7 +582,68 @@ export const RecepcaoPage: React.FC = () => {
   };
 
   // Abrir modal de entrada para Servidor ou Visitante
+  /** (21) 98765-4321 enquanto digita. */
+  const mascaraTelefone = (valor: string) => {
+    const d = valor.replace(/\D/g, '').slice(0, 11);
+    if (d.length <= 2) return d ? `(${d}` : '';
+    if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  };
+
+  /** "Iniciar entrada" do servidor: sem telefone e e-mail, pergunta antes se quer atualizar o contato. */
+  const iniciarEntradaServidor = () => {
+    setIsPersonDetailsModalOpen(false);
+    const servidor = servidorResultado?.servidor;
+    if (servidor && !servidor.telefone?.trim() && !servidor.email?.trim()) {
+      setContatoTelefone('');
+      setContatoEmail('');
+      setContatoErro('');
+      setIsContatoModalOpen(true);
+      return;
+    }
+    handleIniciarEntrada();
+  };
+
+  const pularContato = () => {
+    setIsContatoModalOpen(false);
+    handleIniciarEntrada();
+  };
+
+  const salvarContatoEIniciar = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const servidor = servidorResultado?.servidor;
+    if (!servidor) return;
+    const telefone = contatoTelefone.trim();
+    const email = contatoEmail.trim().toLowerCase();
+    if (!telefone && !email) {
+      setContatoErro('Preencha o telefone ou o e-mail — ou toque em "Agora não".');
+      return;
+    }
+    if (telefone && telefone.replace(/\D/g, '').length < 10) {
+      setContatoErro('Telefone incompleto. Informe o DDD e o número.');
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setContatoErro('E-mail inválido.');
+      return;
+    }
+    setIsSalvandoContato(true);
+    setContatoErro('');
+    try {
+      const atualizado = await dataService.atualizarContatoServidor(servidor.id, { telefone, email });
+      setServidorResultado((atual) => (atual?.servidor ? { ...atual, servidor: { ...atual.servidor, ...atualizado, telefone: atualizado.telefone ?? telefone, email: atualizado.email ?? email } } : atual));
+      setIsContatoModalOpen(false);
+      handleIniciarEntrada();
+    } catch (err) {
+      setContatoErro(err instanceof Error ? err.message : 'Não foi possível salvar o contato.');
+    } finally {
+      setIsSalvandoContato(false);
+    }
+  };
+
   const handleIniciarEntrada = (crachaNumero = '') => {
+    void carregarDadosIniciais();
     setFormCracha(crachaNumero);
     setFormCrachaFeedback(null);
     setFormDestinoDepId('');
@@ -385,7 +677,7 @@ export const RecepcaoPage: React.FC = () => {
 
   const handleBarcodeRead = async (event: React.FormEvent) => {
     event.preventDefault();
-    const barcode = barcodeInput.trim();
+    const barcode = barcodeInput.trim().toUpperCase();
     if (!barcode) return;
     setIsBarcodeLoading(true);
     setBarcodeFeedback(null);
@@ -429,7 +721,7 @@ export const RecepcaoPage: React.FC = () => {
 
   const handleQuickBarcodeReturn = async (event: React.FormEvent) => {
     event.preventDefault();
-    const barcode = returnBarcodeInput.trim();
+    const barcode = returnBarcodeInput.trim().toUpperCase();
     if (!barcode) return;
     setIsReturningBadge(true);
     setReturnBarcodeFeedback(null);
@@ -466,9 +758,10 @@ export const RecepcaoPage: React.FC = () => {
     setDestinosVisita((atuais) => atuais.map((destino, atual) => {
       if (atual !== index) return destino;
       const proximo = { ...destino, ...alteracoes };
-      if ('departamento_destino_id' in alteracoes) {
-        proximo.setor_destino_id = '';
-        proximo.servidor_destino_id = undefined;
+      if ('setor_destino_id' in alteracoes) {
+        const setor = setores.find((item) => item.id === alteracoes.setor_destino_id);
+        proximo.departamento_destino_id = setor?.departamento_id || '';
+        proximo.servidor_destino_id = '';
       }
       return proximo;
     }));
@@ -476,25 +769,62 @@ export const RecepcaoPage: React.FC = () => {
 
   const adicionarDestinoVisita = () => {
     if (destinosVisita.length < 10) {
-      setDestinosVisita((atuais) => [...atuais, { departamento_destino_id: '', setor_destino_id: '' }]);
+      setDestinosVisita((atuais) => [...atuais, { departamento_destino_id: '', setor_destino_id: '', servidor_destino_id: '' }]);
+    }
+  };
+
+  const removerDestinoVisita = (index: number) => {
+    if (destinosVisita.length > 1) {
+      setDestinosVisita((atuais) => atuais.filter((_, itemIndex) => itemIndex !== index));
     }
   };
 
   // Confirmar Entrada Atômica
+  // Responsável que exige autorização prévia: a recepção confirma a autorização antes de registrar.
   const handleConfirmarEntrada = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (destinoRequerAutorizacao) {
+      setIsSubmittingEntrada(true);
+      try {
+        if (!(await validarCrachaParaEntrada())) return;
+        setAutorizacaoMeio('');
+        setAutorizacoesIndividuais({});
+        setIsAutorizacaoModalOpen(true);
+      } finally {
+        setIsSubmittingEntrada(false);
+      }
+      return;
+    }
+    await registrarEntrada(null);
+  };
+
+  const registrarEntrada = async (autorizacao: { situacao: 'confirmada'; meio: string } | { situacao: 'pendente' } | null) => {
     setIsSubmittingEntrada(true);
 
     try {
       if (!(await validarCrachaParaEntrada())) return;
-      const destinos = activeTab === 'visitante'
-        ? destinosVisita
-        : [{ departamento_destino_id: formDestinoDepId, setor_destino_id: formDestinoSetorId, servidor_destino_id: formServidorDestinoId || undefined }];
-      if (!destinos.length || destinos.some((destino) => !destino.departamento_destino_id || !destino.setor_destino_id)) {
-        throw new Error('Selecione o departamento e o setor de cada destino da visita.');
+      const destinosValidos = destinosVisita
+        .filter((d) => Boolean(d.setor_destino_id))
+        .map((d) => ({
+          ...d,
+          departamento_destino_id: d.departamento_destino_id || setores.find((s) => s.id === d.setor_destino_id)?.departamento_id || '',
+          servidor_destino_id: d.servidor_destino_id || undefined,
+        }));
+
+      if (!destinosValidos.length) {
+        throw new Error('Selecione pelo menos um departamento de destino para a visita.');
       }
-      const setorEscolhido = setores.find((s) => s.id === destinos[0].setor_destino_id);
-      const requerAutorizacao = destinos.some((destino) => setores.find((s) => s.id === destino.setor_destino_id)?.requer_autorizacao);
+
+      const requerAutorizacao = destinoRequerAutorizacao && autorizacao?.situacao !== 'confirmada';
+      const nomesResponsaveisAut = destinosComAutorizacaoRequerida
+        .map((d) => todosServidores.find((s) => s.id === d.servidor_destino_id)?.nome)
+        .filter(Boolean)
+        .join(', ');
+
+      const registroAutorizacao = autorizacao?.situacao === 'confirmada'
+        ? `[Autorização prévia] ${nomesResponsaveisAut || 'Responsável'} autorizou a visita (${autorizacao.meio}). Confirmado por ${user?.nome_completo || user?.email || 'recepção'} às ${formatTime(new Date().toISOString())}.`
+        : '';
+      const observacoes = [formObservacoes.trim(), registroAutorizacao].filter(Boolean).join('\n');
 
       const pessoaId =
         activeTab === 'servidor'
@@ -507,24 +837,27 @@ export const RecepcaoPage: React.FC = () => {
         {
           tipo_pessoa: activeTab,
           pessoa_id: pessoaId,
-          departamento_destino_id: destinos[0].departamento_destino_id,
-          setor_destino_id: destinos[0].setor_destino_id,
-          servidor_destino_id: destinos[0].servidor_destino_id,
+          departamento_destino_id: destinosValidos[0].departamento_destino_id,
+          setor_destino_id: destinosValidos[0].setor_destino_id,
+          servidor_destino_id: destinosValidos[0].servidor_destino_id,
           cracha_numero: formCracha.trim().toUpperCase(),
           motivo: formMotivo,
           requer_autorizacao: requerAutorizacao,
-          observacoes: formObservacoes,
-          destinos,
+          observacoes,
+          destinos: destinosValidos,
         },
         user
       );
 
+      setIsAutorizacaoModalOpen(false);
       setIsEntradaModalOpen(false);
       setSearchFeedback({
         type: 'success',
-        message: requerAutorizacao
+        message: autorizacao?.situacao === 'confirmada'
+          ? `Entrada registrada com autorização de ${nomesResponsaveisAut || 'responsável'}.`
+          : requerAutorizacao
           ? 'Entrada registrada com solicitação de autorização enviada ao setor.'
-          : `Entrada registrada com sucesso! ${destinos.length > 1 ? `${destinos.length} destinos vinculados.` : 'Crachá atribuído.'}`,
+          : `Entrada registrada com sucesso! ${destinosValidos.length > 1 ? `${destinosValidos.length} departamentos vinculados à visita.` : 'Crachá atribuído.'}`,
       });
 
       // Resetar resultados e atualizar lista
@@ -541,6 +874,22 @@ export const RecepcaoPage: React.FC = () => {
   };
 
   // Cadastrar Novo Visitante
+  const limparBiometriaVisitante = () => {
+    setNovoVisFoto(null);
+    setNovoVisColetarDigital(false);
+    setNovoVisConsentimento(false);
+  };
+
+  // Foto do visitante identificado (URL assinada e temporária do bucket privado).
+  useEffect(() => {
+    const visitante = visitanteResultado?.visitante;
+    setVisitanteFotoUrl(null);
+    if (!visitante || (!visitante.foto_path && !visitante.foto_url)) return;
+    let ativo = true;
+    dataService.getFotoVisitanteUrl(visitante).then((url) => { if (ativo) setVisitanteFotoUrl(url); });
+    return () => { ativo = false; };
+  }, [visitanteResultado?.visitante?.id, visitanteResultado?.visitante?.foto_path, visitanteResultado?.visitante?.foto_url]);
+
   const handleCadastrarVisitante = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingVisitante(true);
@@ -557,25 +906,48 @@ export const RecepcaoPage: React.FC = () => {
         user
       );
 
+      // Biometria é opcional e só é gravada com o consentimento do visitante (LGPD, art. 11).
+      let visitanteSalvo = novo;
+      const pendencias: string[] = [];
+      if (novoVisConsentimento && novoVisFoto) {
+        try {
+          visitanteSalvo = await dataService.salvarFotoVisitante(novo.id, novoVisFoto, user);
+        } catch (err) {
+          pendencias.push(err instanceof Error ? err.message : 'A foto não foi salva.');
+        }
+      }
+      if (novoVisConsentimento && novoVisColetarDigital) {
+        const leitura = await biometricProvider.startEnrollment(novo.id);
+        if (leitura.status === 'identified') {
+          try {
+            await dataService.registrarDigitalVisitante(novo.id, user);
+          } catch (err) {
+            pendencias.push(err instanceof Error ? err.message : 'A digital não foi registrada.');
+          }
+        } else {
+          pendencias.push(`Digital: ${leitura.message}`);
+        }
+      }
+
       setIsNovoVisitanteModalOpen(false);
       setVisitanteResultado({
         encontrado: true,
-        visitante: novo,
+        visitante: visitanteSalvo,
         no_predio: false,
       });
       // O cadastro é apenas a primeira etapa: encaminha diretamente para a confirmação da pessoa.
       setIsIdentificationModalOpen(false);
       setIsPersonDetailsModalOpen(true);
-      setSearchFeedback({
-        type: 'success',
-        message: `Visitante "${novo.nome}" cadastrado com sucesso! Prossiga com o registro de entrada.`,
-      });
+      setSearchFeedback(pendencias.length
+        ? { type: 'warning', message: `Visitante "${novo.nome}" cadastrado, com pendências: ${pendencias.join(' ')}` }
+        : { type: 'success', message: `Visitante "${novo.nome}" cadastrado com sucesso! Prossiga com o registro de entrada.` });
       // Limpar formulário de visitante
       setNovoVisNome('');
       setNovoVisRg('');
       setNovoVisTelefone('');
       setNovoVisEmpresa('');
       setNovoVisObservacoes('');
+      limparBiometriaVisitante();
     } catch (err: any) {
       alert(`Falha ao cadastrar: ${err.message}`);
     } finally {
@@ -648,16 +1020,23 @@ export const RecepcaoPage: React.FC = () => {
     const handleKeyboardShortcut = (event: KeyboardEvent) => {
       const element = event.target as HTMLElement | null;
       const isTyping = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement || element?.isContentEditable;
+      const key = event.code;
+
+      // F1 (servidor) e F2 (visitante): bloqueia sempre a ação padrão do navegador (F1 abre a ajuda).
+      if ((key === 'F1' || key === 'F2') && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        event.preventDefault();
+        if (isTyping) return;
+        const isServidor = key === 'F1';
+        setActiveTab(isServidor ? 'servidor' : 'visitante');
+        setIdentificationMethod(isServidor ? 'matricula' : 'cpf');
+        setSearchFeedback({ type: null, message: '' });
+        setIsIdentificationModalOpen(true);
+        return;
+      }
+
       if (isTyping || !event.altKey || event.ctrlKey || event.metaKey) return;
 
-      const key = event.code;
-      if (key === 'KeyS') {
-        event.preventDefault();
-        setActiveTab('servidor'); setIdentificationMethod('matricula'); setSearchFeedback({ type: null, message: '' }); setIsIdentificationModalOpen(true);
-      } else if (key === 'KeyV') {
-        event.preventDefault();
-        setActiveTab('visitante'); setIdentificationMethod('cpf'); setSearchFeedback({ type: null, message: '' }); setIsIdentificationModalOpen(true);
-      } else if (key === 'KeyD') {
+      if (key === 'KeyD') {
         event.preventDefault();
         setReturnBarcodeInput(''); setReturnBarcodeFeedback(null); setIsBarcodeReturnModalOpen(true);
       } else if (key === 'KeyA') {
@@ -680,22 +1059,25 @@ export const RecepcaoPage: React.FC = () => {
       <div className="hidden md:flex items-center gap-1.5 text-[11px] text-[#7b8ca4] dark:text-slate-500">
         <span>Início</span><ChevronRight className="w-3 h-3" /><span>Recepção</span><ChevronRight className="w-3 h-3" /><span className="text-[#005a9c] dark:text-emerald-400">Balcão da Recepção Central</span>
       </div>
-      {/* 1. Cabeçalho de Recepção e Indicadores Rápidos */}
+      {/* 1. Cabeçalho de Recepção */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-1">
-        <div>
+        <div className="order-2 hidden sm:block md:order-1">
           <div className="flex items-center gap-2">
             <span className="p-3 rounded-2xl bg-[#dcfce7] text-[#16a34a] border border-[#ccefd8] shadow-sm dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-500/30">
               <UserCheck className="w-6 h-6" />
             </span>
-            <h2 className="text-2xl font-extrabold tracking-tight text-[#102755] dark:text-slate-100">Balcão da Recepção Central</h2>
+            <h2 className="text-xl font-extrabold tracking-tight text-[#102755] sm:text-2xl dark:text-slate-100">Balcão da Recepção Central</h2>
           </div>
           <p className="text-sm text-[#627289] dark:text-slate-400 mt-1">
             Controle de fluxo presencial da Secretaria Municipal de Educação
           </p>
         </div>
 
-        {/* Indicadores de fluxo imediato */}
-        <div className="flex items-center gap-3">
+        <div className="order-1 md:order-2"><ReceptionClock /></div>
+      </div>
+
+      {/* Indicadores de fluxo imediato */}
+      <div className="hidden flex-wrap items-center justify-end gap-3 md:flex">
           <div className="bg-white border border-[#dce4f0] rounded-2xl px-5 py-3 flex items-center gap-4 shadow-[0_12px_24px_-18px_rgba(18,44,82,.35)] dark:bg-[#121826] dark:border-slate-800">
             <div className="p-2.5 rounded-2xl bg-[#edf5fc] text-[#0877c9] dark:bg-blue-950/60 dark:text-blue-400"><Users className="w-5 h-5" /></div>
             <div>
@@ -722,11 +1104,57 @@ export const RecepcaoPage: React.FC = () => {
             <CircleHelp className="w-4 h-4" />
             <span className="sr-only">Ver atalhos do teclado</span>
           </Button>
-        </div>
       </div>
 
       {/* 2. Seleção do fluxo principal: a identificação é o único passo nesta tela. */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Celular: dois cartões lado a lado (título, ícone e "Identificar por" com a seta). */}
+      <div className="grid grid-cols-2 gap-3 sm:hidden">
+        {([
+          {
+            metodo: 'matricula', tab: 'servidor', titulo: 'Servidor', campo: 'matrícula', Icone: Briefcase,
+            icone: 'border-[#c5e0fa] bg-[#dcecff] text-[#1677e8] dark:border-blue-500/30 dark:bg-blue-950/60 dark:text-blue-400',
+            seta: 'bg-[#087ef5] shadow-[0_6px_14px_-6px_rgba(8,126,245,.8)]',
+            ativo: 'border-[#8cc8ff] bg-[linear-gradient(160deg,#eaf4ff_0%,#f6faff_100%)] shadow-[0_14px_26px_-18px_rgba(8,119,201,.7)] dark:border-blue-500/60 dark:bg-none dark:bg-[#131b2e]',
+          },
+          {
+            metodo: 'cpf', tab: 'visitante', titulo: 'Visitante', campo: 'CPF', Icone: Users,
+            icone: 'border-[#ccefd8] bg-[#e8f8ee] text-[#16a34a] dark:border-emerald-500/30 dark:bg-emerald-950/60 dark:text-emerald-400',
+            seta: 'bg-[#00a65a] shadow-[0_6px_14px_-6px_rgba(0,166,90,.8)]',
+            ativo: 'border-[#a7ebc3] bg-[linear-gradient(160deg,#ebfbf1_0%,#f7fdf9_100%)] shadow-[0_14px_26px_-18px_rgba(22,163,74,.6)] dark:border-emerald-500/60 dark:bg-none dark:bg-[#131b2e]',
+          },
+        ] as const).map(({ metodo, tab, titulo, campo, Icone, icone, seta, ativo }) => (
+          <button
+            key={metodo}
+            type="button"
+            onClick={() => {
+              setActiveTab(tab);
+              setIdentificationMethod(metodo);
+              setSearchFeedback({ type: null, message: '' });
+              setIsIdentificationModalOpen(true);
+            }}
+            className={`flex min-w-0 flex-col rounded-[20px] border p-3 text-left transition-all duration-200 active:scale-[.98] ${
+              identificationMethod === metodo
+                ? ativo
+                : 'border-[#dce4f0] bg-white shadow-[0_10px_22px_-18px_rgba(18,44,82,.45)] dark:border-slate-800 dark:bg-[#101625]'
+            }`}
+          >
+            <h3 className="text-base font-extrabold uppercase tracking-wide text-[#102755] dark:text-slate-100">{titulo}</h3>
+            <span className={`mt-2.5 grid h-14 w-14 place-items-center rounded-2xl border shadow-sm ${icone}`}>
+              <Icone className="h-7 w-7" />
+            </span>
+            <span className="mt-3 flex items-end justify-between gap-2">
+              <span className="min-w-0 whitespace-nowrap text-xs leading-tight text-[#173b70] dark:text-slate-400">
+                Identificar por<span className="block text-sm font-extrabold text-[#102755] dark:text-slate-100">{campo}</span>
+              </span>
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-white ${seta}`}>
+                <ArrowRight className="h-5 w-5" />
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="hidden grid-cols-1 gap-4 sm:grid md:grid-cols-2">
         {/* Card Servidor */}
         <div
           onClick={() => {
@@ -735,23 +1163,23 @@ export const RecepcaoPage: React.FC = () => {
             setSearchFeedback({ type: null, message: '' });
             setIsIdentificationModalOpen(true);
           }}
-          title="Identificar servidor — atalho Alt + S"
-          className={`group relative overflow-hidden cursor-pointer rounded-2xl p-5 lg:p-6 border transition-all duration-200 text-left flex items-center gap-5 min-w-0 min-h-[128px] ${
+          title="Identificar servidor — atalho F1"
+          className={`group relative flex min-h-[128px] min-w-0 cursor-pointer items-center gap-3 overflow-hidden rounded-[20px] border p-4 text-left sm:gap-5 sm:p-5 transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
             identificationMethod === 'matricula'
-              ? 'bg-[linear-gradient(135deg,#eff8ff_0%,#fff_66%,#e2f1ff_100%)] border-[#8cc8ff] shadow-[0_18px_32px_-20px_rgba(8,119,201,.65)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
+              ? 'bg-[linear-gradient(135deg,#eff8ff_0%,#fff_66%,#e2f1ff_100%)] dark:bg-none border-[#8cc8ff] shadow-[0_18px_32px_-20px_rgba(8,119,201,.65)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
               : 'bg-white border-[#dce4f0] hover:border-[#72afe5] hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-22px_rgba(8,119,201,.65)] dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
           }`}
         >
-          <div className="relative z-10 w-20 h-20 shrink-0 rounded-2xl bg-[#dcecff] border border-[#c5e0fa] flex items-center justify-center text-[#1677e8] shadow-sm dark:bg-blue-950/60 dark:border-blue-500/30 dark:text-blue-400">
+          <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[#c5e0fa] sm:h-20 sm:w-20 bg-[#dcecff] text-[#1677e8] shadow-sm dark:border-blue-500/30 dark:bg-blue-950/60 dark:text-blue-400">
             <Briefcase className="w-8 h-8" />
           </div>
-          <div className="relative z-10 min-w-0 flex-1">
-            <h3 className="text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Servidor</h3>
+          <div className="relative z-10 min-w-0 flex-1 pr-10 pt-4 sm:pr-14 sm:pt-0">
+            <h3 className="text-base sm:text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Servidor</h3>
             <p className="text-sm font-medium text-[#173b70] dark:text-slate-400 mt-0.5">Identificar por matrícula</p>
-            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de servidores <kbd className="ml-1 rounded border border-[#b9d9f3] bg-white/70 px-1 font-mono text-[10px] text-[#0877d1]">Alt S</kbd></p>
+            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de servidores <kbd className="ml-1 hidden sm:inline rounded border border-[#b9d9f3] bg-white/70 px-1 font-mono text-[10px] text-[#0877d1]">F1</kbd></p>
           </div>
-          <div className={`relative z-10 shrink-0 ${identificationMethod === 'matricula' ? 'self-start text-[10px] mt-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-emerald-600' : 'w-11 h-11 rounded-full bg-[#0877d1] text-white grid place-items-center shadow-md group-hover:translate-x-1 transition-transform'}`}>
-            {identificationMethod === 'matricula' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar servidor" /><span className="sr-only">Alt S</span></>}
+          <div className={`absolute z-10 shrink-0 ${identificationMethod === 'matricula' ? 'right-3 top-3 whitespace-nowrap rounded-full bg-[#dcfce7] px-2.5 py-1 text-[10px] font-semibold text-emerald-600 sm:right-4 sm:top-4' : 'bottom-4 right-4 grid h-10 w-10 place-items-center rounded-full bg-[#087ef5] text-white shadow-md transition-transform group-hover:translate-x-1 sm:bottom-5 sm:right-5 sm:h-12 sm:w-12'}`}>
+            {identificationMethod === 'matricula' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar servidor" /><span className="sr-only">F1</span></>}
           </div>
         </div>
 
@@ -763,23 +1191,23 @@ export const RecepcaoPage: React.FC = () => {
             setSearchFeedback({ type: null, message: '' });
             setIsIdentificationModalOpen(true);
           }}
-          title="Identificar visitante — atalho Alt + V"
-          className={`group relative overflow-hidden cursor-pointer rounded-2xl p-5 lg:p-6 border transition-all duration-200 text-left flex items-center gap-5 min-w-0 min-h-[128px] ${
+          title="Identificar visitante — atalho F2"
+          className={`group relative flex min-h-[128px] min-w-0 cursor-pointer items-center gap-3 overflow-hidden rounded-[20px] border p-4 text-left sm:gap-5 sm:p-5 transition-all duration-200 sm:min-h-[128px] lg:p-6 ${
             identificationMethod === 'cpf'
-              ? 'bg-[linear-gradient(135deg,#effdf5_0%,#fff_66%,#dcfce7_100%)] border-[#a7ebc3] shadow-[0_18px_32px_-20px_rgba(22,163,74,.48)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
+              ? 'bg-[linear-gradient(135deg,#effdf5_0%,#fff_66%,#dcfce7_100%)] dark:bg-none border-[#a7ebc3] shadow-[0_18px_32px_-20px_rgba(22,163,74,.48)] dark:bg-[#131b2e] dark:border-emerald-500 dark:shadow-emerald-950/20 dark:ring-1 dark:ring-emerald-500/50'
               : 'bg-white border-[#dce4f0] hover:border-[#7fd6a5] hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-22px_rgba(22,163,74,.6)] dark:bg-[#101625] dark:border-slate-800 dark:hover:border-slate-700'
           }`}
         >
-          <div className="relative z-10 w-20 h-20 shrink-0 rounded-2xl bg-[#e8f8ee] border border-[#ccefd8] flex items-center justify-center text-[#16a34a] shadow-sm dark:bg-emerald-950/60 dark:border-emerald-500/30 dark:text-emerald-400">
+          <div className="relative z-10 w-14 h-14 sm:w-20 sm:h-20 shrink-0 rounded-2xl bg-[#e8f8ee] border border-[#ccefd8] flex items-center justify-center text-[#16a34a] shadow-sm dark:bg-emerald-950/60 dark:border-emerald-500/30 dark:text-emerald-400">
             <Users className="w-8 h-8" />
           </div>
-          <div className="relative z-10 min-w-0 flex-1">
-            <h3 className="text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Visitante</h3>
+          <div className="relative z-10 min-w-0 flex-1 pr-10 pt-4 sm:pr-14 sm:pt-0">
+            <h3 className="text-base sm:text-lg font-extrabold text-[#102755] uppercase tracking-wide dark:text-slate-100">Visitante</h3>
             <p className="text-sm font-medium text-[#173b70] dark:text-slate-400 mt-0.5">Identificar por CPF</p>
-            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de visitantes <kbd className="ml-1 rounded border border-[#bfe7ce] bg-white/70 px-1 font-mono text-[10px] text-[#16964a]">Alt V</kbd></p>
+            <p className="text-xs text-[#627fa5] dark:text-slate-400 mt-1">Registro de entrada e saída de visitantes <kbd className="ml-1 hidden sm:inline rounded border border-[#bfe7ce] bg-white/70 px-1 font-mono text-[10px] text-[#16964a]">F2</kbd></p>
           </div>
-          <div className={`relative z-10 shrink-0 ${identificationMethod === 'cpf' ? 'self-start text-[10px] mt-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-emerald-600' : 'w-11 h-11 rounded-full bg-[#0aa45a] text-white grid place-items-center shadow-md group-hover:translate-x-1 transition-transform'}`}>
-            {identificationMethod === 'cpf' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar visitante" /><span className="sr-only">Alt V</span></>}
+          <div className={`absolute z-10 shrink-0 ${identificationMethod === 'cpf' ? 'right-3 top-3 whitespace-nowrap rounded-full bg-[#dcfce7] px-2.5 py-1 text-[10px] font-semibold text-emerald-600 sm:right-4 sm:top-4' : 'bottom-4 right-4 grid h-10 w-10 place-items-center rounded-full bg-[#00a65a] text-white shadow-md transition-transform group-hover:translate-x-1 sm:bottom-5 sm:right-5 sm:h-12 sm:w-12'}`}>
+            {identificationMethod === 'cpf' ? '● Modo ativo' : <><ArrowRight className="w-5 h-5" aria-label="Selecionar visitante" /><span className="sr-only">F2</span></>}
           </div>
         </div>
       </div>
@@ -790,7 +1218,7 @@ export const RecepcaoPage: React.FC = () => {
             <form onSubmit={handleConsultarMatricula} className="hidden">
               <div className="flex-1">
                 <Input
-                  placeholder="Ex: SME-100201 ou SME-200781"
+                  placeholder="Ex.: 38.000 ou 38000"
                   value={matriculaInput}
                   onChange={(e) => setMatriculaInput(e.target.value)}
                   icon={<Search className="w-4 h-4" />}
@@ -896,7 +1324,7 @@ export const RecepcaoPage: React.FC = () => {
                   <span className="text-slate-400 block text-[11px]">Lotação / Departamento:</span>
                   <span className="font-semibold text-slate-200">
                     {servidorResultado.servidor.departamento?.sigla || 'SMEDU'} -{' '}
-                    {servidorResultado.servidor.setor?.sigla || 'Geral'}
+                    {servidorResultado.servidor.setor?.nome || 'Geral'}
                   </span>
                 </div>
                 <div className="bg-[#141b2d] p-3 rounded-lg border border-slate-800">
@@ -1024,16 +1452,16 @@ export const RecepcaoPage: React.FC = () => {
           <div className="flex items-start gap-3">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#edf5ff] text-[#0877d1]"><Users className="w-5 h-5" /></span>
             <div>
-              <CardTitle className="text-[15px] font-extrabold text-[#102755]"><span>Presentes no Prédio em Tempo Real</span><Badge variant="success">{pessoasNoPredio.length} ativos</Badge></CardTitle>
+              <CardTitle className="flex-wrap text-[15px] font-extrabold text-[#102755]"><span>Presentes no Prédio em Tempo Real</span><Badge variant="success" className="whitespace-nowrap">{pessoasNoPredio.length} ativos</Badge></CardTitle>
               <CardDescription>Listagem ao vivo de servidores e visitantes com entrada autorizada e crachá ativo</CardDescription>
             </div>
           </div>
-          <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
-            <Button variant="outline" size="sm" onClick={carregarDadosIniciais} title="Atualizar lista — atalho Alt + A"><RefreshCw className="w-3.5 h-3.5" /><span>Atualizar</span><kbd className="hidden xl:inline rounded border border-current/20 px-1 font-mono text-[10px] opacity-70">Alt A</kbd></Button>
+          <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-2 sm:flex sm:w-auto sm:justify-end sm:gap-3">
+            <Button variant="outline" size="sm" className="min-h-11" onClick={carregarDadosIniciais} title="Atualizar lista — atalho Alt + A" aria-label="Atualizar lista"><RefreshCw className="w-3.5 h-3.5" /><span className="hidden min-[400px]:inline">Atualizar</span><kbd className="hidden xl:inline rounded border border-current/20 px-1 font-mono text-[10px] opacity-70">Alt A</kbd></Button>
             <Button
               variant="danger"
               size="md"
-              className="min-h-11 rounded-xl px-4 text-white shadow-[0_10px_20px_-10px_rgba(225,29,72,.65)] hover:shadow-[0_14px_24px_-10px_rgba(225,29,72,.75)]"
+              className="min-h-11 min-w-0 rounded-xl px-3 text-white shadow-[0_10px_20px_-10px_rgba(225,29,72,.65)] hover:shadow-[0_14px_24px_-10px_rgba(225,29,72,.75)] sm:px-4"
               title="Devolução rápida de crachá — atalho Alt + D"
               onClick={() => {
                 setReturnBarcodeInput('');
@@ -1042,19 +1470,58 @@ export const RecepcaoPage: React.FC = () => {
               }}
             >
               <span className="flex w-6 h-6 items-center justify-center rounded-lg bg-white/20"><Barcode className="w-4 h-4" /></span>
-              <span className="flex flex-col items-start leading-tight"><strong>Devolução rápida</strong><small className="text-[10px] font-medium opacity-80">Ler crachá e registrar saída · Alt D</small></span>
+              <span className="flex min-w-0 flex-col items-start leading-tight"><strong className="truncate">Devolução rápida</strong><small className="hidden text-[10px] font-medium opacity-80 sm:block">Ler crachá e registrar saída · Alt D</small></span>
             </Button>
           </div>
         </CardHeader>
 
         {pessoasNoPredio.length === 0 ? (
-          <div className="min-h-[208px] rounded-xl border border-dashed border-[#d7e6f5] bg-[linear-gradient(180deg,#fff_0%,#f8fbff_100%)] px-6 py-8 text-center">
+          <div className="min-h-[208px] rounded-xl border border-dashed border-[#d7e6f5] bg-[linear-gradient(180deg,#fff_0%,#f8fbff_100%)] px-6 py-8 text-center dark:bg-none dark:bg-[#101625] dark:border-slate-700">
             <span className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-[#e8f3ff] text-[#5f9df2] shadow-inner"><Briefcase className="w-8 h-8" /></span>
             <p className="text-sm font-semibold text-[#5f7599]">Nenhuma pessoa registrada com movimentação aberta no momento.</p>
             <p className="mt-1 text-xs text-[#8aa0bd]">Assim que houver registros de entrada, eles serão exibidos aqui em tempo real.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Smartphone: lista em cartões no lugar da tabela */}
+          <ul className="space-y-3 md:hidden">
+            {pessoasNoPredio.map((m) => {
+              const nome = m.servidor?.nome || m.visitante?.nome || 'Não identificado';
+              const doc = m.servidor?.matricula || m.visitante?.cpf || '-';
+              const outrosDestinos = (m.destinos?.length || 1) - 1;
+              return (
+                <li
+                  key={m.id}
+                  onClick={(event) => { if (isRowBackgroundClick(event)) setRouteMovement(m); }}
+                  className="cursor-pointer rounded-xl border border-[#dce8f5] bg-white p-3 text-xs dark:border-slate-800 dark:bg-[#101625]"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-[#102755] dark:text-slate-100 break-words">{nome}</div>
+                      <div className="text-[11px] text-[#627289] dark:text-slate-400"><span className="capitalize">{m.tipo_pessoa}</span> • {doc}</div>
+                    </div>
+                    <span className="shrink-0 rounded border border-emerald-500/20 bg-[#e8f8ee] px-2 py-0.5 font-mono font-bold text-emerald-600 dark:bg-slate-800 dark:text-emerald-400">{m.cracha_numero || 'S/C'}</span>
+                  </div>
+                  <div className="mt-2 text-[#37475e] dark:text-slate-300">
+                    <span className="font-semibold">{m.departamento_destino?.sigla || 'SMEDU'}</span> - {m.setor_destino?.nome || 'Geral'}
+                    {outrosDestinos > 0 && <span className="ml-1 font-semibold text-[#0877d1] dark:text-sky-400">+{outrosDestinos}</span>}
+                  </div>
+                  {m.motivo && <div className="mt-0.5 truncate text-[11px] text-[#627289] dark:text-slate-400">{m.motivo}</div>}
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="font-mono text-[#37475e] dark:text-slate-300">{formatTime(m.data_hora_entrada)}</span>
+                      {m.status === 'pendente_autorizacao' ? <Badge variant="warning">Aguardando</Badge> : <Badge variant="success">No Prédio</Badge>}
+                    </div>
+                    <Button size="sm" variant="danger" className="min-h-9 shrink-0" onClick={() => { setMovimentacaoParaSaida(m); setIsSaidaModalOpen(true); }}>
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Saída</span>
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#151c2d] text-slate-400 border-b border-slate-800 uppercase font-mono text-[10px]">
                 <tr>
@@ -1072,10 +1539,15 @@ export const RecepcaoPage: React.FC = () => {
                   const nome = m.servidor?.nome || m.visitante?.nome || 'Não identificado';
                   const doc = m.servidor?.matricula || m.visitante?.cpf || '-';
                   const dep = m.departamento_destino?.sigla || 'SMEDU';
-                  const setor = m.setor_destino?.sigla || 'Geral';
+                  const setor = m.setor_destino?.nome || 'Geral';
 
                   return (
-                    <tr key={m.id} className="hover:bg-slate-800/30 transition-colors">
+                    <tr
+                      key={m.id}
+                      onClick={(event) => { if (isRowBackgroundClick(event)) setRouteMovement(m); }}
+                      className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                      title="Ver setores/departamentos do roteiro"
+                    >
                       <td className="py-3 px-4">
                         <div className="font-semibold text-slate-100">{nome}</div>
                         <div className="text-slate-400 text-[11px] flex items-center gap-1">
@@ -1092,6 +1564,17 @@ export const RecepcaoPage: React.FC = () => {
                         {m.servidor_destino && (
                           <div className="text-[11px] text-slate-400">
                             Aos cuidados de: {m.servidor_destino.nome}
+                          </div>
+                        )}
+                        {m.destinos && m.destinos.length > 1 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            <span
+                              className="inline-flex items-center gap-1 rounded bg-[#0d6efd]/15 px-2 py-0.5 text-[10px] font-semibold text-sky-400 border border-[#0d6efd]/30"
+                              title={m.destinos.map((d, i) => `${i + 1}. ${d.departamento_destino?.sigla || 'Dep'} - ${d.setor_destino?.nome || 'Setor'}${d.servidor_destino ? ` (${d.servidor_destino.nome})` : ''}`).join('\n')}
+                            >
+                              <Building2 className="w-3 h-3 text-sky-400" />
+                              +{m.destinos.length - 1} {m.destinos.length - 1 === 1 ? 'outro departamento' : 'outros departamentos'}
+                            </span>
                           </div>
                         )}
                       </td>
@@ -1127,20 +1610,43 @@ export const RecepcaoPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </Card>
 
+      <BarcodeCameraScanner
+        isOpen={cameraTarget !== null}
+        onClose={() => setCameraTarget(null)}
+        onDetected={(value) => {
+          if (cameraTarget === 'entrada') {
+            setFormCracha(value);
+            setFormCrachaFeedback(null);
+          } else if (cameraTarget === 'devolucao') {
+            setReturnBarcodeInput(value);
+            setReturnBarcodeFeedback(null);
+          }
+          setCameraTarget(null);
+        }}
+      />
+      <RoteiroDestinosModal
+        movimentacao={routeMovement}
+        onClose={() => setRouteMovement(null)}
+        departamentos={departamentos}
+        setores={setores}
+        servidores={todosServidores}
+      />
+
       <Modal
         isOpen={isBarcodeReturnModalOpen}
-        onClose={() => setIsBarcodeReturnModalOpen(false)}
+        onClose={() => { if (!cameraTarget && !isReturningBadge) setIsBarcodeReturnModalOpen(false); }}
         title="Devolução rápida de crachá"
-        description="Receba o crachá VISITANTE, leia o código de barras e a saída será registrada automaticamente."
+        description="Leia ou digite o código e confirme a devolução antes de registrar a saída."
         maxWidth="md"
       >
         <form onSubmit={handleQuickBarcodeReturn} className="space-y-4">
           <div className="rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] p-3 flex items-start gap-3 dark:border-emerald-500/30 dark:bg-emerald-950/30">
             <span className="p-2 rounded-lg bg-white text-[#16a34a] dark:bg-emerald-900/50"><Barcode className="w-5 h-5" /></span>
-            <div className="text-xs text-[#166534] dark:text-emerald-200"><strong>Ação automática.</strong><br />A leitura confirma a devolução, encerra a entrada em andamento e libera o crachá para o próximo visitante.</div>
+            <div className="text-xs text-[#166534] dark:text-emerald-200"><strong>Confirmação obrigatória.</strong> A leitura apenas preenche o código. A saída e a liberação do crachá acontecem somente após selecionar Registrar devolução.</div>
           </div>
           {!returnBarcodeFeedback?.valid && (
             <Input
@@ -1153,6 +1659,7 @@ export const RecepcaoPage: React.FC = () => {
               autoFocus
             />
           )}
+          {!returnBarcodeFeedback?.valid && <Button type="button" variant="outline" className="min-h-11" onClick={() => setCameraTarget('devolucao')} disabled={isReturningBadge}><Camera className="w-4 h-4" /> Ler com câmera do celular</Button>}
           {returnBarcodeFeedback && (
             <div className={`rounded-xl border-2 p-4 text-sm font-semibold ${returnBarcodeFeedback.valid ? 'border-[#86efac] bg-[#f0fdf4] text-[#166534] dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-200' : 'animate-pulse border-[#f87171] bg-[#fef2f2] text-[#b91c1c] shadow-[0_0_0_3px_rgba(248,113,113,.12)] dark:border-rose-500/50 dark:bg-rose-950/30 dark:text-rose-200'}`}>
               {returnBarcodeFeedback.message}
@@ -1174,23 +1681,48 @@ export const RecepcaoPage: React.FC = () => {
         onClose={() => setIsIdentificationModalOpen(false)}
         title={activeTab === 'servidor' ? 'Identificar servidor' : 'Identificar visitante'}
         description={activeTab === 'servidor'
-          ? 'Informe a matrícula institucional para iniciar o atendimento.'
+          ? 'Informe a matrícula institucional ou busque pelo nome para iniciar o atendimento.'
           : 'Informe o CPF do visitante para consultar o cadastro.'}
         maxWidth="md"
       >
         {activeTab === 'servidor' ? (
           <form onSubmit={handleConsultarMatricula} className="space-y-4">
             <Input
-              label="Matrícula"
-              placeholder="Ex.: SME-100201 ou SME-200781"
+              label="Matrícula ou nome"
+              placeholder="Ex.: 38000 ou Maria da Silva"
               value={matriculaInput}
-              onChange={(event) => setMatriculaInput(event.target.value)}
+              onChange={(event) => {
+                setMatriculaInput(event.target.value);
+                setSearchFeedback({ type: null, message: '' });
+              }}
               icon={<Search className="w-4 h-4" />}
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCapitalize="characters"
               autoFocus
             />
+            {isBuscaPorNome && termosBuscaNome.join('').length >= 2 && (
+              <div className="max-h-64 overflow-y-auto rounded-lg border border-[#d8e3f2] divide-y divide-[#e8eef7] dark:border-slate-700 dark:divide-slate-800">
+                {servidoresPorNome.length === 0 ? (
+                  <p className="px-3 py-2.5 text-xs text-[#627fa5] dark:text-slate-400">Nenhum servidor encontrado com esse nome.</p>
+                ) : (
+                  servidoresPorNome.map((servidor) => (
+                    <button
+                      key={servidor.id}
+                      type="button"
+                      onClick={() => handleConsultarMatricula(undefined, servidor.matricula)}
+                      className="w-full px-3 py-2 text-left hover:bg-[#f2f7fd] focus:bg-[#f2f7fd] focus:outline-none dark:hover:bg-slate-800 dark:focus:bg-slate-800"
+                    >
+                      <span className="block text-sm font-semibold text-[#102755] dark:text-slate-100">{servidor.nome}</span>
+                      <span className="block text-xs text-[#627fa5] dark:text-slate-400">Matrícula {servidor.matricula} · {servidor.cargo}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => setIsIdentificationModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" variant="primary" isLoading={isLoadingSearch}><Search className="w-4 h-4" /> Consultar matrícula</Button>
+              <Button type="submit" variant="primary" isLoading={isLoadingSearch}><Search className="w-4 h-4" /> Consultar</Button>
             </div>
           </form>
         ) : (
@@ -1202,6 +1734,9 @@ export const RecepcaoPage: React.FC = () => {
               onChange={(event) => setCpfInput(formatCpf(event.target.value))}
               icon={<Search className="w-4 h-4" />}
               maxLength={14}
+              inputMode="numeric"
+              enterKeyHint="search"
+              autoComplete="off"
               autoFocus
             />
             <div className="flex justify-end gap-3">
@@ -1235,7 +1770,7 @@ export const RecepcaoPage: React.FC = () => {
                 <UserPlus className="w-3.5 h-3.5" /> Cadastrar visitante
               </Button>
             )}
-            {activeTab === 'servidor' && !servidorResultado?.encontrado && searchFeedback.type === 'error' && (
+            {activeTab === 'servidor' && !isBuscaPorNome && !servidorResultado?.encontrado && searchFeedback.type === 'error' && (
               <Button
                 size="sm"
                 variant="outline"
@@ -1275,7 +1810,7 @@ export const RecepcaoPage: React.FC = () => {
               label="Setor"
               value={novoServSetorId}
               onChange={(event) => setNovoServSetorId(event.target.value)}
-              options={[{ value: '', label: 'Sem setor específico' }, ...setores.filter((item) => item.departamento_id === novoServDepartamentoId).map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))]}
+              options={[{ value: '', label: 'Sem setor específico' }, ...setores.filter((item) => item.departamento_id === novoServDepartamentoId).map((item) => ({ value: item.id, label: item.nome }))]}
             />
           </div>
           <Input label="Ramal" value={novoServRamal} onChange={(event) => setNovoServRamal(event.target.value)} placeholder="Ex.: 1001" />
@@ -1295,74 +1830,136 @@ export const RecepcaoPage: React.FC = () => {
           setSearchFeedback({ type: null, message: '' });
         }}
         title="Pessoa identificada"
-        description="Confirme os dados antes de iniciar o registro de entrada ou saída."
-        maxWidth="xl"
+        description="Confirme os dados para iniciar o registro."
+        icon={<User className="w-7 h-7" />}
+        maxWidth="3xl"
+        variant="destaque"
       >
         {activeTab === 'servidor' && servidorResultado?.encontrado && servidorResultado.servidor && (
-          <div className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#dce4f0] dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-[#edf5fc] border border-[#c9e1f6] flex items-center justify-center font-bold text-[#0877c9] text-lg dark:bg-blue-950/60 dark:border-blue-500/30 dark:text-blue-400">
-                  {servidorResultado.servidor.nome.charAt(0)}
-                </div>
-                <div>
-                  <h4 className="text-base font-bold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.nome}</h4>
-                  <p className="text-xs text-[#627289] dark:text-slate-400">Matrícula: <span className="font-mono font-semibold">{servidorResultado.servidor.matricula}</span> · CPF: {servidorResultado.servidor.cpf}</p>
-                </div>
-              </div>
-              <Badge variant={servidorResultado.no_predio ? 'warning' : 'success'}>{servidorResultado.no_predio ? '● Presente no prédio' : '● Apto para entrada'}</Badge>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Cargo</span><span className="font-semibold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.cargo}</span></div>
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Lotação</span><span className="font-semibold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.departamento?.sigla || 'SMEDU'} - {servidorResultado.servidor.setor?.sigla || 'Geral'}</span></div>
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Contato</span><span className="font-semibold text-[#152238] dark:text-slate-100">{servidorResultado.servidor.telefone || servidorResultado.servidor.email || 'Não informado'}</span></div>
-            </div>
-            <div className="flex justify-end gap-3 pt-1">
-              <Button variant="outline" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
+          <FichaPessoaIdentificada
+            nome={servidorResultado.servidor.nome}
+            documentos={`Matrícula: ${servidorResultado.servidor.matricula}  •  CPF: ${servidorResultado.servidor.cpf || '—'}`}
+            unidade={unidadeDoServidor(servidorResultado.servidor)}
+            status={servidorResultado.no_predio ? { texto: 'Presente no prédio', tom: 'alerta' } : { texto: 'Apto para entrada', tom: 'sucesso' }}
+            dados={[
+              { icone: <Briefcase className="w-5 h-5" />, rotulo: 'Cargo', valor: servidorResultado.servidor.cargo || 'Não informado' },
+              { icone: <Building2 className="w-5 h-5" />, rotulo: 'Lotação', valor: servidorResultado.servidor.lotacao?.trim() || unidadeDoServidor(servidorResultado.servidor)?.nome || 'Não informada' },
+              { icone: <Phone className="w-5 h-5" />, rotulo: 'Contato', valor: servidorResultado.servidor.telefone || servidorResultado.servidor.email || 'Não informado' },
+            ]}
+            acoes={<>
+              <Button variant="outline" className="min-h-12 rounded-xl px-4 sm:px-7" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
               {servidorResultado.no_predio && servidorResultado.movimentacao_atual ? (
-                <Button variant="danger" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(servidorResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
+                <Button variant="danger" className="min-h-12 rounded-xl px-4 sm:px-7" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(servidorResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
               ) : (
-                <Button variant="primary" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}>Iniciar registro de entrada <ArrowRight className="w-4 h-4" /></Button>
+                <Button variant="primary" className="min-h-12 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-4 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] hover:from-[#2a7fff] hover:to-[#0b52d6] sm:px-7" onClick={iniciarEntradaServidor}><span className="sm:hidden">Iniciar entrada</span><span className="hidden sm:inline">Iniciar registro de entrada</span> <ArrowRight className="w-5 h-5" /></Button>
               )}
-            </div>
-          </div>
+            </>}
+          />
         )}
 
         {activeTab === 'visitante' && visitanteResultado?.encontrado && visitanteResultado.visitante && (
-          <div className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#dce4f0] dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-[#e8f7ee] border border-[#ccefd8] flex items-center justify-center font-bold text-[#16a34a] text-lg dark:bg-emerald-950/60 dark:border-emerald-500/30 dark:text-emerald-400">
-                  {visitanteResultado.visitante.nome.charAt(0)}
-                </div>
-                <div>
-                  <h4 className="text-base font-bold text-[#152238] dark:text-slate-100">{visitanteResultado.visitante.nome}</h4>
-                  <p className="text-xs text-[#627289] dark:text-slate-400">CPF: <span className="font-mono font-semibold">{visitanteResultado.visitante.cpf}</span>{visitanteResultado.visitante.rg && ` · RG: ${visitanteResultado.visitante.rg}`}</p>
-                </div>
-              </div>
-              <Badge variant={visitanteResultado.no_predio ? 'warning' : 'success'}>{visitanteResultado.no_predio ? '● Entrada em andamento' : '● Apto para entrada'}</Badge>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Empresa / vínculo</span><span className="font-semibold text-[#152238] dark:text-slate-100">{visitanteResultado.visitante.empresa_orgao || 'Cidadão / Particular'}</span></div>
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Telefone</span><span className="font-semibold text-[#152238] dark:text-slate-100">{visitanteResultado.visitante.telefone || 'Não cadastrado'}</span></div>
-              <div className="bg-[#f8fbff] p-3 rounded-lg border border-[#dce4f0] dark:bg-slate-900 dark:border-slate-800"><span className="text-[#627289] dark:text-slate-400 block text-[11px]">Observação permanente</span><span className="font-semibold text-[#152238] dark:text-slate-100">{visitanteResultado.visitante.observacoes || 'Nenhuma ressalva'}</span></div>
-            </div>
-            {visitanteResultado.historico_recente && visitanteResultado.historico_recente.length > 0 && (
-              <div className="p-3 bg-[#f8fbff] rounded-lg border border-[#dce4f0] text-xs dark:bg-slate-900 dark:border-slate-800">
-                <span className="text-[#627289] dark:text-slate-400 font-medium block mb-1">Últimas visitas na SMEDU</span>
+          <FichaPessoaIdentificada
+            nome={visitanteResultado.visitante.nome}
+            fotoUrl={visitanteFotoUrl}
+            documentos={`CPF: ${visitanteResultado.visitante.cpf}${visitanteResultado.visitante.rg ? `  •  RG: ${visitanteResultado.visitante.rg}` : ''}`}
+            status={visitanteResultado.no_predio ? { texto: 'Entrada em andamento', tom: 'alerta' } : { texto: 'Apto para entrada', tom: 'sucesso' }}
+            dados={[
+              { icone: <Briefcase className="w-5 h-5" />, rotulo: 'Empresa / vínculo', valor: visitanteResultado.visitante.empresa_orgao || 'Cidadão / Particular' },
+              { icone: <Phone className="w-5 h-5" />, rotulo: 'Telefone', valor: visitanteResultado.visitante.telefone || 'Não cadastrado' },
+              { icone: <CircleHelp className="w-5 h-5" />, rotulo: 'Observação permanente', valor: visitanteResultado.visitante.observacoes || 'Nenhuma ressalva' },
+            ]}
+            extra={visitanteResultado.historico_recente && visitanteResultado.historico_recente.length > 0 && (
+              <div className="rounded-2xl border border-[#dce6f3] bg-[#fbfdff] p-4 text-xs dark:border-slate-800 dark:bg-slate-900">
+                <span className="mb-1 block font-medium text-[#627289] dark:text-slate-400">Últimas visitas na SMEDU</span>
                 {visitanteResultado.historico_recente.slice(0, 3).map((item) => <div key={item.id} className="flex justify-between gap-3 text-[#37475e] dark:text-slate-300"><span>{formatDateTime(item.data_hora_entrada)} → {item.departamento}/{item.setor} ({item.motivo})</span><span className="shrink-0">{item.data_hora_saida ? 'Saída registrada' : 'Em andamento'}</span></div>)}
               </div>
             )}
-            <div className="flex justify-end gap-3 pt-1">
-              <Button variant="outline" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
+            acoes={<>
+              <Button variant="outline" className="min-h-12 rounded-xl px-4 sm:px-7" onClick={() => setIsPersonDetailsModalOpen(false)}>Fechar</Button>
               {visitanteResultado.no_predio && visitanteResultado.movimentacao_atual ? (
-                <Button variant="danger" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(visitanteResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
+                <Button variant="danger" className="min-h-12 rounded-xl px-4 sm:px-7" onClick={() => { setIsPersonDetailsModalOpen(false); setMovimentacaoParaSaida(visitanteResultado.movimentacao_atual!); setIsSaidaModalOpen(true); }}><LogOut className="w-4 h-4" /> Registrar saída</Button>
               ) : (
-                <Button variant="primary" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}>Iniciar registro de entrada <ArrowRight className="w-4 h-4" /></Button>
+                <Button variant="primary" className="min-h-12 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-4 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] hover:from-[#2a7fff] hover:to-[#0b52d6] sm:px-7" onClick={() => { setIsPersonDetailsModalOpen(false); handleIniciarEntrada(); }}><span className="sm:hidden">Iniciar entrada</span><span className="hidden sm:inline">Iniciar registro de entrada</span> <ArrowRight className="w-5 h-5" /></Button>
               )}
-            </div>
-          </div>
+            </>}
+          />
         )}
+      </Modal>
+
+      {/* Atualizar contato do servidor antes de iniciar a entrada */}
+      <Modal
+        isOpen={isContatoModalOpen}
+        onClose={() => { if (!isSalvandoContato) setIsContatoModalOpen(false); }}
+        title="Atualizar contato"
+        description="Este servidor está sem telefone e e-mail cadastrados."
+        icon={<PhoneCall className="w-6 h-6" />}
+        maxWidth="md"
+        variant="destaque"
+      >
+        <form onSubmit={salvarContatoEIniciar}>
+          <div className="space-y-4 px-4 pb-4 pt-5 sm:px-7 sm:pt-6">
+            {servidorResultado?.servidor && (
+              <div className="flex items-center gap-3 rounded-2xl border border-[#dce6f3] bg-[#f6faff] p-3 dark:border-slate-800 dark:bg-slate-900/60">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-base font-extrabold text-white">
+                  {servidorResultado.servidor.nome.charAt(0)}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-extrabold text-[#0d1f45] dark:text-slate-100">{servidorResultado.servidor.nome}</p>
+                  <p className="text-xs text-[#627289] dark:text-slate-400">Matrícula {servidorResultado.servidor.matricula}</p>
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-[#37475e] dark:text-slate-300">
+              Aproveite o atendimento para completar o cadastro. Basta um dos dois campos; você também pode seguir sem atualizar.
+            </p>
+
+            {contatoErro && (
+              <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-950/40 dark:text-rose-300">
+                <AlertTriangle className="mt-px h-4 w-4 shrink-0" />{contatoErro}
+              </div>
+            )}
+
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold text-[#37475e] dark:text-slate-300">Celular / telefone</span>
+              <span className="relative block">
+                <Smartphone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0bf]" />
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="off"
+                  value={contatoTelefone}
+                  onChange={(e) => setContatoTelefone(mascaraTelefone(e.target.value))}
+                  placeholder="(21) 98765-4321"
+                  className="min-h-12 w-full rounded-xl border border-[#d4e0ee] bg-white pl-10 pr-3 text-base text-[#0d1f45] outline-none transition-shadow placeholder:text-[#9aabc3] focus:border-[#0d6efd] focus:ring-4 focus:ring-[#0d6efd]/15 sm:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  autoFocus
+                />
+              </span>
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold text-[#37475e] dark:text-slate-300">E-mail</span>
+              <span className="relative block">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0bf]" />
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  value={contatoEmail}
+                  onChange={(e) => setContatoEmail(e.target.value)}
+                  placeholder="nome@edu.itaguai.rj.gov.br"
+                  className="min-h-12 w-full rounded-xl border border-[#d4e0ee] bg-white pl-10 pr-3 text-base text-[#0d1f45] outline-none transition-shadow placeholder:text-[#9aabc3] focus:border-[#0d6efd] focus:ring-4 focus:ring-[#0d6efd]/15 sm:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              </span>
+            </label>
+          </div>
+          <div className="sticky bottom-0 z-10 flex gap-2 border-t border-[#e3eaf4] bg-white/95 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:justify-end sm:gap-3 sm:px-7 sm:py-5 dark:border-slate-800 dark:bg-[#121826]/95">
+            <Button type="button" variant="outline" className="min-h-12 rounded-xl px-4 sm:px-6" onClick={pularContato} disabled={isSalvandoContato}>Agora não</Button>
+            <Button type="submit" variant="primary" isLoading={isSalvandoContato} className="min-h-12 flex-1 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-4 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] sm:flex-none sm:px-6">
+              Salvar e iniciar entrada <ArrowRight className="w-5 h-5" />
+            </Button>
+          </div>
+        </form>
       </Modal>
 
       <Modal
@@ -1373,7 +1970,7 @@ export const RecepcaoPage: React.FC = () => {
         maxWidth="sm"
       >
         <div className="space-y-2">
-          {[['Alt + S', 'Identificar servidor'], ['Alt + V', 'Identificar visitante'], ['Alt + D', 'Abrir devolução rápida'], ['Alt + A', 'Atualizar dados'], ['Alt + P', 'Gerar PDF'], ['Esc', 'Fechar o modal atual']].map(([shortcut, action]) => (
+          {[['F1', 'Identificar servidor'], ['F2', 'Identificar visitante'], ['Alt + D', 'Abrir devolução rápida'], ['Alt + A', 'Atualizar dados'], ['Alt + P', 'Gerar PDF'], ['Esc', 'Fechar o modal atual']].map(([shortcut, action]) => (
             <div key={shortcut} className="flex items-center justify-between rounded-xl border border-[#dce4f0] bg-[#f8fbff] px-3 py-2.5 text-sm dark:border-slate-800 dark:bg-slate-900">
               <span className="text-[#37475e] dark:text-slate-200">{action}</span>
               <kbd className="rounded-md border border-[#b9d9f3] bg-white px-2 py-1 font-mono text-xs font-semibold text-[#0877d1] dark:bg-slate-800 dark:border-slate-700">{shortcut}</kbd>
@@ -1385,186 +1982,522 @@ export const RecepcaoPage: React.FC = () => {
 
       {/* MODAL 1: Registro Atômico de Entrada */}
       <Modal
-        isOpen={isEntradaModalOpen}
+        isOpen={isEntradaModalOpen && !isAutorizacaoModalOpen}
         onClose={() => setIsEntradaModalOpen(false)}
-        title="Entrada em Andamento"
-        description="Confirme o destino e anexe o crachá temporário entregue à pessoa identificada"
+        title="Entrada em andamento"
+        description="Confirme o destino e vincule o crachá entregue."
+        icon={<LogIn className="w-6 h-6" />}
+        maxWidth="3xl"
       >
-        <form onSubmit={handleConfirmarEntrada} className="space-y-4">
-          <div className="p-3 bg-[#edf5fc] rounded-xl border border-[#c9e1f6] text-xs dark:bg-slate-900/80 dark:border-slate-800">
-            <span className="text-slate-400">Identificação:</span>
-            <div className="text-[#152238] font-bold text-sm mt-0.5 dark:text-slate-100">
-              {activeTab === 'servidor'
-                ? servidorResultado?.servidor?.nome
-                : visitanteResultado?.visitante?.nome}
+        <form onSubmit={handleConfirmarEntrada} className="space-y-3 sm:space-y-3.5">
+          <div className="flex items-center gap-3.5 rounded-2xl border border-[#c9e1f6] bg-[#edf5fc] px-4 py-3 dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#dcebf9] text-[#0b6bbf] dark:bg-slate-800 dark:text-sky-300">
+              <User className="w-5 h-5" />
             </div>
-            <div className="text-[#16a34a] font-mono text-[11px] dark:text-emerald-400">
-              {activeTab === 'servidor'
-                ? `Matrícula: ${servidorResultado?.servidor?.matricula}`
-                : `CPF: ${visitanteResultado?.visitante?.cpf}`}
+            <div className="min-w-0">
+              <span className="text-xs text-[#627289] dark:text-slate-400">Pessoa identificada</span>
+              <div className="truncate text-base font-extrabold leading-tight text-[#102755] dark:text-slate-100">
+                {activeTab === 'servidor'
+                  ? servidorResultado?.servidor?.nome
+                  : visitanteResultado?.visitante?.nome}
+              </div>
+              <div className="text-sm text-[#627289] dark:text-slate-400">
+                {activeTab === 'servidor'
+                  ? <>Matrícula: <span className="ml-1">{servidorResultado?.servidor?.matricula}</span></>
+                  : <>CPF: <span className="ml-1">{visitanteResultado?.visitante?.cpf}</span></>}
+              </div>
             </div>
           </div>
 
-          <div>
-            <Input
-              label="Crachá temporário / código de barras"
-              value={formCracha}
-              onChange={(e) => {
-                setFormCracha(e.target.value);
-                setFormCrachaFeedback(null);
-              }}
-              onBlur={() => { void validarCrachaParaEntrada(); }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  void validarCrachaParaEntrada();
-                }
-              }}
-              placeholder="Leia ou digite o código do crachá VISITANTE"
-              icon={<Barcode className="w-4 h-4" />}
-              autoFocus
-            />
-            <p className="mt-1 text-[11px] text-[#627289] dark:text-slate-400">
-              O leitor USB preenche este campo automaticamente. Deixe em branco somente se não houver entrega de crachá.
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-base font-extrabold text-[#102755] dark:text-slate-100">Crachá temporário</h3>
+              <span className="text-xs text-[#627289] dark:text-slate-400">Opcional</span>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                aria-label="Crachá temporário"
+                className="min-h-11 rounded-xl"
+                value={formCracha}
+                onChange={(e) => {
+                  setFormCracha(e.target.value);
+                  setFormCrachaFeedback(null);
+                }}
+                onBlur={() => { void validarCrachaParaEntrada(); }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    void validarCrachaParaEntrada();
+                  }
+                }}
+                placeholder="Leia ou digite o código do crachá"
+                icon={<Barcode className="w-5 h-5" />}
+                autoFocus
+              />
+              <Button type="button" size="sm" variant="outline" className="min-h-11 shrink-0 rounded-xl" onClick={() => setCameraTarget('entrada')} aria-label="Ler com a câmera"><Camera className="w-4 h-4" /><span className="hidden sm:inline">Ler com a câmera</span></Button>
+            </div>
+            <p className="text-xs text-[#627289] dark:text-slate-400">
+              O leitor USB preenche este campo automaticamente. Deixe em branco se não houver entrega de crachá.
             </p>
             {formCrachaFeedback && (
-              <p className={`mt-1 text-[11px] font-medium ${formCrachaFeedback.includes('disponível') ? 'text-[#16a34a] dark:text-emerald-300' : 'text-[#dc2626] dark:text-rose-300'}`}>
+              <p className={`text-xs font-medium ${formCrachaFeedback.includes('disponível') ? 'text-[#16a34a] dark:text-emerald-300' : 'text-[#dc2626] dark:text-rose-300'}`}>
                 {formCrachaFeedback}
               </p>
             )}
           </div>
 
-          {activeTab === 'visitante' && <section className="space-y-3 border-t border-[#dce4f0] pt-4">
-            <div className="flex justify-between"><div><h3 className="font-bold text-[#102755]">Destinos da visita (até 10)</h3><p className="text-xs text-[#627289]">Selecione os departamentos e setores que serão visitados.</p></div><Badge variant="neutral">{destinosVisita.length}/10</Badge></div>
-            {destinosVisita.map((destino, index) => <div key={index} className="rounded-xl border border-[#d6e6f7] bg-[#f8fbff] p-3 space-y-3"><div className="flex justify-between font-bold text-sm"><span>Destino {index + 1}</span>{destinosVisita.length > 1 && <button type="button" onClick={() => setDestinosVisita((items) => items.filter((_, itemIndex) => itemIndex !== index))} className="text-rose-500"><Trash2 className="w-4 h-4" /></button>}</div><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Select label="Departamento de destino" value={destino.departamento_destino_id} onChange={(event) => atualizarDestinoVisita(index, { departamento_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar departamento' }, ...departamentos.map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))]} required /><Select label="Setor específico" value={destino.setor_destino_id} onChange={(event) => atualizarDestinoVisita(index, { setor_destino_id: event.target.value })} options={[{ value: '', label: 'Selecionar setor' }, ...setores.filter((item) => item.departamento_id === destino.departamento_destino_id).map((item) => ({ value: item.id, label: `${item.sigla} - ${item.nome}` }))]} disabled={!destino.departamento_destino_id} required /></div></div>)}
-            {destinosVisita.length < 10 && <button type="button" onClick={adicionarDestinoVisita} className="flex w-full justify-center gap-2 rounded-xl border border-dashed border-[#52a6fb] py-2 text-sm font-semibold text-[#0877d1]"><Plus className="w-4 h-4" />Adicionar outro destino</button>}
-          </section>}
-          <div className={activeTab === 'visitante' ? 'hidden' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'}>
-            <Select
-              label="Departamento de Destino"
-              value={formDestinoDepId}
-              onChange={(e) => setFormDestinoDepId(e.target.value)}
-              options={[
-                { value: '', label: 'Selecione o departamento' },
-                ...departamentos.map((d) => ({
-                  value: d.id,
-                  label: `${d.sigla} - ${d.nome}`,
-                })),
-              ]}
-              required
-            />
-
-            <Select
-              label="Setor Específico"
-              value={formDestinoSetorId}
-              onChange={(e) => setFormDestinoSetorId(e.target.value)}
-              options={[
-                { value: '', label: formDestinoDepId ? 'Selecione o setor' : 'Selecione primeiro o departamento' },
-                ...setoresFiltrados.map((s) => ({
-                  value: s.id,
-                  label: `${s.sigla} - ${s.nome}${s.requer_autorizacao ? ' (Requer Autorização)' : ''}`,
-                })),
-              ]}
-              required
-              disabled={!formDestinoDepId}
-            />
-          </div>
-
-          {/* Servidor anfitrião / destino */}
-          <div className={activeTab === 'visitante' ? 'hidden' : 'relative'}>
-            <Input
-              label="Servidor / Responsável a ser procurado (Opcional)"
-              value={formServidorDestinoBusca}
-              onFocus={() => setIsServidorDestinoBuscaOpen(Boolean(formDestinoDepId && formDestinoSetorId))}
-              onChange={(event) => {
-                setFormServidorDestinoBusca(event.target.value);
-                setFormServidorDestinoId('');
-                setIsServidorDestinoBuscaOpen(true);
-              }}
-              placeholder={formDestinoDepId && formDestinoSetorId ? 'Buscar responsável na lotação selecionada' : 'Selecione departamento e setor primeiro'}
-              icon={<Search className="w-4 h-4" />}
-              disabled={!formDestinoDepId || !formDestinoSetorId}
-            />
-            {isServidorDestinoBuscaOpen && formDestinoDepId && formDestinoSetorId && (
-              <div className="absolute z-30 top-full mt-1 w-full max-h-48 overflow-y-auto rounded-xl border border-[#c9d9ed] bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                <button
-                  type="button"
-                  className="w-full rounded-lg px-3 py-2 text-left text-xs text-[#627289] hover:bg-[#edf5fc] dark:text-slate-300 dark:hover:bg-slate-800"
-                  onClick={() => {
-                    setFormServidorDestinoId('');
-                    setFormServidorDestinoBusca('');
-                    setIsServidorDestinoBuscaOpen(false);
-                  }}
-                >
-                  Nenhum servidor específico — atendimento no balcão do setor
-                </button>
-                {servidoresDestinoFiltrados.map((servidor) => (
-                  <button
-                    type="button"
-                    key={servidor.id}
-                    className="w-full rounded-lg px-3 py-2 text-left hover:bg-[#edf5fc] dark:hover:bg-slate-800"
-                    onClick={() => {
-                      setFormServidorDestinoId(servidor.id);
-                      setFormServidorDestinoBusca(`${servidor.nome} — ${servidor.cargo}`);
-                      setIsServidorDestinoBuscaOpen(false);
-                    }}
-                  >
-                    <span className="block text-sm font-semibold text-[#152238] dark:text-slate-100">{servidor.nome}</span>
-                    <span className="block text-[11px] text-[#627289] dark:text-slate-400">{servidor.cargo} · Matrícula {servidor.matricula}</span>
-                  </button>
-                ))}
-                {servidoresDestinoFiltrados.length === 0 && (
-                  <p className="px-3 py-2 text-xs text-[#627289] dark:text-slate-400">Nenhum servidor encontrado nesta lotação.</p>
-                )}
+          {/* Seção de Destinos da Visita (até 10 departamentos) */}
+          <section className="space-y-3 border-t border-[#dce4f0] pt-4 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold text-[#102755] dark:text-slate-100 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-[#0d6efd]" />
+                  Destino e atendimento
+                </h3>
+                <p className="text-xs text-[#627289] dark:text-slate-400">
+                  A visita pode percorrer até 10 departamentos no prédio.
+                </p>
               </div>
+              <Badge variant={destinosVisita.length >= 10 ? 'warning' : 'neutral'}>
+                {destinosVisita.length}/10 departamentos
+              </Badge>
+            </div>
+
+            <div className="space-y-3">
+              {destinosVisita.map((destino, index) => {
+                const servidoresDoDestino = obterServidoresPorSetor(destino.setor_destino_id);
+                const exigeAut = servidorExigeAutorizacaoNoSetor(destino.setor_destino_id, destino.servidor_destino_id);
+
+                return (
+                  <div
+                    key={index}
+                    className="relative rounded-2xl border border-[#d6e6f7] bg-[#f8fbff] p-3.5 space-y-3 dark:border-slate-800 dark:bg-slate-900/60 transition-all shadow-sm"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#e3effc] text-xs font-bold text-[#0877d1] dark:bg-slate-800 dark:text-sky-300">
+                          {index + 1}
+                        </span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-[#102755] dark:text-slate-200">
+                          Destino {index + 1} {index === 0 && <span className="text-[10px] font-normal text-[#627289] dark:text-slate-400">(Principal)</span>}
+                        </span>
+                      </div>
+                      {destinosVisita.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removerDestinoVisita(index)}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                          title="Remover este destino"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remover</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Select
+                        label="Departamento de destino"
+                        className="min-h-11 rounded-xl"
+                        value={destino.setor_destino_id}
+                        onChange={(event) => atualizarDestinoVisita(index, { setor_destino_id: event.target.value })}
+                        options={[
+                          { value: '', label: 'Selecione o departamento' },
+                          ...setoresDestinoOpcoes.map((s) => ({
+                            value: s.id,
+                            label: `${s.sigla} - ${s.nome}`,
+                          })),
+                        ]}
+                        required
+                      />
+
+                      <Select
+                        label="Diretor / Servidor"
+                        className={`min-h-11 rounded-xl${exigeAut ? ' select-perigo' : ''}`}
+                        value={destino.servidor_destino_id || ''}
+                        onChange={(event) => atualizarDestinoVisita(index, { servidor_destino_id: event.target.value })}
+                        options={[
+                          {
+                            value: '',
+                            label: destino.setor_destino_id ? 'Selecione uma pessoa (opcional)' : 'Selecione primeiro o departamento',
+                          },
+                          ...servidoresDoDestino.map((servidor) => ({
+                            value: servidor.id,
+                            label: `${servidor.nome} — ${servidor.cargo}`,
+                            destaque: servidorExigeAutorizacaoNoSetor(destino.setor_destino_id, servidor.id) ? ('perigo' as const) : undefined,
+                          })),
+                        ]}
+                        disabled={!destino.setor_destino_id}
+                      />
+                    </div>
+
+                    {exigeAut && (
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                        <span>Este responsável exige autorização formal prévia da portaria.</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {destinosVisita.length < 10 ? (
+              <button
+                type="button"
+                onClick={adicionarDestinoVisita}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#52a6fb] bg-[#f0f7ff] py-2.5 text-sm font-semibold text-[#0877d1] hover:bg-[#e4f1ff] transition-colors dark:border-slate-700 dark:bg-slate-900/50 dark:text-sky-400"
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar outro departamento ({destinosVisita.length}/10)
+              </button>
+            ) : (
+              <p className="text-center text-xs text-[#627289] dark:text-slate-400">
+                Limite máximo de 10 departamentos atingido para esta visita.
+              </p>
             )}
+          </section>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Select
+              label="Motivo do acesso"
+              className="min-h-11 rounded-xl"
+              value={formMotivo}
+              onChange={(e) => setFormMotivo(e.target.value)}
+              options={Array.from(new Set([formMotivo, ...MOTIVOS_ACESSO])).map((motivo) => ({ value: motivo, label: motivo }))}
+              required
+            />
+
+            <div className="space-y-1.5">
+              <label htmlFor="observacoes-entrada" className="flex items-baseline gap-2 text-xs font-medium text-slate-300">
+                Observações / Pertences declarados
+                <span className="font-normal text-[#627289] dark:text-slate-400">Opcional</span>
+              </label>
+              <textarea
+                id="observacoes-entrada"
+                rows={1}
+                value={formObservacoes}
+                onChange={(e) => setFormObservacoes(e.target.value)}
+                placeholder="Ex.: pasta e notebook Dell"
+                className="block min-h-11 w-full resize-y rounded-xl border border-slate-700/80 bg-[#121826] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              />
+            </div>
           </div>
 
-          <Input
-            label="Motivo do Acesso"
-            value={formMotivo}
-            onChange={(e) => setFormMotivo(e.target.value)}
-            placeholder="Ex: Reunião pedagógica, entrega de documento..."
-            required
-          />
-
-          <Input
-            label="Observações / Pertences declarados (Notebook, volumes...)"
-            value={formObservacoes}
-            onChange={(e) => setFormObservacoes(e.target.value)}
-            placeholder="Ex: Portando pasta com documentos e notebook Dell"
-          />
-
-          {setores.find((s) => s.id === formDestinoSetorId)?.requer_autorizacao && (
-            <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2">
+          {destinoRequerAutorizacao && (
+            <div className="px-3 py-2 rounded-lg bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
               <span>
-                <strong>Atenção:</strong> Este setor requer autorização formal prévia. A entrada ficará
-                como "Pendente de Autorização" até a liberação pelo responsável.
+                <strong>Atenção:</strong> Há responsável(is) nos destinos selecionados que exige(m) autorização formal prévia. Na próxima etapa, confirme que a visita foi autorizada; sem confirmação, a entrada ficará "Pendente de Autorização".
               </span>
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#dce4f0] dark:border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#dce4f0] dark:border-slate-800">
             <Button
               type="button"
               variant="outline"
+              className="min-h-11 rounded-xl px-6"
               onClick={() => setIsEntradaModalOpen(false)}
             >
               Cancelar
             </Button>
-            <Button type="submit" variant="primary" isLoading={isSubmittingEntrada}>
-              <CheckCircle className="w-4 h-4" />
-              <span>Registrar Entrada Atômica</span>
+            <Button type="submit" variant="primary" className="min-h-11 rounded-xl px-6" isLoading={isSubmittingEntrada}>
+              {destinoRequerAutorizacao
+                ? <><ShieldCheck className="w-5 h-5" /><span>Confirmar autorização</span></>
+                : <><LogIn className="w-5 h-5" /><span>Registrar entrada</span></>}
             </Button>
           </div>
         </form>
       </Modal>
 
+      {/* MODAL 1b: Confirmação de autorização prévia do responsável */}
+      <Modal
+        isOpen={isAutorizacaoModalOpen}
+        onClose={() => setIsAutorizacaoModalOpen(false)}
+        title="Autorização do responsável"
+        description="Confirme com o responsável antes de liberar a entrada."
+        icon={<ShieldCheck className="w-7 h-7" />}
+        maxWidth="3xl"
+        variant="destaque"
+      >
+        {(() => {
+          const pessoaNome = (activeTab === 'servidor' ? servidorResultado?.servidor?.nome : visitanteResultado?.visitante?.nome) || 'Pessoa identificada';
+          const responsavelNome = servidorDestinoSelecionado?.nome || 'Responsável';
+          const setorDestino = setores.find((s) => s.id === formDestinoSetorId);
+          const ramal = servidorDestinoSelecionado?.ramal || setorDestino?.ramal;
+          const meios = [
+            { valor: 'por ramal/telefone', rotulo: 'Ramal / telefone', icone: <PhoneCall className="w-5 h-5" /> },
+            { valor: 'presencialmente', rotulo: 'Presencialmente', icone: <UserCheck className="w-5 h-5" /> },
+            { valor: 'por mensagem/e-mail', rotulo: 'Mensagem / e-mail', icone: <MessageSquare className="w-5 h-5" /> },
+          ];
+          // Monta lista de destinatários que exigem autorização
+          const destinatariosComAut = destinosComAutorizacaoRequerida.map((d, idx) => {
+            const srv = todosServidores.find((s) => s.id === d.servidor_destino_id);
+            const setor = setores.find((s) => s.id === d.setor_destino_id);
+            const chave = d.servidor_destino_id || `destino-${idx}`;
+            return { srv, setor, idx, chave };
+          });
+
+          // Há responsáveis com autorizacao? Usa confirmações individuais; caso contrário, usa estado legado
+          const temMultiplos = destinatariosComAut.length > 0;
+          const todasConfirmadas = temMultiplos
+            ? destinatariosComAut.every(({ chave }) => Boolean(autorizacoesIndividuais[chave]))
+            : Boolean(autorizacoesIndividuais['__unico__']);
+          const podeConfirmar = Boolean(autorizacaoMeio) && todasConfirmadas;
+
+          const toggleConfirmacao = (chave: string) => {
+            setAutorizacoesIndividuais((prev) => ({ ...prev, [chave]: !prev[chave] }));
+          };
+
+          return (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (podeConfirmar) void registrarEntrada({ situacao: 'confirmada', meio: autorizacaoMeio });
+              }}
+            >
+              <div className="space-y-5 px-5 pb-6 pt-6 sm:px-7">
+                {/* Quem visita → quem autoriza (cabeçalho resumo) */}
+                <div className="grid grid-cols-1 items-center gap-3 rounded-2xl border border-[#dce6f3] bg-white p-4 shadow-[0_10px_30px_-18px_rgba(18,44,82,.35)] sm:grid-cols-[1fr_auto_1fr] dark:border-slate-800 dark:bg-slate-900/60">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#1e8bff] to-[#0644c8] text-xl font-extrabold text-white">{pessoaNome.charAt(0)}</div>
+                    <div className="min-w-0">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#627289] dark:text-slate-400">Visitante</span>
+                      <p className="truncate text-sm font-extrabold text-[#0d1f45] dark:text-slate-100">{pessoaNome}</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="mx-auto hidden h-5 w-5 text-[#9fb2cc] sm:block" aria-hidden />
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#fdecec] text-xl font-extrabold text-[#dc2626] dark:bg-rose-950/50 dark:text-rose-300">{responsavelNome.charAt(0)}</div>
+                    <div className="min-w-0">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#dc2626] dark:text-rose-300">Autoriza a visita</span>
+                      <p className="truncate text-sm font-extrabold text-[#0d1f45] dark:text-slate-100">{responsavelNome}</p>
+                      <p className="truncate text-xs text-[#627289] dark:text-slate-400">{servidorDestinoSelecionado?.cargo || setorDestino?.nome}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Como falar com o responsável principal */}
+                <div className="flex flex-wrap gap-2 text-sm">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-[#dce6f3] bg-[#f6f9fe] px-3 py-1.5 text-[#37475e] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><PhoneCall className="h-4 w-4 text-[#0b5ed7]" />Ramal: <strong>{ramal || 'não informado'}</strong></span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-[#dce6f3] bg-[#f6f9fe] px-3 py-1.5 text-[#37475e] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><Building2 className="h-4 w-4 text-[#0b5ed7]" />{setorDestino ? `${setorDestino.sigla} · ${setorDestino.sala || 'sala não informada'}` : 'Setor não informado'}</span>
+                </div>
+
+                {/* ─── BLOCO DE CONFIRMAÇÕES INDIVIDUAIS POR RESPONSÁVEL (1 a 10) ─── */}
+                {/* Meio da autorização */}
+                <fieldset>
+                  <legend className="mb-2 text-sm font-extrabold text-[#0d1f45] dark:text-slate-100">Como a autorização foi obtida?</legend>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {meios.map((meio) => {
+                      const ativo = autorizacaoMeio === meio.valor;
+                      return (
+                        <label
+                          key={meio.valor}
+                          className={cn(
+                            'flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0d6efd]/40',
+                            ativo
+                              ? 'border-[#0d6efd] bg-[#eef5ff] text-[#0647c4] ring-2 ring-[#0d6efd]/25 dark:bg-blue-950/50 dark:text-sky-300'
+                              : 'border-[#dce6f3] bg-white text-[#37475e] hover:border-[#9cc3f5] hover:bg-[#f6f9fe] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300'
+                          )}
+                        >
+                          <input type="radio" name="autorizacao-meio" value={meio.valor} checked={ativo} onChange={() => setAutorizacaoMeio(meio.valor)} className="sr-only" />
+                          <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-lg', ativo ? 'bg-[#0d6efd] text-white' : 'bg-[#e9f2fd] text-[#0b5ed7] dark:bg-slate-800 dark:text-sky-300')}>{meio.icone}</span>
+                          {meio.rotulo}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                {/* Confirmações individuais por responsável */}
+                {temMultiplos ? (
+                  <div className="rounded-2xl border-2 border-amber-300/80 bg-amber-50/60 p-4 dark:border-amber-500/40 dark:bg-amber-950/20">
+                    {/* Cabeçalho do bloco */}
+                    <div className="mb-4 flex items-center gap-2">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-xs">
+                        <ShieldAlert className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900 dark:text-amber-200">
+                          {destinatariosComAut.length === 1
+                            ? 'Atenção: 1 responsável exige autorização formal'
+                            : `Atenção: ${destinatariosComAut.length} responsáveis exigem autorização formal`}
+                        </p>
+                        <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                          Confirme individualmente cada responsável antes de liberar a entrada.
+                        </p>
+                      </div>
+                      {/* Contador de confirmações */}
+                      <span className={cn(
+                        'ml-auto shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-extrabold border transition-colors',
+                        todasConfirmadas
+                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-700'
+                          : 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700'
+                      )}>
+                        <CheckCircle2 className="h-3 w-3" />
+                        {destinatariosComAut.filter(({ chave }) => autorizacoesIndividuais[chave]).length}/{destinatariosComAut.length}
+                      </span>
+                    </div>
+
+                    {/* Cards de confirmação individual */}
+                    <div className="space-y-3">
+                      {destinatariosComAut.map(({ srv, setor, idx, chave }) => {
+                        const confirmado = Boolean(autorizacoesIndividuais[chave]);
+                        return (
+                          <label
+                            key={chave}
+                            htmlFor={`conf-${chave}`}
+                            className={cn(
+                              'flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-3.5 transition-all duration-150 select-none',
+                              confirmado
+                                ? 'border-emerald-400 bg-emerald-50 shadow-xs shadow-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-500/60'
+                                : 'border-amber-200 bg-white hover:border-amber-400 hover:bg-amber-50/60 dark:border-amber-700/40 dark:bg-slate-900/50 dark:hover:border-amber-500/60'
+                            )}
+                          >
+                            {/* Checkbox estilizado */}
+                            <div className="mt-0.5 shrink-0">
+                              <input
+                                id={`conf-${chave}`}
+                                type="checkbox"
+                                checked={confirmado}
+                                onChange={() => toggleConfirmacao(chave)}
+                                className="sr-only"
+                              />
+                              <div className={cn(
+                                'w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
+                                confirmado
+                                  ? 'bg-emerald-500 border-emerald-500'
+                                  : 'bg-white border-amber-400 dark:bg-slate-900 dark:border-amber-600'
+                              )}>
+                                {confirmado && (
+                                  <svg viewBox="0 0 12 10" fill="none" className="w-3 h-3">
+                                    <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Avatar */}
+                            <div className={cn(
+                              'grid h-10 w-10 shrink-0 place-items-center rounded-xl text-sm font-extrabold text-white shadow-xs transition-all',
+                              confirmado
+                                ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
+                                : 'bg-gradient-to-br from-amber-400 to-orange-500'
+                            )}>
+                              {srv ? srv.nome.charAt(0) : '?'}
+                            </div>
+
+                            {/* Dados do responsável */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-xs font-extrabold text-[#0d1f45] dark:text-slate-100">
+                                  {srv?.nome || 'Responsável não identificado'}
+                                </p>
+                                {(srv?.ramal || setor?.ramal) && (
+                                  <span className={cn(
+                                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border',
+                                    confirmado
+                                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700'
+                                      : 'bg-amber-100/70 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/40'
+                                  )}>
+                                    <PhoneCall className="h-2.5 w-2.5" />
+                                    {srv?.ramal || setor?.ramal}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-[#627289] dark:text-slate-400 mt-0.5">
+                                {srv?.cargo || '—'}{setor ? ` · ${setor.sigla}` : ''}
+                              </p>
+                              {/* Texto de confirmação */}
+                              <p className={cn(
+                                'text-[11px] font-semibold mt-1.5 transition-colors',
+                                confirmado ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-500'
+                              )}>
+                                {confirmado
+                                  ? `✓ Confirmado — ${srv?.nome || 'Responsável'} autorizou a entrada de ${pessoaNome}.`
+                                  : `Confirmo que ${srv?.nome || 'Responsável'} autorizou a entrada de ${pessoaNome}.`}
+                              </p>
+                            </div>
+
+                            {/* Badge de status */}
+                            <div className="shrink-0 self-center">
+                              {confirmado ? (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-700">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Confirmado
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold bg-amber-100/70 text-amber-900 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700/50">
+                                  <ShieldAlert className="h-3 w-3 text-amber-600" />
+                                  Pendente
+                                </span>
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  /* Caso sem múltiplos — checkbox único legado */
+                  <label
+                    className={cn(
+                      'flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition-colors',
+                      autorizacoesIndividuais['__unico__']
+                        ? 'border-[#16a34a] bg-[#eefbf2] dark:bg-emerald-950/40'
+                        : 'border-dashed border-[#c8d9ec] bg-[#fbfdff] hover:border-[#9cc3f5] dark:border-slate-700 dark:bg-slate-900'
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(autorizacoesIndividuais['__unico__'])}
+                      onChange={() => toggleConfirmacao('__unico__')}
+                      className="mt-0.5 h-5 w-5 shrink-0 accent-[#16a34a]"
+                    />
+                    <span className="text-sm leading-relaxed text-[#37475e] dark:text-slate-300">
+                      Confirmo que <strong className="text-[#0d1f45] dark:text-slate-100">{responsavelNome}</strong> autorizou a entrada de{' '}
+                      <strong className="text-[#0d1f45] dark:text-slate-100">{pessoaNome}</strong>.
+                      <span className="mt-1 block text-xs text-[#627289] dark:text-slate-400">
+                        A confirmação fica registrada na entrada com seu nome e o horário.
+                      </span>
+                    </span>
+                  </label>
+                )}
+                {/* ─── FIM DO BLOCO DE CONFIRMAÇÕES ─── */}
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 border-t border-[#e3eaf4] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={isSubmittingEntrada}
+                  onClick={() => void registrarEntrada({ situacao: 'pendente' })}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-semibold text-[#b45309] transition-colors hover:bg-amber-50 disabled:opacity-50 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                >
+                  <Clock className="h-4 w-4" /> Sem resposta? Deixar pendente
+                </button>
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" className="min-h-12 flex-1 rounded-xl px-6 sm:flex-none" onClick={() => setIsAutorizacaoModalOpen(false)}>Voltar</Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={!podeConfirmar}
+                    isLoading={isSubmittingEntrada}
+                    className="min-h-12 flex-1 rounded-xl border-0 bg-gradient-to-r from-[#0d6efd] to-[#0647c4] px-6 font-semibold shadow-[0_12px_24px_-10px_rgba(13,110,253,.7)] sm:flex-none"
+                  >
+                    <ShieldCheck className="h-5 w-5" /> Confirmar entrada
+                  </Button>
+                </div>
+              </div>
+            </form>
+          );
+        })()}
+      </Modal>
+
       {/* MODAL 2: Cadastro Rápido de Visitante */}
       <Modal
         isOpen={isNovoVisitanteModalOpen}
-        onClose={() => setIsNovoVisitanteModalOpen(false)}
+        onClose={() => { setIsNovoVisitanteModalOpen(false); limparBiometriaVisitante(); }}
         title="Cadastro de Novo Visitante"
         description="Cadastre os dados pessoais do visitante em conformidade com a LGPD"
       >
@@ -1619,11 +2552,21 @@ export const RecepcaoPage: React.FC = () => {
             placeholder="Ex: Necessidade especial de mobilidade, etc."
           />
 
+          <BiometriaVisitante
+            foto={novoVisFoto}
+            onFotoChange={setNovoVisFoto}
+            coletarDigital={novoVisColetarDigital}
+            onColetarDigitalChange={setNovoVisColetarDigital}
+            consentimento={novoVisConsentimento}
+            onConsentimentoChange={setNovoVisConsentimento}
+            leitorStatus={biometricStatus}
+          />
+
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setIsNovoVisitanteModalOpen(false)}
+              onClick={() => { setIsNovoVisitanteModalOpen(false); limparBiometriaVisitante(); }}
             >
               Cancelar
             </Button>

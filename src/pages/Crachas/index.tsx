@@ -18,6 +18,19 @@ const situacaoBadge: Record<CrachaStatus, 'success' | 'warning' | 'danger' | 'ne
   disponivel: 'success', em_uso: 'warning', extraviado: 'danger', danificado: 'danger', inativo: 'neutral',
 };
 
+// Próxima legenda livre: VISITANTE 1, VISITANTE 2... (reaproveita números que ficaram vagos).
+const proximaLegendaVisitante = (crachas: Cracha[]) => {
+  const usados = new Set(
+    crachas
+      .map((item) => /^VISITANTE\s+(\d+)$/i.exec((item.descricao || '').trim())?.[1])
+      .filter(Boolean)
+      .map(Number),
+  );
+  let numero = 1;
+  while (usados.has(numero)) numero += 1;
+  return `VISITANTE ${numero}`;
+};
+
 export const CrachasPage: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -39,14 +52,20 @@ export const CrachasPage: React.FC = () => {
   const abrirCadastro = (cracha?: Cracha) => {
     setEditing(cracha || null);
     setNumero(cracha?.numero || '');
-    setDescricao(cracha?.descricao || '');
+    setDescricao(cracha ? cracha.descricao || '' : proximaLegendaVisitante(crachas));
     setSituacao(cracha?.situacao || 'disponivel');
     setIsModalOpen(true);
   };
 
   const salvar = async (event: React.FormEvent) => {
     event.preventDefault();
-    await dataService.salvarCracha({ id: editing?.id, numero, descricao, situacao, ativo: situacao !== 'inativo' });
+    // Recalcula na hora de salvar com a lista atualizada (outro operador pode ter cadastrado nesse meio-tempo).
+    const atuais = editing ? crachas : await dataService.getCrachas();
+    const legendaAtual = descricao.trim();
+    const legendaAutomatica = /^VISITANTE\s+\d+$/i.test(legendaAtual);
+    const legendaEmUso = atuais.some((item) => item.id !== editing?.id && (item.descricao || '').trim().toUpperCase() === legendaAtual.toUpperCase());
+    const legenda = !editing && (!legendaAtual || (legendaAutomatica && legendaEmUso)) ? proximaLegendaVisitante(atuais) : legendaAtual;
+    await dataService.salvarCracha({ id: editing?.id, numero, descricao: legenda, situacao, ativo: situacao !== 'inativo' });
     setIsModalOpen(false);
     await carregar();
   };
@@ -74,7 +93,7 @@ export const CrachasPage: React.FC = () => {
       </Card>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editing ? 'Editar crachá' : 'Cadastrar crachá'} description="Credenciais extraviadas ou danificadas não podem ser atribuídas.">
-        <form onSubmit={salvar} className="space-y-4"><Input label="Código de barras / identificador *" value={numero} onChange={(event) => setNumero(event.target.value)} placeholder="Ex.: 7892840819507" required /><Input label="Legenda impressa no crachá" value={descricao} onChange={(event) => setDescricao(event.target.value)} placeholder="Ex.: VISITANTE 1" /><Select label="Situação" value={situacao} onChange={(event) => setSituacao(event.target.value as CrachaStatus)} options={(Object.keys(situacaoLabel) as CrachaStatus[]).map((value) => ({ value, label: situacaoLabel[value] }))} /><div className="flex justify-end gap-3 pt-3 border-t border-[#dce4f0] dark:border-slate-800"><Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button><Button type="submit">Salvar</Button></div></form>
+        <form onSubmit={salvar} className="space-y-4"><Input label="Código de barras / identificador *" value={numero} onChange={(event) => setNumero(event.target.value)} placeholder="Ex.: 7892840819507" required /><div><Input label="Legenda impressa no crachá" value={descricao} onChange={(event) => setDescricao(event.target.value)} placeholder="Ex.: VISITANTE 1" />{!editing && <p className="mt-1.5 text-[11px] text-[#627289] dark:text-slate-400">Preenchida automaticamente com o próximo número livre (VISITANTE 1, 2, 3…). Pode ser alterada.</p>}</div><Select label="Situação" value={situacao} onChange={(event) => setSituacao(event.target.value as CrachaStatus)} options={(Object.keys(situacaoLabel) as CrachaStatus[]).map((value) => ({ value, label: situacaoLabel[value] }))} /><div className="flex justify-end gap-3 pt-3 border-t border-[#dce4f0] dark:border-slate-800"><Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button><Button type="submit">Salvar</Button></div></form>
       </Modal>
     </div>
   );

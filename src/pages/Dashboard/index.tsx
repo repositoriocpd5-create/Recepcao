@@ -256,7 +256,7 @@ export const DashboardPage: React.FC = () => {
                   </td>
                   <td className="py-2.5 px-4 font-mono text-emerald-400">{m.cracha_numero || '-'}</td>
                   <td className="py-2.5 px-4 text-slate-300">
-                    {m.departamento_destino?.sigla} - {m.setor_destino?.sigla}
+                    {m.departamento_destino?.sigla} - {m.setor_destino?.nome}
                   </td>
                   <td className="py-2.5 px-4 text-slate-400 font-mono">
                     {formatDateTime(m.data_hora_entrada)}
