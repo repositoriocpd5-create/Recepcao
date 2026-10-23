@@ -7,8 +7,9 @@
 //   situacao null = manter a situação atual.
 //
 // Provedores, nesta ordem (o primeiro que responder vale):
-//   1. JEV      JEV_API_KEY + JEV_API_URL (+ JEV_MODEL). Chamada no formato chat completions
-//               (OpenAI-compatível). Se a API do JEV usar outro formato, ajuste porJev().
+//   1. JEV      JEV_API_KEY (+ JEV_MODEL, padrão jev-latest; + JEV_API_URL, padrão
+//               https://api.typesafe.ai/v1/systemone). Pergunta do tipo "choice": a resposta traz a
+//               opção e a confiança; abaixo de JEV_CONFIANCA_MINIMA mantém a situação atual.
 //   2. Gemini   GEMINI_API_KEY (+ GEMINI_MODEL), o mesmo da análise de gravidade.
 //   3. Palavras-chave (sem IA), mesma regra de src/lib/sugestaoSituacao.ts.
 // Segredos ficam em Supabase → Edge Functions → Secrets (nunca no código do navegador).
@@ -87,23 +88,35 @@ const interpretar = (conteudo: unknown, origem: Sugestao["origem"]): Sugestao | 
 const usuarioPrompt = (texto: string, descricao: string) =>
   `Ocorrência registrada pela escola:\n"""\n${descricao.slice(0, 1500)}\n"""\nAndamento escrito pela equipe:\n"""\n${texto.slice(0, 2000)}\n"""`;
 
-/** JEV: só roda com JEV_API_KEY e JEV_API_URL configurados. */
+// Opções do JEV e o critério de cada uma (o JEV escolhe a que melhor descreve o andamento).
+const CRITERIOS_JEV: Record<"em_analise" | "em_atendimento" | "manter", string> = {
+  em_analise: "A equipe está verificando imagens, conferindo informações ou aguardando retorno.",
+  em_atendimento: "Houve ação concreta: equipe, ronda, Guarda Municipal ou polícia acionada ou enviada, técnico, manutenção, visita à unidade ou providência em andamento.",
+  manter: "O texto é só um comentário e não muda a situação.",
+};
+const JEV_CONFIANCA_MINIMA = 0.6;
+
+/** JEV (TypeSafe System One): só roda com JEV_API_KEY configurada. */
 const porJev = async (texto: string, descricao: string, atual: string): Promise<Sugestao | null> => {
   const chave = Deno.env.get("JEV_API_KEY");
-  const url = Deno.env.get("JEV_API_URL");
-  if (!chave || !url) return null;
+  if (!chave) return null;
+  const url = Deno.env.get("JEV_API_URL") || "https://api.typesafe.ai/v1/systemone";
+  const minima = Number(Deno.env.get("JEV_CONFIANCA_MINIMA")) || JEV_CONFIANCA_MINIMA;
   const resposta = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${chave}` },
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.timeout(10_000),
     body: JSON.stringify({
-      model: Deno.env.get("JEV_MODEL") || undefined,
-      temperature: 0,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: instrucao(atual) },
-        { role: "user", content: usuarioPrompt(texto, descricao) },
-      ],
+      model: Deno.env.get("JEV_MODEL") || "jev-latest",
+      // O texto do andamento é só dado: o JEV escolhe uma das opções, não executa instruções.
+      state: `Situação atual: ${ROTULOS[atual] ?? atual}.\n${usuarioPrompt(texto, descricao)}`,
+      questions: {
+        situacao: {
+          type: "choice",
+          instructions: "Escolha a situação da ocorrência do CCO após este andamento. Uma ocorrência resolvida é finalizada em outro botão; nesse caso escolha em_atendimento.",
+          criteria: CRITERIOS_JEV,
+        },
+      },
     }),
   });
   if (!resposta.ok) {
@@ -111,7 +124,19 @@ const porJev = async (texto: string, descricao: string, atual: string): Promise<
     return null;
   }
   const corpo = await resposta.json();
-  return interpretar(corpo?.choices?.[0]?.message?.content ?? corpo?.output ?? corpo?.text, "jev");
+  const resposta1 = corpo?.answers?.situacao;
+  const escolha = resposta1?.choice;
+  if (!(escolha in CRITERIOS_JEV)) return null;
+  const confianca = typeof resposta1.confidence === "number" ? resposta1.confidence : 0;
+  const pct = `${Math.round(confianca * 100)}%`;
+  if (confianca < minima) {
+    return { situacao: null, motivo: `Sem certeza suficiente (${pct}) para mudar a situação; escolha manualmente se precisar.`, origem: "jev" };
+  }
+  return {
+    situacao: escolha === "manter" ? null : escolha,
+    motivo: `${CRITERIOS_JEV[escolha as keyof typeof CRITERIOS_JEV]} (confiança ${pct})`,
+    origem: "jev",
+  };
 };
 
 const porGemini = async (texto: string, descricao: string, atual: string): Promise<Sugestao | null> => {
