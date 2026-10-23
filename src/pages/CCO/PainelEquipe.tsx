@@ -15,6 +15,7 @@ import { Carregando, Cartao, ESTILO_SITUACAO } from './componentes/ui';
 import { useDetalheNaUrl, useOcorrencias } from './hooks';
 import { DetalheOcorrencia } from './componentes/DetalheOcorrencia';
 import { TabelaAdmin } from './componentes/TabelaAdmin';
+import { BoasVindasAdmin } from './componentes/BoasVindasAdmin';
 
 const INDICADOR: Record<string, string> = { registrada: 'Registradas', em_analise: 'Em análise', em_atendimento: 'Em atendimento', concluida: 'Solucionadas' };
 
@@ -265,6 +266,8 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user} onFechar={detalhe.fechar} focarAndamento={detalhe.acao === 'andamento'} onExcluir={admin ? setExcluir : undefined} />
       {admin && <ExcluirOcorrencia oc={excluir} user={user} onFechar={() => setExcluir(null)} onExcluida={aoExcluir} />}
+      {/* Administrador: boas-vindas com o resumo do dia (uma vez por dia; espera o detalhe aberto por link fechar). */}
+      {admin && <BoasVindasAdmin user={user} ocorrencias={lista} carregando={ocorrencias.isLoading || Boolean(detalhe.id)} onAbrir={(id) => detalhe.abrir(id)} />}
       {toast && (
         <div role="status" className="fixed bottom-24 left-1/2 z-[70] flex w-[calc(100%-32px)] max-w-md -translate-x-1/2 items-center gap-3 rounded-2xl bg-[#0d2240] px-4 py-3 text-sm font-semibold text-white shadow-xl md:bottom-6 dark:bg-slate-800">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-green-400" aria-hidden="true" />
