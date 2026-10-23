@@ -117,7 +117,7 @@ const porJev = async (texto: string, descricao: string, atual: string): Promise<
 const porGemini = async (texto: string, descricao: string, atual: string): Promise<Sugestao | null> => {
   const chave = Deno.env.get("GEMINI_API_KEY");
   if (!chave) return null;
-  const modelo = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
+  const modelo = Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite";
   const resposta = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelo)}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": chave },
