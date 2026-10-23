@@ -4,9 +4,14 @@ import { CcoOcorrencia, RamalUnidade } from '@/types';
 
 /**
  * Sede da SMEDU: ponto de partida das rotas de vistoria.
- * Coordenada aproximada do Centro de Itaguaí — ajuste aqui se o endereço da sede for outro.
+ * Estr. Ari Parreiras, 1242 - Engenho, Itaguaí (mesmo prédio do CESMI): https://maps.app.goo.gl/4oVGoUCWBAbcHKMr5
  */
-export const SEDE = { nome: 'SMEDU - Sede', lat: -22.8652, lng: -43.7781 };
+export const SEDE = {
+  nome: 'SMEDU - Sede',
+  endereco: 'Estr. Ari Parreiras, 1242 - Engenho, Itaguaí - RJ, 23820-302',
+  lat: -22.8686739,
+  lng: -43.7889103,
+};
 
 /** Ocorrência aberta há mais que isso sem solução = prazo vencido. */
 export const PRAZO_DIAS = 3;

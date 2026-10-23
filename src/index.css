@@ -497,3 +497,8 @@ html.dark ::placeholder { color: #64748b; }
 .dark .cco-mapa .cco-tiles-mapa { filter: invert(1) hue-rotate(180deg) grayscale(.7) brightness(.85) contrast(.9); }
 .cco-mapa .leaflet-control-layers { border-radius: 10px; border: 1px solid #dbe6f3; box-shadow: 0 6px 16px -10px rgba(16,35,63,.5); font-size: 12px; padding: 4px 8px; }
 .dark .cco-mapa .leaflet-control-layers { background: #121826; color: #e2e8f0; border-color: #334155; }
+.cco-sede { position: relative; }
+.cco-sede::after {
+  content: ''; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%);
+  border: 6px solid transparent; border-top-color: #0b4fa3; border-bottom: 0;
+}

@@ -37,9 +37,10 @@ const iconeUnidade = (u: UnidadeMapa, ativo: boolean, ordemRota?: number) => {
 
 const iconeSede = L.divIcon({
   className: 'cco-marcador',
+  // Etiqueta acima do ponto (com seta), para não cobrir o marcador do CESMI, que fica no mesmo prédio.
   html: '<span class="cco-sede"><img src="/assets/brasao_itaguai.png" alt="" />SMEDU · Sede</span>',
   iconSize: [112, 28],
-  iconAnchor: [56, 14],
+  iconAnchor: [56, 50],
 });
 
 /** Mapa (Leaflet + OpenStreetMap/CARTO) com as unidades, a sede e a rota escolhida. */
@@ -65,7 +66,9 @@ export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto
     L.control.layers({ Mapa: tiles.current, 'Satélite': satelite }, undefined, { position: 'topright', collapsed: false }).addTo(m);
     camadaRota.current = L.layerGroup().addTo(m);
     camadaMarcadores.current = L.layerGroup().addTo(m);
-    L.marker([SEDE.lat, SEDE.lng], { icon: iconeSede, zIndexOffset: 1000, keyboard: false, title: SEDE.nome }).addTo(m);
+    L.marker([SEDE.lat, SEDE.lng], { icon: iconeSede, zIndexOffset: 1000, keyboard: false, title: SEDE.nome })
+      .bindTooltip(`<strong>${SEDE.nome}</strong><br/>${SEDE.endereco}`, { direction: "top", offset: [0, -50] })
+      .addTo(m);
     mapa.current = m;
 
     // Tela cheia / redimensionamento: o Leaflet precisa recalcular o tamanho.
