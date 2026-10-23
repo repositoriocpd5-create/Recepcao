@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -25,7 +24,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { dataService } from '@/services/dataService';
-import { useOcorrencias } from '../hooks';
+import { useDetalheNaUrl, useOcorrencias } from '../hooks';
+import { DetalheOcorrencia } from '../componentes/DetalheOcorrencia';
+import { IMPORTANCIAS, importanciaDe } from '@/services/ccoService';
 import { Carregando } from '../componentes/ui';
 import { MapaRede } from './MapaRede';
 import { useTempoRealCco } from '../tempoReal';
@@ -95,7 +96,8 @@ const Indicador: React.FC<{ icone: typeof School; valor: number; rotulo: string;
 /** Mapa Operacional da Rede: visão territorial das unidades e roteirizador de vistorias (administração do CCO). */
 export const MapaRedePage: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  // Detalhe da ocorrência aberto aqui mesmo, sobre o mapa (?ocorrencia=…), para agir sem sair da tela.
+  const detalhe = useDetalheNaUrl();
   const ocorrencias = useOcorrencias(user!, { atualizarSozinho: true });
   const unidadesCadastradas = useQuery({ queryKey: ['cco', 'unidades'], queryFn: () => dataService.getRamaisUnidades(), staleTime: 10 * 60_000 });
 
@@ -165,6 +167,19 @@ export const MapaRedePage: React.FC = () => {
     window.setTimeout(() => setNovas((atual) => atual.filter((x) => x.id !== oc.id)), 15_000);
     window.setTimeout(() => setDestaques((atual) => atual.filter((id) => id !== oc.unidade_id)), 60_000);
   }, []));
+
+  /** A mais urgente da unidade: importância (alta → baixa) e, no empate, a mais antiga. */
+  const maisUrgente = (u: UnidadeMapa) =>
+    [...u.abertas].sort((a, b) =>
+      IMPORTANCIAS[importanciaDe(a).nivel].ordem - IMPORTANCIAS[importanciaDe(b).nivel].ordem
+      || a.created_at.localeCompare(b.created_at))[0];
+
+  /** Clique na escola do mapa: com ocorrência em aberto, já abre a mais urgente para tomar providências. */
+  const clicarNaUnidade = useCallback((id: string) => {
+    setSelecionada(id);
+    const unidade = comLocal.find((u) => u.id === id);
+    if (unidade?.abertas.length) detalhe.abrir(maisUrgente(unidade).id);
+  }, [comLocal, detalhe]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mostrarAviso = (texto: string) => {
     setAviso(texto);
@@ -255,7 +270,7 @@ export const MapaRedePage: React.FC = () => {
                 <p className="line-clamp-2 text-xs text-[#5f7391] dark:text-slate-400">{oc.descricao}</p>
                 <div className="mt-2 flex gap-2">
                   <button type="button" onClick={() => { setSelecionada(oc.unidade_id); setNovas((a) => a.filter((x) => x.id !== oc.id)); }} className="rounded-lg bg-[#0b63ce] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#0a56b4]">Ver no mapa</button>
-                  <button type="button" onClick={() => navigate(`/cco?ocorrencia=${oc.id}`)} className="rounded-lg border border-[#b9cfe9] px-3 py-1.5 text-xs font-bold text-[#0b4fa3] hover:bg-[#eef5fe] dark:border-slate-700 dark:text-sky-200">Abrir</button>
+                  <button type="button" onClick={() => { setSelecionada(oc.unidade_id); detalhe.abrir(oc.id); setNovas((a) => a.filter((x) => x.id !== oc.id)); }} className="rounded-lg border border-[#b9cfe9] px-3 py-1.5 text-xs font-bold text-[#0b4fa3] hover:bg-[#eef5fe] dark:border-slate-700 dark:text-sky-200">Abrir</button>
                 </div>
               </div>
               <button type="button" onClick={() => setNovas((a) => a.filter((x) => x.id !== oc.id))} aria-label="Fechar aviso" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[#9aaac0] hover:bg-[#eef5fe] dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
@@ -356,8 +371,8 @@ export const MapaRedePage: React.FC = () => {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         {/* Mapa */}
-        <div className={cn('relative overflow-hidden rounded-2xl border border-[#e2eaf4] bg-white shadow-[0_10px_30px_-22px_rgba(16,48,96,.45)] dark:border-slate-800', telaCheia ? 'h-[calc(100vh-260px)]' : 'h-[460px] sm:h-[560px]')}>
-          <MapaRede unidades={filtradas} selecionada={selecionada} rota={rota.ordem} trajeto={rotaPorRuas?.trajeto} destaques={destaques} onSelecionar={setSelecionada} />
+        <div className={cn('relative isolate z-0 overflow-hidden rounded-2xl border border-[#e2eaf4] bg-white shadow-[0_10px_30px_-22px_rgba(16,48,96,.45)] dark:border-slate-800', telaCheia ? 'h-[calc(100vh-260px)]' : 'h-[460px] sm:h-[560px]')}>
+          <MapaRede unidades={filtradas} selecionada={selecionada} rota={rota.ordem} trajeto={rotaPorRuas?.trajeto} destaques={destaques} onSelecionar={clicarNaUnidade} />
           {/* Legenda */}
           <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-xl bg-white/95 px-3 py-2 text-[11px] shadow-md dark:bg-[#121826]/95">
             <ul className="space-y-1">
@@ -394,7 +409,7 @@ export const MapaRedePage: React.FC = () => {
                 <ul className="mt-3 space-y-1.5">
                   {unidadeSelecionada.abertas.slice(0, 4).map((oc) => (
                     <li key={oc.id}>
-                      <button type="button" onClick={() => navigate(`/cco?ocorrencia=${oc.id}`)} className="flex w-full items-start gap-2 rounded-lg bg-[#f5f8fc] px-2.5 py-2 text-left text-xs hover:bg-[#eaf2fd] dark:bg-slate-800/60 dark:hover:bg-slate-800">
+                      <button type="button" onClick={() => detalhe.abrir(oc.id)} className="flex w-full items-start gap-2 rounded-lg bg-[#f5f8fc] px-2.5 py-2 text-left text-xs hover:bg-[#eaf2fd] dark:bg-slate-800/60 dark:hover:bg-slate-800">
                         <span className="font-mono font-bold text-[#0b4fa3] dark:text-sky-300">{oc.protocolo}</span>
                         <span className="line-clamp-2 flex-1 text-[#3b4d68] dark:text-slate-300">{oc.descricao}</span>
                         <ChevronRight className="h-4 w-4 shrink-0 text-[#9aaac0]" aria-hidden="true" />
@@ -500,6 +515,7 @@ export const MapaRedePage: React.FC = () => {
           )}
         </aside>
       </div>
+      <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user!} onFechar={detalhe.fechar} />
     </section>
   );
 };
