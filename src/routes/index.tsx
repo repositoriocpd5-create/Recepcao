@@ -63,6 +63,28 @@ const RotaInicial: React.FC = () => {
   );
 };
 
+/** Log do sistema: tudo o que foi registrado (Recepção e CCO), somente para o administrador. */
+const LogDoSistema: React.FC = () => (
+  <RelatoriosPage
+    titulo="Log do sistema"
+    descricao="Tudo o que acontece no sistema, da Recepção e do CCO: quem fez o quê, quando e de onde."
+  />
+);
+
+/** Log no CCO: o administrador geral vê tudo; o administrador do CCO, só os eventos do CCO. */
+const LogDoCco: React.FC = () => {
+  const { user } = useAuth();
+  return user?.role === 'cco_admin' ? (
+    <RelatoriosPage
+      titulo="Log do sistema"
+      descricao="Tudo o que acontece no CCO: quem fez o quê, quando e de onde."
+      somenteCco
+    />
+  ) : (
+    <LogDoSistema />
+  );
+};
+
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
@@ -89,7 +111,9 @@ export const AppRoutes: React.FC = () => {
           <Route path="autorizacoes" element={<AutorizacoesPage />} />
           {/* Agendamentos e Relatórios: somente administradores */}
           <Route path="agendamentos" element={<ProtectedRoute requiredRole="admin"><AgendamentosPage /></ProtectedRoute>} />
-          <Route path="relatorios" element={<ProtectedRoute requiredRole="admin"><RelatoriosPage /></ProtectedRoute>} />
+          {/* "Relatórios & Auditoria" virou "Log do sistema": o endereço antigo continua funcionando. */}
+          <Route path="relatorios" element={<Navigate to="/log-do-sistema" replace />} />
+          <Route path="log-do-sistema" element={<ProtectedRoute requiredRole="admin"><LogDoSistema /></ProtectedRoute>} />
           <Route path="departamentos" element={<DepartamentosPage />} />
           <Route path="setores" element={<SetoresPage />} />
           <Route path="crachas" element={<CrachasPage />} />
@@ -107,6 +131,10 @@ export const AppRoutes: React.FC = () => {
           <Route index element={<CcoInicioPage />} />
           <Route path="ocorrencias" element={<CcoOcorrenciasPage />} />
           <Route path="ajuda" element={<CcoAjudaPage />} />
+          <Route path="log" element={<ProtectedRoute requiredRole="cco_admin"><LogDoCco /></ProtectedRoute>} />
+          {/* Mesmas telas da administração, sem sair do módulo CCO. */}
+          <Route path="usuarios" element={<ProtectedRoute requiredRole="admin"><AdministracaoPage /></ProtectedRoute>} />
+          <Route path="relatorios" element={<Navigate to="/cco/log" replace />} />
         </Route>
       </Route>
 

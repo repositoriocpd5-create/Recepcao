@@ -1,24 +1,21 @@
 import React, { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowRight,
-  Building2,
-  Camera,
   CheckCircle2,
   ClipboardList,
   Copy,
   Eye,
   FileText,
-  HelpCircle,
-  LifeBuoy,
   Lock,
+  Pencil,
   Plus,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { perfilCco } from '@/lib/modulos';
-import { ORDEM_SITUACOES, SITUACOES, formatarData } from '@/services/ccoService';
+import { ccoService, formatarData, motivoSemEdicao, podeEditar } from '@/services/ccoService';
 import { CcoOcorrencia, UserProfile } from '@/types';
 import { CabecalhoCco } from './componentes/Cabecalho';
 import { DetalheOcorrencia } from './componentes/DetalheOcorrencia';
@@ -51,7 +48,7 @@ const Registrada: React.FC<{ ocorrencia: CcoOcorrencia | null; onVer: () => void
   const [copiado, setCopiado] = useState(false);
   if (!ocorrencia) return null;
   return (
-    <Modal isOpen onClose={onFechar} title="Ocorrência registrada" description="O CCO já recebeu o seu registro." maxWidth="md" icon={<CheckCircle2 className="h-6 w-6 text-green-600" />}>
+    <Modal isOpen onClose={onFechar} title={ocorrencia.tipo_registro === 'camera' ? 'Relato enviado' : 'Ocorrência registrada'} description="O CCO já recebeu o seu registro." maxWidth="md" icon={<CheckCircle2 className="h-6 w-6 text-green-600" />}>
       <div className="space-y-5">
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center dark:border-emerald-500/30 dark:bg-emerald-950/20">
           <p className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">Protocolo</p>
@@ -82,44 +79,107 @@ const Registrada: React.FC<{ ocorrencia: CcoOcorrencia | null; onVer: () => void
   );
 };
 
+/** Ação da linha em "Minhas ocorrências": editar enquanto o administrador não visualizou. */
+const acaoEditar = (user: UserProfile) => (oc: CcoOcorrencia) =>
+  podeEditar(user, oc) ? (
+    <Link
+      to={`/cco?editar=${oc.id}`}
+      aria-label={`Editar ocorrência ${oc.protocolo}`}
+      title="Editar (ainda não visualizada pelo administrador)"
+      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[#b9cfe9] px-3 text-sm font-bold text-[#0b4fa3] transition-colors hover:bg-[#f0f6fe] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] dark:border-slate-700 dark:text-sky-200 dark:hover:bg-slate-800"
+    >
+      <Pencil className="h-4 w-4" aria-hidden="true" /> Editar
+    </Link>
+  ) : (
+    <span title={motivoSemEdicao(user, oc) ?? undefined} className="inline-flex items-center gap-1 text-xs text-[#8a9bb3] dark:text-slate-500">
+      <Lock className="h-4 w-4" aria-hidden="true" />
+      <span className="sr-only">{motivoSemEdicao(user, oc)}</span>
+    </span>
+  );
+
 const InicioUnidade: React.FC<{ user: UserProfile }> = ({ user }) => {
   const queryClient = useQueryClient();
   const unidade = useUnidade(user.unidade_id);
   const ocorrencias = useOcorrencias(user);
   const detalhe = useDetalheNaUrl();
   const [registrada, setRegistrada] = useState<CcoOcorrencia | null>(null);
+  const [salva, setSalva] = useState<CcoOcorrencia | null>(null);
+  const [params, setParams] = useSearchParams();
+  const editarId = params.get('editar');
+  const emEdicao = useQuery({
+    queryKey: ['cco', 'ocorrencia', editarId],
+    queryFn: () => ccoService.obterOcorrencia(user, editarId!),
+    enabled: Boolean(editarId),
+    // Não recarrega no meio da edição; o banco confere de novo ao salvar.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+  const sairDaEdicao = () => setParams((atual) => { atual.delete('editar'); return atual; }, { replace: true });
+  const edicao = editarId && emEdicao.data && podeEditar(user, emEdicao.data) ? emEdicao.data : undefined;
+  const bloqueioEdicao = editarId && emEdicao.isFetched && !edicao
+    ? (emEdicao.data ? motivoSemEdicao(user, emEdicao.data) : 'Ocorrência não encontrada.')
+    : null;
 
   return (
     <div className="space-y-5">
       <CabecalhoCco
         titulo="Central Controle Operacional"
-        subtitulo="Registre e acompanhe ocorrências relacionadas ao monitoramento da sua unidade escolar."
+        subtitulo="Registre ocorrências e informe problemas nas câmeras da sua unidade."
         user={user}
         unidadeNome={unidade.data?.nome}
       />
 
       {!user.unidade_id ? (
         <SemUnidade />
+      ) : editarId && emEdicao.isLoading ? (
+        <Cartao><Carregando texto="Abrindo a ocorrência para edição…" /></Cartao>
       ) : (
-        <FormularioOcorrencia
-          user={user}
-          unidadeId={user.unidade_id}
-          unidadeNome={unidade.data?.nome}
-          onRegistrada={(oc) => {
-            setRegistrada(oc);
-            void queryClient.invalidateQueries({ queryKey: ['cco'] });
-          }}
-        />
+        <>
+          {bloqueioEdicao && (
+            <Cartao className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p role="alert" className="flex items-start gap-2 text-sm text-amber-800 dark:text-amber-200">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> {bloqueioEdicao}
+              </p>
+              <button type="button" onClick={sairDaEdicao} className={botaoSecundario}>Fazer um novo registro</button>
+            </Cartao>
+          )}
+          {!bloqueioEdicao && (
+            <FormularioOcorrencia
+              key={edicao?.id ?? 'novo'}
+              user={user}
+              unidadeId={user.unidade_id}
+              unidadeNome={unidade.data?.nome}
+              edicao={edicao}
+              onCancelarEdicao={sairDaEdicao}
+              onEditada={(oc) => {
+                setSalva(oc);
+                sairDaEdicao();
+                void queryClient.invalidateQueries({ queryKey: ['cco'] });
+              }}
+              onRegistrada={(oc) => {
+                setRegistrada(oc);
+                void queryClient.invalidateQueries({ queryKey: ['cco'] });
+              }}
+            />
+          )}
+        </>
+      )}
+
+      {salva && (
+        <p role="status" className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-950/20 dark:text-emerald-200">
+          <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" /> Alterações da ocorrência {salva.protocolo} salvas.
+          <button type="button" onClick={() => setSalva(null)} className="ml-auto rounded-lg px-2 py-1 text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40">Fechar</button>
+        </p>
       )}
 
       <Cartao aria-labelledby="cco-minhas-titulo">
         <div className="flex items-center justify-between gap-3 border-b border-[#e6edf6] px-4 py-4 sm:px-6 dark:border-slate-800">
           <div className="flex items-center gap-3">
             <IconeTitulo className="h-10 w-10"><FileText className="h-5 w-5" aria-hidden="true" /></IconeTitulo>
-            <h2 id="cco-minhas-titulo" className="text-lg font-extrabold text-[#0d2240] dark:text-slate-100">Minhas ocorrências</h2>
+            <h2 id="cco-minhas-titulo" className="text-lg font-extrabold text-[#0d2240] dark:text-slate-100">Meus registros</h2>
           </div>
           <Link to="/cco/ocorrencias" className="inline-flex min-h-10 shrink-0 items-center whitespace-nowrap gap-1.5 rounded-lg px-2 text-sm font-bold text-[#0b63ce] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:text-sky-300 dark:hover:bg-slate-800">
-            Ver todas <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            Ver todos <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
         {ocorrencias.isLoading ? (
@@ -127,7 +187,13 @@ const InicioUnidade: React.FC<{ user: UserProfile }> = ({ user }) => {
         ) : ocorrencias.error ? (
           <ErroLista erro={ocorrencias.error} />
         ) : (
-          <ListaOcorrencias ocorrencias={(ocorrencias.data || []).slice(0, 5)} onAbrir={(oc) => detalhe.abrir(oc.id)} />
+          <ListaOcorrencias
+            ocorrencias={(ocorrencias.data || []).slice(0, 5)}
+            onAbrir={(oc) => detalhe.abrir(oc.id)}
+            acaoLinha={acaoEditar(user)}
+            acaoCompacta
+            vazio={<ListaVazia titulo="Nenhum registro enviado" texto="Suas ocorrências e relatos de problemas aparecerão aqui." />}
+          />
         )}
       </Cartao>
 
@@ -184,6 +250,8 @@ export const CcoOcorrenciasPage: React.FC = () => {
             <ListaOcorrencias
               ocorrencias={filtradas}
               onAbrir={(oc) => detalhe.abrir(oc.id)}
+              acaoLinha={acaoEditar(user)}
+              acaoCompacta
               vazio={
                 ativos ? (
                   <ListaVazia titulo="Nenhuma ocorrência com estes filtros." texto="Ajuste ou limpe os filtros." />
@@ -205,69 +273,4 @@ export const CcoOcorrenciasPage: React.FC = () => {
   );
 };
 
-const Topico: React.FC<{ icone: typeof Camera; titulo: string; children: React.ReactNode }> = ({ icone: Icone, titulo, children }) => (
-  <Cartao className="p-5">
-    <div className="flex items-start gap-3">
-      <IconeTitulo className="h-10 w-10"><Icone className="h-5 w-5" aria-hidden="true" /></IconeTitulo>
-      <div className="min-w-0">
-        <h2 className="text-base font-extrabold text-[#0d2240] dark:text-slate-100">{titulo}</h2>
-        <div className="mt-1.5 space-y-2 text-sm leading-relaxed text-[#3b4d68] dark:text-slate-300">{children}</div>
-      </div>
-    </div>
-  </Cartao>
-);
-
-export const CcoAjudaPage: React.FC = () => {
-  const { user } = useAuth();
-  const unidade = useUnidade(user?.unidade_id);
-  if (!user) return null;
-  const equipe = perfilCco(user) !== 'unidade';
-  return (
-    <div className="space-y-5">
-      <CabecalhoCco
-        titulo="Ajuda do CCO"
-        subtitulo="Como registrar e acompanhar as ocorrências do monitoramento das câmeras."
-        trilha="Ajuda"
-        user={user}
-        unidadeNome={unidade.data?.nome}
-        icone={<HelpCircle className="h-7 w-7 sm:h-9 sm:w-9" aria-hidden="true" />}
-      />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Topico icone={ClipboardList} titulo="Como registrar uma ocorrência">
-          <ol className="list-decimal space-y-1 pl-4">
-            <li>Confira a <strong>data</strong> (já vem com o dia de hoje).</li>
-            <li>Informe o <strong>horário inicial</strong> e o <strong>final</strong>, no formato 24 h (ex.: 14:30). O botão do relógio preenche o horário atual.</li>
-            <li>Se ainda está acontecendo, marque <strong>Ocorrência em andamento</strong> e informe o fim depois, no detalhe da ocorrência.</li>
-            <li>Descreva o que aconteceu, o local ou a câmera envolvida e o que mais ajudar no atendimento.</li>
-            <li>Se puder, anexe uma foto. Toque em <strong>Registrar ocorrência</strong> e guarde o protocolo.</li>
-          </ol>
-        </Topico>
-        <Topico icone={CheckCircle2} titulo="O que significa cada situação">
-          <ul className="space-y-2">
-            {ORDEM_SITUACOES.map((s) => (
-              <li key={s} className="flex flex-wrap items-center gap-2"><SituacaoBadge situacao={s} /> <span>{SITUACOES[s].descricao}</span></li>
-            ))}
-          </ul>
-        </Topico>
-        <Topico icone={Camera} titulo="Fotos">
-          <p>No celular, use <strong>Tirar foto</strong> ou <strong>Escolher da galeria</strong>. No computador, arraste a imagem para a área da foto.</p>
-          <p>Formatos JPG, PNG ou WEBP, até 10 MB. A foto é reduzida antes do envio e a localização gravada pela câmera é removida.</p>
-        </Topico>
-        <Topico icone={Lock} titulo="Privacidade e segurança">
-          <p>Cada unidade vê apenas as próprias ocorrências e fotos. As fotos ficam em armazenamento privado e só abrem por um link temporário.</p>
-          <p>Registro, mudanças de situação, responsável e observações ficam no histórico e na auditoria do sistema, com autor e horário.</p>
-        </Topico>
-        {equipe && (
-          <Topico icone={Building2} titulo="Para a equipe do CCO">
-            <p>No painel, filtre por unidade, período e situação. Abra a ocorrência para definir o responsável, mudar a situação e registrar observações — tudo fica visível para a unidade no histórico.</p>
-            <p>O painel se atualiza sozinho a cada minuto.</p>
-          </Topico>
-        )}
-        <Topico icone={LifeBuoy} titulo="Problemas para enviar?">
-          <p>Se a internet cair durante o envio, os dados continuam no formulário: toque em <strong>Tentar novamente</strong>. O sistema não duplica o registro.</p>
-          <p>Em caso de emergência, não espere pelo sistema: acione a Guarda Municipal ou a Polícia Militar (190).</p>
-        </Topico>
-      </div>
-    </div>
-  );
-};
+export { CcoAjudaPage } from './Ajuda';

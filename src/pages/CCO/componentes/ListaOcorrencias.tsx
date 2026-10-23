@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { SITUACOES, descreverHorario, formatarData } from '@/services/ccoService';
 import { CcoOcorrencia } from '@/types';
 import { SituacaoBadge } from './ui';
+import { ImportanciaBadge } from './TabelaAdmin';
 
 interface Props {
   ocorrencias: CcoOcorrencia[];
@@ -13,6 +14,10 @@ interface Props {
   vazio?: React.ReactNode;
   /** Ação rápida ao lado da linha (ex.: registrar andamento no painel da equipe). */
   acaoLinha?: (ocorrencia: CcoOcorrencia) => React.ReactNode;
+  /** Ação curta (um botão pequeno ou ícone): ocupa menos espaço da linha. */
+  acaoCompacta?: boolean;
+  /** Administrador: mostra o nível de importância ao lado do protocolo. */
+  mostrarImportancia?: boolean;
 }
 
 export const ListaVazia: React.FC<{ titulo: string; texto?: string }> = ({ titulo, texto }) => (
@@ -28,7 +33,7 @@ export const ListaVazia: React.FC<{ titulo: string; texto?: string }> = ({ titul
 );
 
 /** Lista de ocorrências: tabela no computador, cartões no celular. */
-export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostrarUnidade, vazio, acaoLinha }) => {
+export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostrarUnidade, vazio, acaoLinha, acaoCompacta, mostrarImportancia }) => {
   if (!ocorrencias.length) return <>{vazio ?? <ListaVazia titulo="Nenhuma ocorrência registrada." />}</>;
 
   const colunas = mostrarUnidade
@@ -39,7 +44,7 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
     <div>
       <div
         aria-hidden="true"
-        className={cn('hidden gap-4 border-b border-[#e6edf6] px-4 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#6b7f9b] lg:grid sm:px-6 dark:border-slate-800 dark:text-slate-500', colunas, acaoLinha && 'lg:pr-[176px]')}
+        className={cn('hidden gap-4 border-b border-[#e6edf6] px-4 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#6b7f9b] lg:grid sm:px-6 dark:border-slate-800 dark:text-slate-500', colunas, acaoLinha && (acaoCompacta ? 'lg:pr-[104px]' : 'lg:pr-[176px]'))}
       >
         <span>Protocolo</span>
         <span>Data e horário</span>
@@ -60,7 +65,10 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
                 colunas,
               )}
             >
-              <span className="min-w-0 font-mono text-[13px] font-bold text-[#0b4fa3] dark:text-sky-300">{oc.protocolo}</span>
+              <span className="flex min-w-0 flex-wrap items-center gap-2 font-mono text-[13px] font-bold text-[#0b4fa3] dark:text-sky-300">
+                {oc.protocolo}
+                {mostrarImportancia && <ImportanciaBadge oc={oc} className="font-sans" />}
+              </span>
               <span className="lg:hidden"><SituacaoBadge situacao={oc.situacao} /></span>
 
               <span className="col-span-2 flex flex-wrap items-center gap-x-1.5 text-[13px] text-[#3b4d68] lg:col-span-1 lg:block dark:text-slate-300">
@@ -88,7 +96,11 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
               <span className="hidden lg:block"><SituacaoBadge situacao={oc.situacao} /></span>
               <ChevronRight className="hidden h-5 w-5 text-[#9aaac0] transition-transform group-hover:translate-x-0.5 group-hover:text-[#0b63ce] lg:block" aria-hidden="true" />
             </button>
-            {acaoLinha && <div className="flex w-[52px] shrink-0 justify-center pr-3 lg:w-[176px] lg:pr-6">{acaoLinha(oc)}</div>}
+            {acaoLinha && (
+              <div className={cn('flex shrink-0 justify-center pr-3', acaoCompacta ? 'w-[96px] sm:w-[104px] sm:pr-6' : 'w-[52px] lg:w-[176px] lg:pr-6')}>
+                {acaoLinha(oc)}
+              </div>
+            )}
           </li>
         ))}
       </ul>

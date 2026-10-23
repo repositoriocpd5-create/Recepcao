@@ -426,6 +426,14 @@ export const DEMO_USERS: UserProfile[] = [
     unidade_id: RAMAIS_UNIDADES_INICIAIS.find((u) => u.nome === 'E. M. ALEXANDRE IGNÁCIO')?.id ?? null,
   },
   {
+    id: 'u-demo-cco-admin',
+    email: 'paulo.sergio@edu.itaguai.rj.gov.br',
+    nome_completo: 'Paulo Sergio Souza Santos',
+    cargo: 'Administrador do CCO',
+    role: 'cco_admin',
+    ativo: true,
+  },
+  {
     id: 'u-demo-cco',
     email: 'cco@sme.gov.br',
     nome_completo: 'Marcos Vinícius Rocha',

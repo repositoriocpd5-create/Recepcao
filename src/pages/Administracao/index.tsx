@@ -86,9 +86,15 @@ const ROLE_CONFIG: Record<
     icon: <Camera className="w-3.5 h-3.5" />,
     descricao: 'CCO: acompanha e atende as ocorrências das unidades autorizadas',
   },
+  cco_admin: {
+    label: 'ADMIN DO CCO',
+    variant: 'info',
+    icon: <Crown className="w-3.5 h-3.5" />,
+    descricao: 'Administra somente o CCO (todas as unidades, exclusões, reaberturas e log do CCO). Não acessa a Recepção',
+  },
 };
 
-const ROLES_OPTIONS: UserRole[] = ['admin', 'gestor', 'recepcionista', 'atendente', 'unidade_escolar', 'cco'];
+const ROLES_OPTIONS: UserRole[] = ['admin', 'gestor', 'recepcionista', 'atendente', 'unidade_escolar', 'cco', 'cco_admin'];
 /** Papéis da recepção que podem, além disso, integrar a equipe do CCO. */
 const ROLES_RECEPCAO_COM_CCO: UserRole[] = ['gestor', 'recepcionista', 'atendente'];
 
@@ -258,7 +264,7 @@ export const AdministracaoPage: React.FC = () => {
         ? await dataService.salvarUsuarioSistema({ ...editingUser, ...dados }, formSenha || undefined)
         : await dataService.criarUsuarioSistema(dados, formSenha);
     } catch (err: any) {
-      const papelNovo = formRole === 'unidade_escolar' || formRole === 'cco';
+      const papelNovo = formRole === 'unidade_escolar' || formRole === 'cco' || formRole === 'cco_admin';
       setFormErro(papelNovo && /papel \(role\) inválido/i.test(err.message || '')
         ? 'O Supabase ainda não conhece os papéis do CCO: publique a nova versão da função "admin-manage-user" e aplique as migrações do CCO.'
         : err.message || 'Não foi possível salvar o usuário.');

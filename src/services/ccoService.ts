@@ -11,8 +11,10 @@ import { perfilCco } from '@/lib/modulos';
 import { dataService } from '@/services/dataService';
 import { RAMAIS_UNIDADES_INICIAIS } from '@/services/ramaisUnidades';
 import { DEMO_USERS } from '@/services/mockData';
+import { ResultadoGravidade, classificarPorPalavras } from '@/lib/gravidadeCco';
 import {
   CcoAtualizacao,
+  CcoEdicao,
   CcoHistorico,
   CcoNovaOcorrencia,
   CcoOcorrencia,
@@ -27,6 +29,29 @@ const CHAVES = {
   HISTORICO: 'sme_cco_historico',
   FOTOS: 'sme_cco_fotos',
 };
+
+// ─── Problema em câmera ───
+/** Sugestões da lista de câmeras; a unidade também pode digitar outra. */
+export const CAMERAS_SUGERIDAS = [
+  'Portão principal',
+  'Portão de serviço',
+  'Pátio',
+  'Corredor',
+  'Quadra',
+  'Estacionamento',
+  'Refeitório',
+  'Secretaria',
+];
+
+export const TIPOS_PROBLEMA_CAMERA = [
+  'Sem imagem',
+  'Imagem com falha ou chuviscada',
+  'Câmera desligada ou offline',
+  'Câmera fora de posição',
+  'Câmera danificada',
+  'Gravação indisponível',
+  'Outro',
+];
 
 // ─── Foto ───
 export const FOTO_TIPOS_ACEITOS = ['image/jpeg', 'image/png', 'image/webp'];
@@ -258,6 +283,60 @@ function adicionarHistoricoDemo(evento: Omit<CcoHistorico, 'id' | 'created_at'>)
 }
 
 // ─── API ───
+const textoParaAnalise = (oc: Pick<CcoOcorrencia, 'descricao' | 'tipo_registro' | 'cameras' | 'tipo_problema'>) =>
+  [
+    oc.tipo_registro === 'camera' ? `Relato de problema em câmera(s): ${(oc.cameras || []).join(', ')} — ${oc.tipo_problema || ''}` : '',
+    oc.descricao,
+  ].join('\n');
+
+/** Gravidade a mostrar: a análise gravada ou, enquanto ela não chega, as palavras-chave. */
+export function gravidadeDe(oc: CcoOcorrencia): ResultadoGravidade & { origem: 'ia' | 'palavras'; provisoria: boolean } {
+  if (oc.ia_analisada_em && typeof oc.ia_grave === 'boolean') {
+    return { grave: oc.ia_grave, categoria: oc.ia_categoria ?? null, motivo: oc.ia_motivo ?? null, origem: oc.ia_origem ?? 'palavras', provisoria: false };
+  }
+  return { ...classificarPorPalavras(textoParaAnalise(oc)), origem: 'palavras', provisoria: true };
+}
+
+// ─── Importância (painel do administrador) ───
+
+export type Importancia = 'alta' | 'media' | 'baixa';
+
+export const IMPORTANCIAS: Record<Importancia, { rotulo: string; ordem: number }> = {
+  alta: { rotulo: 'Alta', ordem: 0 },
+  media: { rotulo: 'Média', ordem: 1 },
+  baixa: { rotulo: 'Baixa', ordem: 2 },
+};
+
+/**
+ * Alta: caso grave (IA ou palavras-chave). Média: ainda em andamento ou câmera com falha
+ * (a unidade fica sem monitoramento). Baixa: as demais. Devolve também o motivo, para a tela.
+ */
+export function importanciaDe(oc: CcoOcorrencia): { nivel: Importancia; motivo: string } {
+  const gravidade = gravidadeDe(oc);
+  if (gravidade.grave) return { nivel: 'alta', motivo: `Caso grave${gravidade.categoria ? `: ${gravidade.categoria}` : ''}` };
+  if (oc.situacao !== 'concluida' && oc.em_andamento) return { nivel: 'media', motivo: 'Ainda em andamento' };
+  if (oc.tipo_registro === 'camera') return { nivel: 'media', motivo: `Câmera com falha${oc.tipo_problema ? `: ${oc.tipo_problema}` : ''}` };
+  return { nivel: 'baixa', motivo: 'Sem sinais de gravidade' };
+}
+
+/** Quem dirige cada unidade e o cargo de quem registra (colunas do painel do administrador). */
+export interface PessoasDasUnidades {
+  direcao: Record<string, { nome: string; cargo: string | null }>;
+  cargos: Record<string, string | null>;
+}
+
+const ehDirecao = (cargo?: string | null) => Boolean(cargo && /diret|dirigent/i.test(cargo));
+
+/** Por que a unidade não pode editar a ocorrência (ou null, se pode). */
+export function motivoSemEdicao(user: UserProfile, oc: CcoOcorrencia): string | null {
+  if (perfilCco(user) !== 'unidade' || oc.unidade_id !== user.unidade_id) return 'Somente a unidade escolar edita a própria ocorrência.';
+  if (oc.visualizada_em) return 'O administrador já visualizou esta ocorrência. Ela não pode mais ser editada.';
+  if (oc.situacao !== 'registrada') return 'O CCO já iniciou o atendimento. A ocorrência não pode mais ser editada.';
+  return null;
+}
+
+export const podeEditar = (user: UserProfile, oc: CcoOcorrencia) => motivoSemEdicao(user, oc) === null;
+
 export const ccoService = {
   async getUnidade(id?: string | null): Promise<RamalUnidade | null> {
     if (!id) return null;
@@ -341,6 +420,7 @@ export const ccoService = {
         }
         throw new Error(mensagemErro(error, 'Não foi possível registrar a ocorrência'));
       }
+      void this.analisarGravidade((data as CcoOcorrencia).id).catch(() => {});
       return data as CcoOcorrencia;
     }
 
@@ -395,8 +475,10 @@ export const ccoService = {
         protocolo: nova.protocolo, unidade: nova.unidade_nome, data_ocorrencia: nova.data_ocorrencia,
         hora_inicio: nova.hora_inicio, hora_fim: nova.hora_fim, em_andamento: nova.em_andamento,
         termina_dia_seguinte: nova.termina_dia_seguinte, com_foto: Boolean(foto_path),
+        tipo_registro: nova.tipo_registro, cameras: nova.cameras, tipo_problema: nova.tipo_problema,
       },
     });
+    void this.analisarGravidade(id).catch(() => {});
     return nova;
   },
 
@@ -550,6 +632,126 @@ export const ccoService = {
   },
 
   /** URL temporária da foto (bucket privado). */
+  /**
+   * Pede a análise de gravidade (IA no servidor; palavras-chave no modo demonstração).
+   * Não bloqueia quem chamou: se falhar, a tela usa as palavras-chave.
+   */
+  async analisarGravidade(id: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.functions.invoke('cco-analisar-ocorrencia', { body: { id } });
+      if (error) throw new Error(mensagemErro(error, 'Não foi possível analisar a ocorrência'));
+      return;
+    }
+    const lista = ocorrenciasDemo();
+    const oc = lista.find((item) => item.id === id);
+    if (!oc) return;
+    const resultado = classificarPorPalavras(textoParaAnalise(oc));
+    gravar(CHAVES.OCORRENCIAS, lista.map((item) => (item.id === id
+      ? { ...item, ia_grave: resultado.grave, ia_categoria: resultado.categoria, ia_motivo: resultado.motivo, ia_origem: 'palavras' as const, ia_analisada_em: new Date().toISOString() }
+      : item)));
+    await dataService.registrarLogAuditoria({
+      usuario_email: 'sistema',
+      acao: 'CCO_ANALISE_IA',
+      tabela: 'cco_ocorrencias',
+      registro_id: id,
+      detalhes: { protocolo: oc.protocolo, unidade: oc.unidade_nome, grave: resultado.grave, categoria: resultado.categoria, origem: 'palavras-chave' },
+    });
+  },
+
+  /** O administrador abriu a ocorrência: a partir daqui a unidade não edita mais. */
+  async marcarVisualizada(user: UserProfile, id: string): Promise<void> {
+    if (perfilCco(user) !== 'admin') return;
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.rpc('cco_marcar_visualizada', { p_id: id });
+      if (error) throw new Error(mensagemErro(error, 'Não foi possível registrar a visualização'));
+      return;
+    }
+    const lista = ocorrenciasDemo();
+    const oc = lista.find((item) => item.id === id);
+    if (!oc || oc.visualizada_em) return;
+    gravar(CHAVES.OCORRENCIAS, lista.map((item) => (item.id === id
+      ? { ...item, visualizada_em: new Date().toISOString(), visualizada_por: user.id, visualizada_por_nome: user.nome_completo }
+      : item)));
+    await dataService.registrarLogAuditoria({
+      usuario_email: user.email,
+      acao: 'CCO_VISUALIZACAO',
+      tabela: 'cco_ocorrencias',
+      registro_id: id,
+      detalhes: { protocolo: oc.protocolo, unidade: oc.unidade_nome },
+    });
+  },
+
+  async editarOcorrencia(user: UserProfile, id: string, dados: CcoEdicao): Promise<CcoOcorrencia> {
+    const { foto, alterar_foto, ...campos } = dados;
+    const atual = await this.obterOcorrencia(user, id);
+    if (!atual) throw new Error('Ocorrência não encontrada.');
+    const bloqueio = motivoSemEdicao(user, atual);
+    if (bloqueio) throw new Error(bloqueio);
+
+    // Foto nova em caminho novo: a anterior continua no Storage (só o administrador apaga fotos).
+    let foto_path: string | null = alterar_foto ? null : atual.foto_path ?? null;
+    if (alterar_foto && foto) foto_path = `${atual.unidade_id}/${id}-${Date.now()}.jpg`;
+
+    if (isSupabaseConfigured) {
+      if (alterar_foto && foto && foto_path) {
+        const { error } = await supabase.storage
+          .from(BUCKET)
+          .upload(foto_path, foto, { contentType: 'image/jpeg', upsert: true, cacheControl: '3600' });
+        if (error) throw new Error(mensagemErro(error, 'Não foi possível enviar a foto'));
+      }
+      const { data, error } = await supabase.rpc('cco_editar_ocorrencia', {
+        p_id: id,
+        p_data_ocorrencia: campos.data_ocorrencia,
+        p_hora_inicio: campos.hora_inicio,
+        p_hora_fim: campos.hora_fim,
+        p_em_andamento: campos.em_andamento,
+        p_termina_dia_seguinte: campos.termina_dia_seguinte,
+        p_descricao: campos.descricao.trim(),
+        p_tipo_registro: campos.tipo_registro,
+        p_cameras: campos.cameras,
+        p_tipo_problema: campos.tipo_problema,
+        p_alterar_foto: alterar_foto,
+        p_foto_path: foto_path,
+      });
+      if (error) throw new Error(mensagemErro(error, 'Não foi possível salvar as alterações'));
+      void this.analisarGravidade(id).catch(() => {});
+      return data as CcoOcorrencia;
+    }
+
+    // Modo demonstração
+    await esperar(500);
+    if (alterar_foto && foto && foto_path) {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const leitor = new FileReader();
+        leitor.onload = () => resolve(String(leitor.result));
+        leitor.onerror = () => reject(new Error('Não foi possível ler a foto.'));
+        leitor.readAsDataURL(foto);
+      });
+      gravar(CHAVES.FOTOS, { ...ler<Record<string, string>>(CHAVES.FOTOS, {}), [foto_path]: dataUrl });
+    }
+    const editada: CcoOcorrencia = {
+      ...atual,
+      ...campos,
+      descricao: campos.descricao.trim(),
+      hora_fim: campos.em_andamento ? null : campos.hora_fim,
+      cameras: campos.tipo_registro === 'camera' ? campos.cameras : null,
+      tipo_problema: campos.tipo_registro === 'camera' ? campos.tipo_problema : null,
+      foto_path,
+      updated_at: new Date().toISOString(),
+    };
+    gravar(CHAVES.OCORRENCIAS, ocorrenciasDemo().map((item) => (item.id === id ? editada : item)));
+    adicionarHistoricoDemo({ ocorrencia_id: id, tipo: 'edicao', descricao: 'Ocorrência editada pela unidade.', autor_id: user.id, autor_nome: user.nome_completo });
+    await dataService.registrarLogAuditoria({
+      usuario_email: user.email,
+      acao: 'CCO_EDICAO',
+      tabela: 'cco_ocorrencias',
+      registro_id: id,
+      detalhes: { protocolo: atual.protocolo, unidade: atual.unidade_nome, antes: atual, depois: { ...editada } },
+    });
+    void this.analisarGravidade(id).catch(() => {});
+    return editada;
+  },
+
   async urlFoto(caminho?: string | null): Promise<string | null> {
     if (!caminho) return null;
     if (isSupabaseConfigured) {
@@ -560,6 +762,41 @@ export const ccoService = {
     return ler<Record<string, string>>(CHAVES.FOTOS, {})[caminho] || null;
   },
 
+  /**
+   * Direção de cada unidade e cargo de quem registrou. Fonte: acessos por e-mail (cadastro oficial
+   * das escolas) e, na falta, os perfis com cargo de direção. Só o administrador enxerga essas tabelas.
+   */
+  async listarPessoasDasUnidades(): Promise<PessoasDasUnidades> {
+    const resultado: PessoasDasUnidades = { direcao: {}, cargos: {} };
+    let perfis: Pick<UserProfile, 'id' | 'nome_completo' | 'cargo' | 'unidade_id' | 'role'>[] = [];
+
+    if (isSupabaseConfigured) {
+      const [acessos, perfisLive] = await Promise.all([
+        supabase.from('acessos_por_email').select('unidade_id, responsavel, cargo').eq('role', 'unidade_escolar'),
+        supabase.from('profiles').select('id, nome_completo, cargo, unidade_id, role').eq('role', 'unidade_escolar'),
+      ]);
+      perfis = (perfisLive.data || []) as typeof perfis;
+      // 1º: quem tem cargo de direção; 2º: o responsável do e-mail institucional da escola.
+      const linhas = (acessos.data || []) as { unidade_id: string | null; responsavel: string | null; cargo: string | null }[];
+      [...linhas.filter((l) => ehDirecao(l.cargo)), ...linhas.filter((l) => !l.cargo)].forEach((l) => {
+        if (l.unidade_id && l.responsavel && !resultado.direcao[l.unidade_id]) {
+          resultado.direcao[l.unidade_id] = { nome: l.responsavel, cargo: l.cargo || 'Direção' };
+        }
+      });
+    } else {
+      const usuarios = await dataService.getUsuariosSistema();
+      perfis = [...usuarios, ...DEMO_USERS.filter((d) => !usuarios.some((u) => u.id === d.id))];
+    }
+
+    perfis.forEach((p) => {
+      resultado.cargos[p.id] = p.cargo ?? null;
+      if (p.role === 'unidade_escolar' && p.unidade_id && ehDirecao(p.cargo) && !resultado.direcao[p.unidade_id]) {
+        resultado.direcao[p.unidade_id] = { nome: p.nome_completo, cargo: p.cargo ?? 'Direção' };
+      }
+    });
+    return resultado;
+  },
+
   /** Pessoas que podem ser responsáveis por um atendimento. */
   async listarEquipe(): Promise<UserProfile[]> {
     if (isSupabaseConfigured) {
@@ -567,7 +804,7 @@ export const ccoService = {
         .from('profiles')
         .select('*')
         .eq('ativo', true)
-        .or('role.in.(admin,cco),acesso_cco.eq.true')
+        .or('role.in.(admin,cco,cco_admin),acesso_cco.eq.true')
         .order('nome_completo');
       if (error) throw new Error(mensagemErro(error, 'Não foi possível carregar a equipe do CCO'));
       return data as UserProfile[];

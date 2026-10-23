@@ -1,18 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, LayoutDashboard, MessageSquarePlus, RefreshCw, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileDown, LayoutDashboard, Loader2, MessageSquarePlus, RefreshCw, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { dataService } from '@/services/dataService';
-import { ORDEM_SITUACOES, formatarDataHora } from '@/services/ccoService';
+import { IMPORTANCIAS, Importancia, ORDEM_SITUACOES, SITUACOES, ccoService, formatarData, formatarDataHora, importanciaDe } from '@/services/ccoService';
+import { gerarRelatorioCcoPdf } from './relatorioPdf';
 import { CcoOcorrencia, UserProfile } from '@/types';
 import { perfilCco } from '@/lib/modulos';
 import { ExcluirOcorrencia } from './componentes/ExcluirOcorrencia';
 import { CabecalhoCco } from './componentes/Cabecalho';
-import { BarraFiltros, useFiltros } from './componentes/Filtros';
+import { BarraFiltros, Segmentado, useFiltros } from './componentes/Filtros';
 import { ListaOcorrencias, ListaVazia } from './componentes/ListaOcorrencias';
 import { Carregando, Cartao, ESTILO_SITUACAO } from './componentes/ui';
 import { useDetalheNaUrl, useOcorrencias } from './hooks';
 import { DetalheOcorrencia } from './componentes/DetalheOcorrencia';
+import { TabelaAdmin } from './componentes/TabelaAdmin';
 
 const INDICADOR: Record<string, string> = { registrada: 'Registradas', em_analise: 'Em análise', em_atendimento: 'Em atendimento', concluida: 'Solucionadas' };
 
@@ -53,6 +55,44 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
   }, [unidadesCadastradas.data, lista, user.cco_unidades]);
 
   const abertas = lista.filter((oc) => oc.situacao !== 'concluida').length;
+
+  // Administrador: colunas a mais (direção, quem registrou), filtro e ordem por importância.
+  const pessoas = useQuery({ queryKey: ['cco', 'pessoas-unidades'], queryFn: () => ccoService.listarPessoasDasUnidades(), enabled: admin, staleTime: 10 * 60_000 });
+  const [importancia, setImportancia] = useState<Importancia | ''>('');
+  const [ordem, setOrdem] = useState<'recentes' | 'importancia'>('recentes');
+  const exibidas = useMemo(() => {
+    if (!admin) return filtradas;
+    const lista = importancia ? filtradas.filter((oc) => importanciaDe(oc).nivel === importancia) : filtradas;
+    if (ordem === 'recentes') return lista;
+    return [...lista].sort((a, b) => IMPORTANCIAS[importanciaDe(a).nivel].ordem - IMPORTANCIAS[importanciaDe(b).nivel].ordem || b.created_at.localeCompare(a.created_at));
+  }, [admin, filtradas, importancia, ordem]);
+  // PDF: a lista exatamente como está na tela (filtros e ordem), 15 casos por página.
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const descreverFiltros = () => [
+    filtros.busca.trim() && `Busca: "${filtros.busca.trim()}"`,
+    filtros.unidade && `Unidade: ${unidades.find((u) => u.id === filtros.unidade)?.nome ?? filtros.unidade}`,
+    (filtros.de || filtros.ate) && `Período: ${filtros.de ? formatarData(filtros.de) : 'início'} a ${filtros.ate ? formatarData(filtros.ate) : 'hoje'}`,
+    filtros.situacao && `Situação: ${SITUACOES[filtros.situacao].rotulo}`,
+    admin && importancia && `Importância: ${IMPORTANCIAS[importancia].rotulo}`,
+    admin && ordem === 'importancia' && 'Ordem: mais importantes primeiro',
+  ].filter(Boolean).join(' · ');
+  const gerarPdf = async () => {
+    setGerandoPdf(true);
+    try {
+      await gerarRelatorioCcoPdf({ ocorrencias: exibidas, user, pessoas: pessoas.data, filtros: descreverFiltros(), completo: admin });
+      setToast(`PDF gerado com ${exibidas.length} ocorrência(s).`);
+    } catch {
+      setToast('Não foi possível gerar o PDF. Tente novamente.');
+    } finally {
+      setGerandoPdf(false);
+    }
+  };
+
+  const contagemImportancia = useMemo(() => {
+    const total: Record<Importancia, number> = { alta: 0, media: 0, baixa: 0 };
+    filtradas.forEach((oc) => { total[importanciaDe(oc).nivel] += 1; });
+    return total;
+  }, [filtradas]);
 
   return (
     <div className="space-y-5">
@@ -101,14 +141,27 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
               {ocorrencias.dataUpdatedAt ? ` · atualizado ${formatarDataHora(new Date(ocorrencias.dataUpdatedAt).toISOString()).split(' às ')[1]}` : ''}
             </p>
           </div>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => void gerarPdf()}
+            disabled={gerandoPdf || ocorrencias.isLoading}
+            aria-busy={gerandoPdf}
+            title="Gera um PDF com a lista exibida (15 ocorrências por página)"
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b63ce] px-3.5 text-sm font-bold text-white shadow-[0_8px_18px_-12px_rgba(11,99,206,.9)] hover:bg-[#0a56b4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] disabled:opacity-60"
+          >
+            {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <FileDown className="h-4 w-4" aria-hidden="true" />}
+            {gerandoPdf ? 'Gerando PDF…' : 'Gerar PDF'}
+          </button>
           <button
             type="button"
             onClick={() => void ocorrencias.refetch()}
             disabled={ocorrencias.isFetching}
-            className="inline-flex min-h-10 items-center gap-2 self-start rounded-xl border border-[#cfdbea] bg-white px-3.5 text-sm font-bold text-[#0b4fa3] hover:bg-[#f0f6fe] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] disabled:opacity-60 sm:self-auto dark:border-slate-700 dark:bg-transparent dark:text-sky-200"
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#cfdbea] bg-white px-3.5 text-sm font-bold text-[#0b4fa3] hover:bg-[#f0f6fe] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] disabled:opacity-60 dark:border-slate-700 dark:bg-transparent dark:text-sky-200"
           >
             <RefreshCw className={cn('h-4 w-4', ocorrencias.isFetching && 'animate-spin')} aria-hidden="true" /> Atualizar
           </button>
+          </div>
         </div>
         <div className="border-b border-[#e6edf6] px-4 py-4 sm:px-6 dark:border-slate-800">
           <BarraFiltros
@@ -120,6 +173,32 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
             ativos={ativos}
             unidades={unidades}
             placeholderBusca="Buscar por protocolo, unidade, texto ou pessoa"
+            extras={admin && (
+              <>
+                <Segmentado
+                  rotulo="Importância"
+                  valor={importancia}
+                  onChange={(v) => setImportancia(v as Importancia | '')}
+                  opcoes={[
+                    { valor: '', rotulo: 'Todas', contagem: filtradas.length },
+                    { valor: 'alta', rotulo: IMPORTANCIAS.alta.rotulo, contagem: contagemImportancia.alta, ponto: 'bg-rose-600' },
+                    { valor: 'media', rotulo: IMPORTANCIAS.media.rotulo, contagem: contagemImportancia.media, ponto: 'bg-amber-500' },
+                    { valor: 'baixa', rotulo: IMPORTANCIAS.baixa.rotulo, contagem: contagemImportancia.baixa, ponto: 'bg-slate-400' },
+                  ]}
+                />
+                <label className="ml-auto block">
+                  <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#6b7f9b] dark:text-slate-500">Ordenar por</span>
+                  <select
+                    value={ordem}
+                    onChange={(e) => setOrdem(e.target.value as 'recentes' | 'importancia')}
+                    className="min-h-11 rounded-xl border border-[#cfdbea] bg-white px-3 text-[13px] font-semibold text-[#10233f] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b63ce]/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  >
+                    <option value="recentes">Mais recentes</option>
+                    <option value="importancia">Mais importantes primeiro</option>
+                  </select>
+                </label>
+              </>
+            )}
           />
         </div>
         {ocorrencias.isLoading ? (
@@ -130,9 +209,22 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
           </p>
         ) : (
           <div className="pt-2">
+            {admin && exibidas.length > 0 && (
+              <div className="hidden lg:block">
+                <TabelaAdmin
+                  ocorrencias={exibidas}
+                  pessoas={pessoas.data}
+                  onAbrir={(oc) => detalhe.abrir(oc.id)}
+                  onAndamento={(oc) => detalhe.abrir(oc.id, 'andamento')}
+                  onExcluir={setExcluir}
+                />
+              </div>
+            )}
+            <div className={cn(admin && exibidas.length > 0 && 'lg:hidden')}>
             <ListaOcorrencias
-              ocorrencias={filtradas}
+              ocorrencias={exibidas}
               mostrarUnidade
+              mostrarImportancia={admin}
               onAbrir={(oc) => detalhe.abrir(oc.id)}
               acaoLinha={(oc) => (
                 <div className="flex items-center gap-1.5">
@@ -164,8 +256,9 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
                 )}
                 </div>
               )}
-              vazio={<ListaVazia titulo={ativos ? 'Nenhuma ocorrência com estes filtros.' : 'Nenhuma ocorrência registrada.'} texto={ativos ? 'Ajuste ou limpe os filtros.' : undefined} />}
+              vazio={<ListaVazia titulo={ativos || importancia ? 'Nenhuma ocorrência com estes filtros.' : 'Nenhuma ocorrência registrada.'} texto={ativos || importancia ? 'Ajuste ou limpe os filtros.' : undefined} />}
             />
+            </div>
           </div>
         )}
       </Cartao>

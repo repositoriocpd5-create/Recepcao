@@ -39,7 +39,7 @@ export const MobileBottomNav = () => {
     { label: 'Autorizações', path: '/autorizacoes', icon: CheckCircle2, tom: TONS.verde },
     ...(user?.role === 'admin' ? [{ label: 'Agendamentos', path: '/agendamentos', icon: Calendar, tom: TONS.ambar }] : []),
     { label: 'Crachás', path: '/crachas', icon: BadgeCheck, tom: TONS.ciano },
-    ...(user?.role === 'admin' ? [{ label: 'Relatórios & Auditoria', path: '/relatorios', icon: FileSpreadsheet, tom: TONS.violeta }] : []),
+    ...(user?.role === 'admin' ? [{ label: 'Log do sistema', path: '/log-do-sistema', icon: FileSpreadsheet, tom: TONS.violeta }] : []),
     { label: 'Departamentos & Setores', path: '/departamentos', icon: Building2, tom: TONS.azul },
     ...(user?.role === 'admin' ? [{ label: 'Administração', path: '/administracao', icon: ShieldCheck, tom: TONS.rosa }] : []),
     { label: 'Manual de Uso', path: '/manual', icon: BookOpen, tom: TONS.cinza },
@@ -72,10 +72,12 @@ export const MobileBottomNav = () => {
       ...(perfil === 'unidade' ? [{ label: 'Ocorrências', path: '/cco/ocorrencias', icon: FileText, end: false }] : []),
       ...(user?.role === 'admin'
         ? [
-            { label: 'Usuários', path: '/administracao', icon: ShieldCheck, end: false },
-            { label: 'Auditoria', path: '/relatorios', icon: FileSpreadsheet, end: false },
+            { label: 'Usuários', path: '/cco/usuarios', icon: ShieldCheck, end: false },
+            { label: 'Log', path: '/cco/log', icon: FileSpreadsheet, end: false },
           ]
-        : []),
+        : user?.role === 'cco_admin'
+          ? [{ label: 'Log', path: '/cco/log', icon: FileSpreadsheet, end: false }]
+          : []),
       { label: 'Ajuda', path: '/cco/ajuda', icon: HelpCircle, end: false },
     ];
     return (

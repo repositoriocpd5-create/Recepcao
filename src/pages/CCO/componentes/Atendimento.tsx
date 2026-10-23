@@ -154,15 +154,12 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
           )}
         </div>
       ) : (
-        <form onSubmit={registrarAndamento} noValidate className="space-y-4 rounded-2xl border border-[#d3e3f8] bg-[#f6faff] p-4 dark:border-slate-700 dark:bg-slate-900/40">
+        <form onSubmit={registrarAndamento} noValidate className="space-y-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/30 dark:bg-emerald-950/20">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className={cn(titulo, 'mb-0')}>Registrar andamento</h3>
-            <button
-              type="button"
-              onClick={() => abrirModal('finalizar')}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-green-600 px-4 text-sm font-bold text-white shadow-[0_10px_20px_-12px_rgba(22,163,74,.9)] transition-colors hover:bg-green-700 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-green-600"
-            >
-              <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Finalizar ocorrência
+            <button type="submit" disabled={salvando} className={cn(botaoPrimario, 'min-h-11 px-4 text-sm')}>
+              {salvando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />}
+              {salvando ? 'Registrando…' : 'Adicionar andamento'}
             </button>
           </div>
 
@@ -224,9 +221,12 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
             <Aviso mensagem={mensagem} />
-            <button type="submit" disabled={salvando} className={botaoPrimario}>
-              {salvando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />}
-              {salvando ? 'Registrando…' : 'Adicionar andamento'}
+            <button
+              type="button"
+              onClick={() => abrirModal('finalizar')}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-600 px-4 text-sm font-bold text-white shadow-[0_10px_20px_-12px_rgba(22,163,74,.9)] transition-colors hover:bg-green-700 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:ml-auto"
+            >
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Finalizar ocorrência
             </button>
           </div>
         </form>

@@ -59,9 +59,58 @@ interface Props {
   ativos: number;
   unidades?: { id: string; nome: string }[];
   placeholderBusca?: string;
+  /** Outros grupos na mesma faixa dos filtros de situação (ex.: importância, ordenação). */
+  extras?: React.ReactNode;
 }
 
-export const BarraFiltros: React.FC<Props> = ({ filtros, mudar, limpar, contagem, total, ativos, unidades, placeholderBusca = 'Buscar por protocolo ou texto da ocorrência' }) => {
+export interface OpcaoSegmentada {
+  valor: string;
+  rotulo: string;
+  contagem?: number;
+  /** Classe da bolinha de cor (ex.: situação ou importância). */
+  ponto?: string;
+}
+
+/** Grupo de botões lado a lado (um só ativo), com rótulo e contagem: visual de controle segmentado. */
+export const Segmentado: React.FC<{ rotulo: string; valor: string; opcoes: OpcaoSegmentada[]; onChange: (valor: string) => void }> = ({ rotulo, valor, opcoes, onChange }) => (
+  <div className="min-w-0">
+    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#6b7f9b] dark:text-slate-500" aria-hidden="true">{rotulo}</p>
+    <div role="group" aria-label={`Filtrar por ${rotulo.toLowerCase()}`} className="inline-flex max-w-full flex-wrap gap-0.5 rounded-xl bg-[#e9eff7] p-1 dark:bg-slate-800">
+      {opcoes.map((o) => {
+        const ativo = valor === o.valor;
+        return (
+          <button
+            key={o.valor || 'todas'}
+            type="button"
+            aria-pressed={ativo}
+            onClick={() => onChange(ativo && o.valor ? '' : o.valor)}
+            className={cn(
+              'inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-[13px] font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0b63ce]',
+              ativo
+                ? 'bg-white text-[#0d2240] shadow-[0_1px_3px_rgba(16,35,63,.18)] dark:bg-slate-950 dark:text-slate-50'
+                : 'text-[#4c6283] hover:bg-white/60 hover:text-[#0d2240] dark:text-slate-400 dark:hover:bg-slate-900/60 dark:hover:text-slate-100',
+            )}
+          >
+            {o.ponto && <span className={cn('h-2 w-2 shrink-0 rounded-full', o.ponto)} aria-hidden="true" />}
+            {o.rotulo}
+            {o.contagem !== undefined && (
+              <span
+                className={cn(
+                  'min-w-[22px] rounded-md px-1.5 py-px text-center text-[11px] font-bold tabular-nums',
+                  ativo ? 'bg-[#0b63ce] text-white' : 'bg-white/70 text-[#4c6283] dark:bg-slate-900 dark:text-slate-400',
+                )}
+              >
+                {o.contagem}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  </div>
+);
+
+export const BarraFiltros: React.FC<Props> = ({ filtros, mudar, limpar, contagem, total, ativos, unidades, extras, placeholderBusca = 'Buscar por protocolo ou texto da ocorrência' }) => {
   const periodoInvalido = filtros.de && filtros.ate && filtros.de > filtros.ate;
   return (
     <div className="space-y-3">
@@ -97,38 +146,19 @@ export const BarraFiltros: React.FC<Props> = ({ filtros, mudar, limpar, contagem
         </fieldset>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrar por situação">
-        <button
-          type="button"
-          aria-pressed={!filtros.situacao}
-          onClick={() => mudar({ situacao: '' })}
-          className={cn(
-            'inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce]',
-            !filtros.situacao ? 'border-[#0b63ce] bg-[#0b63ce] text-white' : 'border-[#cfdbea] bg-white text-[#3b4d68] hover:border-[#a9c1de] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
-          )}
-        >
-          Todas <span className="tabular-nums opacity-80">{total}</span>
-        </button>
-        {ORDEM_SITUACOES.map((s) => {
-          const ativo = filtros.situacao === s;
-          return (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={ativo}
-              onClick={() => mudar({ situacao: ativo ? '' : s })}
-              className={cn(
-                'inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce]',
-                ativo ? cn('border-transparent ring-2', ESTILO_SITUACAO[s].classe) : 'border-[#cfdbea] bg-white text-[#3b4d68] hover:border-[#a9c1de] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
-              )}
-            >
-              <span className={cn('h-2 w-2 rounded-full', ESTILO_SITUACAO[s].ponto)} aria-hidden="true" />
-              {SITUACOES[s].rotulo} <span className="tabular-nums opacity-70">{contagem[s]}</span>
-            </button>
-          );
-        })}
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-2xl bg-[#f6f9fd] p-3 ring-1 ring-[#e6edf6] dark:bg-slate-900/40 dark:ring-slate-800">
+        <Segmentado
+          rotulo="Situação"
+          valor={filtros.situacao}
+          onChange={(v) => mudar({ situacao: v as FiltrosEstado['situacao'] })}
+          opcoes={[
+            { valor: '', rotulo: 'Todas', contagem: total },
+            ...ORDEM_SITUACOES.map((s) => ({ valor: s, rotulo: SITUACOES[s].rotulo, contagem: contagem[s], ponto: ESTILO_SITUACAO[s].ponto })),
+          ]}
+        />
+        {extras}
         {ativos > 0 && (
-          <button type="button" onClick={limpar} className="inline-flex min-h-10 items-center gap-1 rounded-full px-3 text-[13px] font-bold text-[#0b63ce] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:text-sky-300 dark:hover:bg-slate-800">
+          <button type="button" onClick={limpar} className="inline-flex min-h-9 items-center gap-1 self-end rounded-lg px-2.5 text-[13px] font-bold text-[#0b63ce] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:text-sky-300 dark:hover:bg-slate-800">
             <X className="h-3.5 w-3.5" aria-hidden="true" /> Limpar filtros
           </button>
         )}

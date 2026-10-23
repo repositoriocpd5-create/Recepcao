@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Calendar,
   LayoutDashboard,
-  FileSpreadsheet,
   Building2,
   ShieldCheck,
   ChevronRight,
@@ -21,6 +20,7 @@ import {
   Home,
   FileText,
   HelpCircle,
+  ScrollText,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserAvatar } from '@/components/ui/UserAvatar';
@@ -77,8 +77,8 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
 
   const managementNav = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    // Relatórios & Auditoria: somente administradores
-    ...(user?.role === 'admin' ? [{ name: 'Relatórios & Auditoria', path: '/relatorios', icon: FileSpreadsheet }] : []),
+    // Log do sistema (antes "Relatórios & Auditoria"): somente administradores
+    ...(user?.role === 'admin' ? [{ name: 'Log do sistema', path: '/log-do-sistema', icon: ScrollText }] : []),
     { name: 'Departamentos & Setores', path: '/departamentos', icon: Building2 },
     ...(user?.role === 'admin'
       ? [{ name: 'Administração', path: '/administracao', icon: ShieldCheck }]
@@ -101,11 +101,13 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
           titulo: 'Gestão',
           seta: true,
           itens: [
-            { name: 'Usuários e unidades', path: '/administracao', icon: ShieldCheck },
-            { name: 'Relatórios & Auditoria', path: '/relatorios', icon: FileSpreadsheet },
+            { name: 'Usuários e unidades', path: '/cco/usuarios', icon: ShieldCheck },
+            { name: 'Log do sistema', path: '/cco/log', icon: ScrollText },
           ],
         }]
-      : []),
+      : user?.role === 'cco_admin'
+        ? [{ titulo: 'Gestão', itens: [{ name: 'Log do sistema', path: '/cco/log', icon: ScrollText }] }]
+        : []),
   ];
 
   const secoes: SecaoMenu[] = modulo === 'cco'

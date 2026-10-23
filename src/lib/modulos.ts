@@ -8,12 +8,15 @@ export type PerfilCco = 'unidade' | 'equipe' | 'admin';
 
 type Usuario = (Pick<UserProfile, 'role' | 'acesso_cco'> & { id?: string }) | null | undefined;
 
-export const acessaRecepcao = (user: Usuario) =>
-  Boolean(user && user.role !== 'unidade_escolar' && user.role !== 'cco');
+/** Papéis que só existem no CCO (não entram na Recepção). */
+const PAPEIS_SO_CCO = ['unidade_escolar', 'cco', 'cco_admin'];
+
+export const acessaRecepcao = (user: Usuario) => Boolean(user && !PAPEIS_SO_CCO.includes(user.role));
 
 export const perfilCco = (user: Usuario): PerfilCco | null => {
   if (!user) return null;
-  if (user.role === 'admin') return 'admin';
+  // Administrador do CCO: os mesmos poderes do administrador, mas só dentro do CCO.
+  if (user.role === 'admin' || user.role === 'cco_admin') return 'admin';
   if (user.role === 'unidade_escolar') return 'unidade';
   if (user.role === 'cco' || user.acesso_cco) return 'equipe';
   return null;
@@ -66,4 +69,5 @@ export const ROTULO_PAPEL: Record<string, string> = {
   atendente: 'Atendente',
   unidade_escolar: 'Unidade escolar',
   cco: 'Equipe CCO',
+  cco_admin: 'Administrador do CCO',
 };

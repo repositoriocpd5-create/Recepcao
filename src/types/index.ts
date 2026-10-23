@@ -1,5 +1,5 @@
-/** unidade_escolar e cco são papéis do módulo CCO (Central Controle Operacional). */
-export type UserRole = 'admin' | 'recepcionista' | 'gestor' | 'atendente' | 'unidade_escolar' | 'cco';
+/** unidade_escolar, cco e cco_admin são papéis só do módulo CCO (Central Controle Operacional). */
+export type UserRole = 'admin' | 'recepcionista' | 'gestor' | 'atendente' | 'unidade_escolar' | 'cco' | 'cco_admin';
 
 export type PessoaTipo = 'servidor' | 'visitante';
 
@@ -267,6 +267,9 @@ export interface RegistroEntradaInput {
 
 export type CcoSituacao = 'registrada' | 'em_analise' | 'em_atendimento' | 'concluida';
 
+/** Ocorrência comum ou relato de problema em câmera(s). */
+export type CcoTipoRegistro = 'ocorrencia' | 'camera';
+
 export interface CcoOcorrencia {
   id: string;
   protocolo: string;
@@ -279,7 +282,21 @@ export interface CcoOcorrencia {
   em_andamento: boolean;
   termina_dia_seguinte: boolean;
   descricao: string;
+  /** Registros antigos não têm o campo: tratar ausência como 'ocorrencia'. */
+  tipo_registro?: CcoTipoRegistro;
+  cameras?: string[] | null;
+  tipo_problema?: string | null;
   foto_path?: string | null;
+  /** Quando o administrador abriu a ocorrência pela primeira vez; até lá a unidade pode editar. */
+  visualizada_em?: string | null;
+  visualizada_por?: string | null;
+  visualizada_por_nome?: string | null;
+  /** Análise de gravidade (IA ou palavras-chave); vazia até a análise terminar. */
+  ia_grave?: boolean | null;
+  ia_categoria?: string | null;
+  ia_motivo?: string | null;
+  ia_origem?: 'ia' | 'palavras' | null;
+  ia_analisada_em?: string | null;
   situacao: CcoSituacao;
   responsavel_id?: string | null;
   responsavel_nome?: string | null;
@@ -291,7 +308,7 @@ export interface CcoOcorrencia {
   updated_at: string;
 }
 
-export type CcoHistoricoTipo = 'registro' | 'situacao' | 'responsavel' | 'observacao' | 'termino' | 'andamento' | 'solucao' | 'reabertura';
+export type CcoHistoricoTipo = 'registro' | 'situacao' | 'responsavel' | 'observacao' | 'termino' | 'andamento' | 'solucao' | 'reabertura' | 'edicao';
 
 export interface CcoHistorico {
   id: string;
@@ -314,6 +331,16 @@ export interface CcoNovaOcorrencia {
   em_andamento: boolean;
   termina_dia_seguinte: boolean;
   descricao: string;
+  tipo_registro: CcoTipoRegistro;
+  cameras: string[] | null;
+  tipo_problema: string | null;
+  foto?: Blob | null;
+}
+
+/** Alteração feita pela unidade antes de o administrador visualizar. */
+export interface CcoEdicao extends Omit<CcoNovaOcorrencia, 'client_request_id' | 'unidade_id' | 'foto'> {
+  /** false: mantém a foto atual; true: troca por `foto` (ou remove, se null). */
+  alterar_foto: boolean;
   foto?: Blob | null;
 }
 

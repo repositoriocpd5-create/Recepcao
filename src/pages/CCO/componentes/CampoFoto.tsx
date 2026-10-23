@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, Eye, ImagePlus, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import { Camera, Eye, FolderOpen, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 import { FOTO_DESCRICAO_LIMITES, FOTO_TIPOS_ACEITOS } from '@/services/ccoService';
@@ -123,7 +123,7 @@ export const CampoFoto: React.FC<CampoFotoProps> = ({ id, foto, processando, err
           }}
           aria-describedby={erro ? `${id}-erro` : undefined}
           className={cn(
-            'flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-5 text-center transition-colors',
+            'flex min-h-[196px] flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed px-4 py-4 text-center transition-colors',
             arrastando ? 'border-[#0b63ce] bg-[#eaf3ff] dark:bg-sky-500/10' : 'border-[#bcd2ec] bg-[#f7faff] dark:border-slate-700 dark:bg-[#0f1524]',
             erro && 'border-rose-400',
           )}
@@ -134,21 +134,31 @@ export const CampoFoto: React.FC<CampoFotoProps> = ({ id, foto, processando, err
             </p>
           ) : (
             <>
-              <Camera className="h-9 w-9 text-[#0b63ce] dark:text-sky-300" aria-hidden="true" />
-              <p className="text-[15px] font-semibold text-[#3b4d68] dark:text-slate-200">
-                {toque ? 'Tire uma foto ou escolha da galeria' : 'Arraste uma foto ou clique para anexar'}
-              </p>
-              <p className="text-xs text-[#5f7391] dark:text-slate-400">{FOTO_DESCRICAO_LIMITES} · opcional</p>
-              <div className="mt-1 flex flex-wrap justify-center gap-2">
-                {toque && (
-                  <button type="button" onClick={() => camera.current?.click()} className={botaoPequeno} disabled={disabled}>
-                    <Camera className="h-4 w-4" aria-hidden="true" /> Tirar foto
-                  </button>
-                )}
-                <button type="button" onClick={() => galeria.current?.click()} className={botaoPequeno} disabled={disabled}>
-                  <ImagePlus className="h-4 w-4" aria-hidden="true" /> {toque ? 'Escolher da galeria' : 'Selecionar foto'}
-                </button>
+              <Camera className="h-8 w-8 text-[#0b63ce] dark:text-sky-300" aria-hidden="true" />
+              <div>
+                <p className="text-[15px] font-bold text-[#0d2240] dark:text-slate-100">Adicione uma foto</p>
+                <p className="mt-0.5 text-[13px] text-[#5f7391] dark:text-slate-400">
+                  {toque ? 'Tire uma foto ou escolha da galeria' : 'Arraste aqui ou selecione um arquivo'}
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => galeria.current?.click()}
+                className={cn(botaoPequeno, 'min-w-[210px] border-[#0b63ce]/60 text-[#0b63ce]')}
+                disabled={disabled}
+              >
+                <FolderOpen className="h-4 w-4" aria-hidden="true" /> {toque ? 'Escolher da galeria' : 'Selecionar foto'}
+              </button>
+              <span className="my-1 h-px w-full max-w-[410px] bg-[#d9e4f1] dark:bg-slate-700" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => camera.current?.click()}
+                disabled={disabled}
+                className="inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-[#0b63ce] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] disabled:opacity-50 dark:text-sky-300 dark:hover:bg-slate-800"
+              >
+                <Camera className="h-4 w-4" aria-hidden="true" /> {toque ? 'Tirar foto' : 'Usar câmera'}
+              </button>
+              <p className="text-xs text-[#5f7391] dark:text-slate-400">{FOTO_DESCRICAO_LIMITES.replace('até', 'Até')}</p>
             </>
           )}
         </div>

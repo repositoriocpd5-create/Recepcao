@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   Building2,
@@ -13,7 +14,10 @@ import {
   Loader2,
   MessageSquare,
   MoonStar,
+  Pencil,
   RotateCcw,
+  ShieldAlert,
+  Sparkles,
   Save,
   UserRound,
   Trash2,
@@ -29,7 +33,10 @@ import {
   descreverHorario,
   formatarData,
   formatarDataHora,
+  gravidadeDe,
+  motivoSemEdicao,
 } from '@/services/ccoService';
+import { SUGESTAO_IMAGENS } from '@/lib/gravidadeCco';
 import { CcoHistorico, CcoOcorrencia, CcoSituacao, UserProfile } from '@/types';
 import { Campo, CampoHora, caixaCampo, completarHora, horaValida } from './campos';
 import { Carregando, ESTILO_SITUACAO, SituacaoBadge, botaoPrimario } from './ui';
@@ -68,6 +75,7 @@ const ICONE_HISTORICO: Record<CcoHistorico['tipo'], typeof Clock> = {
   andamento: MessageSquare,
   solucao: CheckCircle2,
   reabertura: RotateCcw,
+  edicao: Pencil,
 };
 
 /** Textos livres do histórico: aparecem em destaque, com o tipo escrito. */
@@ -204,6 +212,25 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
   const atualizar = () => queryClient.invalidateQueries({ queryKey: ['cco'] });
   const oc = ocorrencia.data;
 
+  // O administrador abriu a ocorrência: a unidade deixa de poder editar.
+  const pendenteVisualizacao = perfil === 'admin' && oc && !oc.visualizada_em ? oc.id : null;
+  useEffect(() => {
+    if (!pendenteVisualizacao) return;
+    ccoService.marcarVisualizada(user, pendenteVisualizacao).then(() => void atualizar()).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendenteVisualizacao]);
+
+  const semEdicao = oc && perfil === 'unidade' ? motivoSemEdicao(user, oc) : null;
+
+  // Equipe/admin: se a análise de gravidade ainda não rodou (ou falhou no envio), pede agora.
+  const semAnalise = equipe && oc && !oc.ia_analisada_em ? oc.id : null;
+  useEffect(() => {
+    if (!semAnalise) return;
+    ccoService.analisarGravidade(semAnalise).then(() => void atualizar()).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [semAnalise]);
+  const gravidade = oc && equipe ? gravidadeDe(oc) : null;
+
   const copiar = async () => {
     if (!oc) return;
     try {
@@ -213,6 +240,13 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
     } catch {}
   };
 
+  const secaoHistorico = (
+    <section>
+      <Titulo>Histórico de atendimento</Titulo>
+      {historico.isLoading ? <Carregando texto="Carregando o histórico…" /> : <Historico eventos={historico.data || []} />}
+    </section>
+  );
+
   return (
     <Modal
       isOpen={Boolean(ocorrenciaId)}
@@ -220,7 +254,7 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
       title={oc ? `Ocorrência ${oc.protocolo}` : 'Ocorrência'}
       description={oc ? oc.unidade_nome : undefined}
       icon={<FileText className="h-6 w-6" />}
-      maxWidth="2xl"
+      maxWidth="6xl"
     >
       {ocorrencia.isLoading ? (
         <Carregando />
@@ -231,7 +265,10 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
       ) : !oc ? (
         <p className="py-6 text-center text-sm text-[#5f7391] dark:text-slate-400">Ocorrência não encontrada ou sem permissão de acesso.</p>
       ) : (
-        <div className="space-y-6">
+        // Computador: duas colunas lado a lado, do topo — dados à esquerda e atendimento (ou histórico) à direita —
+        // para a janela caber na tela sem rolagem.
+        <div className="grid grid-cols-1 gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-3.5">
           <div className="flex flex-wrap items-center gap-2">
             <SituacaoBadge situacao={oc.situacao} className="px-3 py-1.5 text-[13px]" />
             <span className="text-xs text-[#5f7391] dark:text-slate-400">{SITUACOES[oc.situacao].descricao}</span>
@@ -241,7 +278,31 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
             </button>
           </div>
 
-          <dl className="grid grid-cols-1 gap-4 rounded-2xl border border-[#e2eaf4] p-4 sm:grid-cols-2 dark:border-slate-800">
+          {gravidade?.grave && (
+            <section role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 p-3 dark:border-rose-500/40 dark:bg-rose-950/30">
+              <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-600 text-white" aria-hidden="true">
+                  <ShieldAlert className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-2 text-[15px] font-extrabold text-rose-900 dark:text-rose-100">
+                    Caso grave{gravidade.categoria ? `: ${gravidade.categoria}` : ''}
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/15 dark:text-rose-200 dark:ring-rose-500/30">
+                      <Sparkles className="h-3 w-3" aria-hidden="true" /> {gravidade.origem === 'ia' ? 'Sugestão da IA' : 'Alerta automático'}
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-[13px] font-semibold leading-snug text-rose-900 dark:text-rose-100">{SUGESTAO_IMAGENS}</p>
+                  <p className="mt-1 text-xs text-rose-800/90 dark:text-rose-200/80">
+                    Período: {formatarData(oc.data_ocorrencia)}, {descreverHorario(oc)}
+                    {oc.cameras?.length ? ` · Câmeras: ${oc.cameras.join(', ')}` : ''}.
+                    {gravidade.motivo ? ` ${gravidade.motivo}` : ''}
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <dl className="grid grid-cols-1 gap-3 rounded-2xl border border-[#e2eaf4] p-3 sm:grid-cols-3 dark:border-slate-800">
             <Dado icone={CalendarDays} rotulo="Data da ocorrência">{formatarData(oc.data_ocorrencia)}</Dado>
             <Dado icone={Clock} rotulo="Horário">{descreverHorario(oc)}</Dado>
             <Dado icone={Building2} rotulo="Unidade escolar">{oc.unidade_nome}</Dado>
@@ -252,11 +313,41 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
             </Dado>
           </dl>
 
+          {perfil === 'unidade' && (
+            !semEdicao ? (
+              <div className="flex flex-col gap-3 rounded-2xl border border-[#cfe0f7] bg-[#f3f8ff] p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-sky-500/30 dark:bg-sky-500/10">
+                <p className="text-sm text-[#3b4d68] dark:text-slate-300">
+                  <strong className="block text-[#0d2240] dark:text-slate-100">Ainda não visualizada pelo administrador.</strong>
+                  Você pode corrigir os dados até o administrador abrir a ocorrência.
+                </p>
+                <Link to={`/cco?editar=${oc.id}`} className={cn(botaoPrimario, 'min-h-11 shrink-0')}>
+                  <Pencil className="h-4 w-4" aria-hidden="true" /> Editar ocorrência
+                </Link>
+              </div>
+            ) : oc.visualizada_em ? (
+              <p className="flex items-center gap-2 rounded-xl bg-[#f5f8fc] px-3.5 py-2.5 text-[13px] text-[#4c6283] dark:bg-slate-800/60 dark:text-slate-300">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+                Visualizada pelo administrador em {formatarDataHora(oc.visualizada_em)}. Não pode mais ser editada.
+              </p>
+            ) : null
+          )}
+
           {oc.em_andamento && <InformarTermino oc={oc} user={user} onSalvo={atualizar} />}
+
+          {oc.tipo_registro === 'camera' && (
+            <section>
+              <Titulo>Problema em câmera · {oc.tipo_problema}</Titulo>
+              <ul className="flex flex-wrap gap-2">
+                {(oc.cameras || []).map((c) => (
+                  <li key={c} className="rounded-full bg-[#e6f0fc] px-3 py-1 text-sm text-[#1f3557] dark:bg-sky-500/15 dark:text-sky-100">{c}</li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section>
             <Titulo>Descrição</Titulo>
-            <p className="whitespace-pre-wrap break-words rounded-xl bg-[#f5f8fc] p-3.5 text-[15px] leading-relaxed text-[#10233f] dark:bg-slate-800/60 dark:text-slate-100">{oc.descricao}</p>
+            <p className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-rose-200 border-l-4 border-l-rose-500 bg-rose-50 p-3.5 text-base font-medium leading-relaxed text-[#3b0d17] dark:border-rose-500/30 dark:border-l-rose-400 dark:bg-rose-950/30 dark:text-rose-50">{oc.descricao}</p>
           </section>
 
           {oc.foto_path && (
@@ -266,15 +357,15 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
             </section>
           )}
 
-          {equipe && <Atendimento oc={oc} user={user} focarAndamento={focarAndamento} onSalvo={() => void atualizar()} />}
+          {equipe && secaoHistorico}
 
-          <section>
-            <Titulo>Histórico de atendimento</Titulo>
-            {historico.isLoading ? <Carregando texto="Carregando o histórico…" /> : <Historico eventos={historico.data || []} />}
-          </section>
+          </div>
 
-          {perfil === 'admin' && onExcluir && (
-            <div className="flex flex-col gap-2 border-t border-[#e6edf6] pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+          {/* Equipe: o formulário de atendimento ocupa a coluna da direita; unidade: o histórico. */}
+          <div className="min-w-0 space-y-4">
+            {equipe ? <Atendimento oc={oc} user={user} focarAndamento={focarAndamento} onSalvo={() => void atualizar()} /> : secaoHistorico}
+            {perfil === 'admin' && onExcluir && (
+            <div className="flex flex-col gap-2 border-t border-[#e6edf6] pt-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
               <p className="text-xs text-[#6b7f9b] dark:text-slate-500">Administração: excluir apaga a ocorrência para todos e guarda uma cópia na auditoria.</p>
               <button
                 type="button"
@@ -285,6 +376,7 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
               </button>
             </div>
           )}
+          </div>
         </div>
       )}
     </Modal>

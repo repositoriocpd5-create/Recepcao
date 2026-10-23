@@ -13,6 +13,7 @@ import { isInstallAvailable, openInstallSheet, usePwa } from '@/pwa/pwa';
 import { useLocation } from 'react-router-dom';
 import { ROTULO_PAPEL, moduloDaRota } from '@/lib/modulos';
 import { SeletorModulo } from './SeletorModulo';
+import { SinoCco } from './SinoCco';
 
 interface NavbarProps {
   sidebarCollapsed: boolean;
@@ -64,6 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
     atendente: { label: 'Atendente', email: getRoleEmail('atendente', '') },
     unidade_escolar: { label: 'Unidade escolar', email: getRoleEmail('unidade_escolar', 'unidade@sme.gov.br') },
     cco: { label: 'Equipe CCO', email: getRoleEmail('cco', 'cco@sme.gov.br') },
+    cco_admin: { label: 'Admin do CCO', email: getRoleEmail('cco_admin', 'paulo.sergio@edu.itaguai.rj.gov.br') },
   };
 
   const openProfileLogin = (role: UserRole) => {
@@ -113,6 +115,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
             <div className="flex items-start gap-1.5"><h1 className="text-[11px] font-extrabold leading-[1.05] tracking-wide text-[#082b57] min-[380px]:text-[13px]">SECRETARIA MUNICIPAL<br />DE EDUCAÇÃO</h1><span className="mt-0.5 hidden rounded border border-[#b9d9f3] bg-[#edf5ff] px-1.5 py-0.5 text-[9px] font-bold text-[#087ef5] min-[420px]:inline">SMEDU</span></div>
             <p className="mt-1 truncate text-[10px] text-[#68809f] min-[380px]:text-[11px]">{subtitulo}</p>
           </div>
+          <SinoCco />
           <ThemeToggle size="xs" className="min-[380px]:hidden" />
           <ThemeToggle size="sm" className="max-[379px]:hidden" />
           <button type="button" onClick={() => setIsAccountOpen(true)} aria-haspopup="dialog" aria-expanded={isAccountOpen} className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ef5]" aria-label="Abrir conta e preferências" title="Conta e preferências"><UserAvatar nome={user?.nome_completo} className="h-10 w-10 text-sm min-[380px]:h-11 min-[380px]:w-11 min-[380px]:text-base" /></button>
@@ -157,9 +160,9 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
         <div className="flex items-center gap-3">
           {/* Quick role switcher for testing */}
           {user && !isSupabaseLive && (
-            <div className="hidden md:flex items-center gap-1 bg-[#151c2c] border border-slate-700/80 rounded-lg p-0.5 text-xs">
+            <div className="hidden xl:flex items-center gap-1 bg-[#151c2c] border border-slate-700/80 rounded-lg p-0.5 text-xs">
               <span className="px-2 text-slate-400 text-[11px]">Perfil teste:</span>
-              {(['recepcionista', 'admin', 'gestor', 'unidade_escolar', 'cco'] as UserRole[]).map((r) => (
+              {(['recepcionista', 'admin', 'gestor', 'unidade_escolar', 'cco', 'cco_admin'] as UserRole[]).map((r) => (
                 <button
                   key={r}
                   onClick={() => switchDemoRole(r)}
@@ -169,7 +172,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  {r === 'unidade_escolar' ? 'unidade' : r}
+                  {r === 'unidade_escolar' ? 'unidade' : r === 'cco_admin' ? 'admin cco' : r}
                 </button>
               ))}
               <button
@@ -183,6 +186,8 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
           )}
 
           <SeletorModulo />
+
+          <SinoCco />
 
           <ThemeToggle size="sm" />
 

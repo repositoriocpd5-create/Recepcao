@@ -447,3 +447,18 @@ html.dark [class~='hover:text-[#0d1f45]']:not([class*='dark:hover:text-']):hover
 }
 
 html.dark ::placeholder { color: #64748b; }
+
+/* Sininho do CCO: balança quando chega uma ocorrência nova. */
+@keyframes cco-sino {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(16deg); }
+  40% { transform: rotate(-14deg); }
+  60% { transform: rotate(9deg); }
+  80% { transform: rotate(-5deg); }
+}
+
+/* Central de Ajuda do CCO: resposta das dúvidas aparece com um movimento curto. */
+@keyframes cco-ajuda-abrir {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}

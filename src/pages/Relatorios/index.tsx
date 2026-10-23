@@ -82,6 +82,10 @@ const ACOES: Record<string, { rotulo: string; categoria: CategoriaId; sensivel?:
   CCO_FINALIZACAO: { rotulo: 'Ocorrência finalizada (CCO)', categoria: 'cco' },
   CCO_REABERTURA: { rotulo: 'Ocorrência reaberta (CCO)', categoria: 'cco', sensivel: true },
   CCO_EXCLUSAO: { rotulo: 'Ocorrência excluída (CCO)', categoria: 'cco', sensivel: true },
+  CCO_EDICAO: { rotulo: 'Ocorrência editada pela unidade (CCO)', categoria: 'cco', sensivel: true },
+  CCO_VISUALIZACAO: { rotulo: 'Ocorrência visualizada pelo administrador (CCO)', categoria: 'cco' },
+  CCO_ANALISE_IA: { rotulo: 'Análise de gravidade (CCO)', categoria: 'cco' },
+  CCO_RELATORIO_PDF: { rotulo: 'Relatório em PDF gerado (CCO)', categoria: 'cco' },
 };
 
 /** Ação desconhecida: deduz a categoria pelo código e deixa o rótulo legível. */
@@ -199,7 +203,19 @@ const Interruptor: React.FC<{ ativo: boolean; onChange: () => void; icone: React
 
 // ─── Página ─────────────────────────────────────────────────────────────────
 
-export const RelatoriosPage: React.FC = () => {
+interface RelatoriosProps {
+  /** "Log do sistema" usa a mesma trilha com outro título. */
+  titulo?: string;
+  descricao?: string;
+  /** Administrador do CCO: só os eventos do CCO (o banco já filtra; aqui vale para o modo demonstração). */
+  somenteCco?: boolean;
+}
+
+export const RelatoriosPage: React.FC<RelatoriosProps> = ({
+  titulo = 'Relatórios & Auditoria de Segurança',
+  descricao = 'Trilha de auditoria em conformidade com a LGPD: quem fez o quê, quando e de onde.',
+  somenteCco = false,
+}) => {
   const hoje = paraDataInput(new Date());
   const [logs, setLogs] = useState<AuditoriaLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -240,7 +256,8 @@ export const RelatoriosPage: React.FC = () => {
     try {
       const inicio = de <= ate ? de : ate;
       const fim = de <= ate ? ate : de;
-      setLogs(await dataService.getLogsAuditoria({ desde: inicioDoDia(inicio), ate: fimDoDia(fim), limite: LIMITE }));
+      const lista = await dataService.getLogsAuditoria({ desde: inicioDoDia(inicio), ate: fimDoDia(fim), limite: LIMITE });
+      setLogs(somenteCco ? lista.filter((log) => log.acao.startsWith('CCO_')) : lista);
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Não foi possível carregar a auditoria.');
     } finally {
@@ -405,9 +422,9 @@ export const RelatoriosPage: React.FC = () => {
             <span className="grid h-10 w-10 place-items-center rounded-2xl border border-[#c5e0fa] bg-[#e6f1fb] text-[#005a9c] shadow-sm dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
               <FileSpreadsheet className="h-5 w-5" />
             </span>
-            <h2 className="text-xl font-extrabold tracking-tight text-[#102755] sm:text-2xl dark:text-slate-100">Relatórios & Auditoria de Segurança</h2>
+            <h2 className="text-xl font-extrabold tracking-tight text-[#102755] sm:text-2xl dark:text-slate-100">{titulo}</h2>
           </div>
-          <p className="mt-1.5 text-xs text-[#627fa5] sm:text-sm dark:text-slate-400">Trilha de auditoria em conformidade com a LGPD: quem fez o quê, quando e de onde.</p>
+          <p className="mt-1.5 text-xs text-[#627fa5] sm:text-sm dark:text-slate-400">{descricao}</p>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={carregarLogs} disabled={isLoading} className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#d4e0ee] bg-white px-3.5 text-sm font-semibold text-[#37475e] shadow-sm transition-colors hover:border-[#9fc9ed] disabled:opacity-60 dark:border-slate-700 dark:bg-[#121826] dark:text-slate-200">
