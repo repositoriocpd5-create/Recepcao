@@ -21,6 +21,7 @@ import {
   FileText,
   HelpCircle,
   ScrollText,
+  Map as MapIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserAvatar } from '@/components/ui/UserAvatar';
@@ -101,12 +102,13 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
           titulo: 'Gestão',
           seta: true,
           itens: [
+            { name: 'Mapa', path: '/cco/mapa', icon: MapIcon },
             { name: 'Usuários e unidades', path: '/cco/usuarios', icon: ShieldCheck },
             { name: 'Log do sistema', path: '/cco/log', icon: ScrollText },
           ],
         }]
       : user?.role === 'cco_admin'
-        ? [{ titulo: 'Gestão', itens: [{ name: 'Log do sistema', path: '/cco/log', icon: ScrollText }] }]
+        ? [{ titulo: 'Gestão', itens: [{ name: 'Mapa', path: '/cco/mapa', icon: MapIcon }, { name: 'Log do sistema', path: '/cco/log', icon: ScrollText }] }]
         : []),
   ];
 

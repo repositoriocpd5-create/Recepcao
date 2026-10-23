@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { FileText, HelpCircle, BadgeCheck, BookOpen, Briefcase, Building2, Calendar, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Home, LayoutDashboard, MoreHorizontal, ShieldCheck, Users, ArrowRightLeft, Phone, X } from 'lucide-react';
+import { Map as MapIcon, FileText, HelpCircle, BadgeCheck, BookOpen, Briefcase, Building2, Calendar, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Home, LayoutDashboard, MoreHorizontal, ShieldCheck, Users, ArrowRightLeft, Phone, X } from 'lucide-react';
 import { isInstallAvailable, openInstallSheet, usePwa } from '@/pwa/pwa';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTecladoVirtual } from '@/hooks/useTecladoVirtual';
@@ -72,11 +72,12 @@ export const MobileBottomNav = () => {
       ...(perfil === 'unidade' ? [{ label: 'Ocorrências', path: '/cco/ocorrencias', icon: FileText, end: false }] : []),
       ...(user?.role === 'admin'
         ? [
+            { label: 'Mapa', path: '/cco/mapa', icon: MapIcon, end: false },
             { label: 'Usuários', path: '/cco/usuarios', icon: ShieldCheck, end: false },
             { label: 'Log', path: '/cco/log', icon: FileSpreadsheet, end: false },
           ]
         : user?.role === 'cco_admin'
-          ? [{ label: 'Log', path: '/cco/log', icon: FileSpreadsheet, end: false }]
+          ? [{ label: 'Mapa', path: '/cco/mapa', icon: MapIcon, end: false }, { label: 'Log', path: '/cco/log', icon: FileSpreadsheet, end: false }]
           : []),
       { label: 'Ajuda', path: '/cco/ajuda', icon: HelpCircle, end: false },
     ];

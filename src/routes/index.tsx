@@ -20,6 +20,7 @@ import { ManualPage } from '@/pages/Manual';
 import { RamaisPage } from '@/pages/Ramais';
 import { CcoAjudaPage, CcoInicioPage, CcoOcorrenciasPage } from '@/pages/CCO';
 import { EscolherModuloPage } from '@/pages/EscolherModulo';
+import { MapaRedePage } from '@/pages/CCO/mapa';
 import { PrimeiroAcessoPage } from '@/pages/PrimeiroAcesso';
 import { Modulo, acessaCco, acessaRecepcao, rotaInicial } from '@/lib/modulos';
 
@@ -131,6 +132,7 @@ export const AppRoutes: React.FC = () => {
           <Route index element={<CcoInicioPage />} />
           <Route path="ocorrencias" element={<CcoOcorrenciasPage />} />
           <Route path="ajuda" element={<CcoAjudaPage />} />
+          <Route path="mapa" element={<ProtectedRoute requiredRole="cco_admin"><MapaRedePage /></ProtectedRoute>} />
           <Route path="log" element={<ProtectedRoute requiredRole="cco_admin"><LogDoCco /></ProtectedRoute>} />
           {/* Mesmas telas da administração, sem sair do módulo CCO. */}
           <Route path="usuarios" element={<ProtectedRoute requiredRole="admin"><AdministracaoPage /></ProtectedRoute>} />

@@ -78,6 +78,20 @@ export interface RamalUnidade {
   /** Todos os ramais; departamentos podem ter mais de um. */
   ramais: RamalContato[];
   ativo: boolean;
+  /** Localização (Mapa Operacional da Rede). */
+  latitude?: number | null;
+  longitude?: number | null;
+  bairro?: string | null;
+  endereco?: string | null;
+  mapa_url?: string | null;
+}
+
+export interface LocalizacaoUnidade {
+  lat: number;
+  lng: number;
+  bairro: string | null;
+  endereco: string | null;
+  mapa_url: string | null;
 }
 
 export interface ServidorSetorVinculo {

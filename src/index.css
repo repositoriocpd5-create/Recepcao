@@ -462,3 +462,36 @@ html.dark ::placeholder { color: #64748b; }
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: none; }
 }
+
+/* ─── Mapa Operacional da Rede (CCO) ─── */
+.cco-mapa { background: #eef2f6; font-family: inherit; }
+.dark .cco-mapa { background: #0f1524; }
+.cco-marcador { background: none !important; border: 0 !important; }
+.cco-bolha {
+  position: relative; display: grid; place-items: center; border-radius: 9999px;
+  color: #fff; font: 800 13px/1 'Montserrat', system-ui, sans-serif; transition: transform .15s ease;
+}
+.cco-marcador:hover .cco-bolha { transform: scale(1.12); }
+.cco-conteudo { position: relative; z-index: 1; display: grid; place-items: center; }
+.cco-pulso {
+  position: absolute; inset: -8px; border-radius: 9999px; opacity: .35; z-index: 0;
+  animation: cco-pulso 1.8s ease-out infinite;
+}
+@keyframes cco-pulso { 0% { transform: scale(.6); opacity: .45; } 100% { transform: scale(1.5); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cco-pulso { animation: none; } }
+.cco-ordem {
+  position: absolute; top: -9px; right: -9px; z-index: 2; display: grid; place-items: center;
+  min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9999px; background: #0b63ce; color: #fff;
+  font-size: 10px; box-shadow: 0 0 0 2px #fff;
+}
+.cco-sede {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; padding: 4px 10px 4px 4px;
+  border-radius: 8px; background: #0b4fa3; color: #fff; font: 700 11px/1 'Montserrat', system-ui, sans-serif;
+  box-shadow: 0 6px 14px -6px rgba(4,30,64,.7), 0 0 0 2px #fff;
+}
+.cco-sede img { width: 20px; height: 20px; border-radius: 4px; background: #fff; padding: 1px; object-fit: contain; }
+.cco-mapa .leaflet-control-zoom a { width: 34px; height: 34px; line-height: 32px; font-size: 18px; color: #10233f; }
+.cco-mapa .leaflet-tooltip { font-family: inherit; font-size: 12px; border-radius: 8px; }
+/* Fundo do mapa em tons neutros (claro) ou escuros, para os marcadores se destacarem. */
+.cco-mapa .leaflet-tile-pane { filter: grayscale(.85) brightness(1.04) contrast(.92); }
+.dark .cco-mapa .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) grayscale(.7) brightness(.85) contrast(.9); }
