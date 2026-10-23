@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { CAMERAS_SUGERIDAS } from '@/services/ccoService';
+import { CAMERAS_SUGERIDAS, LOCAIS_SUGERIDOS } from '@/services/ccoService';
 
 interface Props {
   id: string;
@@ -9,12 +9,30 @@ interface Props {
   onChange: (cameras: string[]) => void;
   erro?: string | null;
   disabled?: boolean;
+  /** Itens oferecidos na lista (padrão: câmeras). */
+  sugestoes?: string[];
+  /** Textos de acessibilidade e do campo "outro". */
+  rotuloSelecionados?: string;
+  rotuloLista?: string;
+  placeholderOutro?: string;
+  rotuloOutro?: string;
 }
 
 const NOME_MAX = 60;
 
 /** Escolha de uma ou mais câmeras: sugestões da lista ou nome digitado pela unidade. */
-export const SeletorCameras: React.FC<Props> = ({ id, valor, onChange, erro, disabled }) => {
+export const SeletorCameras: React.FC<Props> = ({
+  id,
+  valor,
+  onChange,
+  erro,
+  disabled,
+  sugestoes = CAMERAS_SUGERIDAS,
+  rotuloSelecionados = 'Câmeras selecionadas',
+  rotuloLista = 'Câmeras da unidade',
+  placeholderOutro = 'Outra câmera (ex.: Biblioteca)',
+  rotuloOutro = 'Nome de outra câmera',
+}) => {
   const [aberto, setAberto] = useState(false);
   const [outra, setOutra] = useState('');
   const raiz = useRef<HTMLDivElement>(null);
@@ -42,7 +60,7 @@ export const SeletorCameras: React.FC<Props> = ({ id, valor, onChange, erro, dis
     setOutra('');
   };
 
-  const extras = valor.filter((c) => !CAMERAS_SUGERIDAS.includes(c));
+  const extras = valor.filter((c) => !sugestoes.includes(c));
 
   return (
     <div ref={raiz} className="relative">
@@ -53,7 +71,7 @@ export const SeletorCameras: React.FC<Props> = ({ id, valor, onChange, erro, dis
           disabled && 'cursor-not-allowed bg-[#f3f6fa] dark:bg-slate-900/60',
         )}
       >
-        <ul className="flex min-w-0 flex-1 flex-wrap items-center gap-2" aria-label="Câmeras selecionadas">
+        <ul className="flex min-w-0 flex-1 flex-wrap items-center gap-2" aria-label={rotuloSelecionados}>
           {valor.map((camera) => (
             <li key={camera} className="inline-flex max-w-full items-center gap-2 rounded-full bg-[#e6f0fc] py-1.5 pl-4 pr-2 text-[15px] text-[#1f3557] dark:bg-sky-500/15 dark:text-sky-100">
               <span className="truncate">{camera}</span>
@@ -104,8 +122,8 @@ export const SeletorCameras: React.FC<Props> = ({ id, valor, onChange, erro, dis
           id={`${id}-lista`}
           className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-[#d6e2f0] bg-white shadow-[0_18px_40px_-18px_rgba(16,48,96,.55)] dark:border-slate-700 dark:bg-[#121826]"
         >
-          <ul className="max-h-64 overflow-y-auto py-1.5" aria-label="Câmeras da unidade">
-            {[...CAMERAS_SUGERIDAS, ...extras].map((camera) => {
+          <ul className="max-h-64 overflow-y-auto py-1.5" aria-label={rotuloLista}>
+            {[...sugestoes, ...extras].map((camera) => {
               const marcada = valor.includes(camera);
               return (
                 <li key={camera}>
@@ -137,8 +155,8 @@ export const SeletorCameras: React.FC<Props> = ({ id, valor, onChange, erro, dis
                   adicionarOutra();
                 }
               }}
-              placeholder="Outra câmera (ex.: Biblioteca)"
-              aria-label="Nome de outra câmera"
+              placeholder={placeholderOutro}
+              aria-label={rotuloOutro}
               className="min-h-10 min-w-0 flex-1 rounded-lg border border-[#cfdbea] bg-white px-3 text-sm text-[#10233f] placeholder:text-[#8a9bb3] focus:outline-none focus-visible:border-[#0b63ce] focus-visible:ring-2 focus-visible:ring-[#0b63ce]/20 dark:border-slate-700 dark:bg-[#0f1524] dark:text-slate-100"
             />
             <button
@@ -155,3 +173,15 @@ export const SeletorCameras: React.FC<Props> = ({ id, valor, onChange, erro, dis
     </div>
   );
 };
+
+/** Local da ocorrência: mesmo componente, com as sugestões de local. */
+export const SeletorLocais: React.FC<Omit<Props, 'sugestoes' | 'rotuloSelecionados' | 'rotuloLista' | 'placeholderOutro' | 'rotuloOutro'>> = (props) => (
+  <SeletorCameras
+    {...props}
+    sugestoes={LOCAIS_SUGERIDOS}
+    rotuloSelecionados="Locais selecionados"
+    rotuloLista="Locais da unidade"
+    placeholderOutro="Outro local (ex.: Biblioteca)"
+    rotuloOutro="Nome de outro local"
+  />
+);

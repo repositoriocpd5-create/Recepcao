@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, Loader2, Lock, MessageSquarePlus, RotateCcw } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Loader2, Lock, MessageSquarePlus, RotateCcw, Undo2, X } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 import { perfilCco } from '@/lib/modulos';
-import { SITUACOES, ccoService } from '@/services/ccoService';
+import { SITUACOES, ccoService, hojeBrasilia } from '@/services/ccoService';
 import { CcoOcorrencia, CcoSituacao, UserProfile } from '@/types';
 import { Campo, caixaCampo } from './campos';
 import { ESTILO_SITUACAO, botaoPrimario, botaoSecundario } from './ui';
@@ -15,6 +15,26 @@ const SUGESTOES_SOLUCAO = [
   'Guarda Municipal acionada; situação normalizada.',
   'Câmera ajustada pela manutenção; imagem normalizada.',
 ];
+const VISITA_MAX_DIAS = 180;
+
+const somarDias = (iso: string, dias: number) => {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + dias);
+  return d.toISOString().slice(0, 10);
+};
+
+const proximoDiaUtil = (iso: string) => {
+  let d = somarDias(iso, 1);
+  while ([0, 6].includes(new Date(`${d}T12:00:00`).getDay())) d = somarDias(d, 1);
+  return d;
+};
+
+/** "quinta-feira, 24/10/2026 às 09:00" */
+export const formatarVisita = (data: string, hora?: string | null) => {
+  const dia = new Date(`${data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `${dia.charAt(0).toLocaleUpperCase('pt-BR')}${dia.slice(1)}${hora ? ` às ${hora.slice(0, 5)}` : ''}`;
+};
+
 /** Situações que um andamento pode definir (registrada é a inicial; solucionada é pela finalização). */
 const SITUACOES_ANDAMENTO: CcoSituacao[] = ['em_analise', 'em_atendimento'];
 
@@ -46,6 +66,14 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
   const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
   const [erroTexto, setErroTexto] = useState('');
 
+  // Visita presencial à unidade (quando não dá para verificar as imagens remotamente)
+  const hoje = hojeBrasilia();
+  const [visitaAberta, setVisitaAberta] = useState(false);
+  const [visitaData, setVisitaData] = useState('');
+  const [visitaHora, setVisitaHora] = useState('');
+  const [cancelarVisita, setCancelarVisita] = useState(false);
+  const [erroVisita, setErroVisita] = useState('');
+
   // Finalizar / reabrir
   const [modal, setModal] = useState<'finalizar' | 'reabrir' | null>(null);
   const [textoModal, setTextoModal] = useState('');
@@ -66,7 +94,26 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
 
   const trocouResponsavel = responsavel !== (oc.responsavel_id || '');
   const trocouSituacao = Boolean(situacao) && situacao !== oc.situacao;
-  const temAlgo = texto.trim().length > 0 || trocouResponsavel || trocouSituacao;
+  const horaVisitaAtual = oc.visita_hora?.slice(0, 5) || '';
+  const trocouVisita = visitaAberta && Boolean(visitaData) && (visitaData !== oc.visita_data || visitaHora !== horaVisitaAtual);
+  const temAlgo = texto.trim().length > 0 || trocouResponsavel || trocouSituacao || trocouVisita || (cancelarVisita && Boolean(oc.visita_data));
+
+  const abrirVisita = () => {
+    setVisitaAberta(true);
+    setCancelarVisita(false);
+    setVisitaData(oc.visita_data || '');
+    setVisitaHora(horaVisitaAtual);
+    setErroVisita('');
+    setMensagem(null);
+    window.setTimeout(() => document.getElementById('cco-visita-data')?.focus(), 0);
+  };
+
+  const fecharVisita = () => {
+    setVisitaAberta(false);
+    setVisitaData('');
+    setVisitaHora('');
+    setErroVisita('');
+  };
 
   const registrarAndamento = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +129,16 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
       campoAndamento.current?.focus();
       return;
     }
+    if (visitaAberta && !visitaData) {
+      setErroVisita('Escolha a data da visita ou desative o agendamento.');
+      document.getElementById('cco-visita-data')?.focus();
+      return;
+    }
+    if (trocouVisita && visitaData < hoje) {
+      setErroVisita('A data da visita não pode estar no passado.');
+      document.getElementById('cco-visita-data')?.focus();
+      return;
+    }
     setSalvando(true);
     setMensagem(null);
     try {
@@ -89,10 +146,19 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
         situacao: trocouSituacao ? (situacao as CcoSituacao) : undefined,
         responsavel_id: trocouResponsavel ? responsavel || null : undefined,
         observacao: t || undefined,
+        visita: trocouVisita ? { data: visitaData, hora: visitaHora || null } : undefined,
+        remover_visita: cancelarVisita && Boolean(oc.visita_data) ? true : undefined,
       });
       setTexto('');
       setSituacao('');
-      setMensagem({ tipo: 'ok', texto: 'Andamento registrado. A unidade já pode vê-lo no histórico.' });
+      setCancelarVisita(false);
+      fecharVisita();
+      setMensagem({
+        tipo: 'ok',
+        texto: trocouVisita
+          ? `Visita agendada para ${formatarVisita(visitaData, visitaHora)}. A unidade já pode vê-la no histórico.`
+          : cancelarVisita ? 'Visita cancelada. A unidade já pode ver no histórico.' : 'Andamento registrado. A unidade já pode vê-lo no histórico.',
+      });
       onSalvo(atualizada);
     } catch (err) {
       setMensagem({ tipo: 'erro', texto: err instanceof Error ? err.message : 'Não foi possível registrar.' });
@@ -176,6 +242,113 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
               className={cn(caixaCampo(erroTexto), 'resize-y py-2.5')}
             />
           </Campo>
+
+          {/* Visita presencial à unidade */}
+          <div className="rounded-xl border border-indigo-200 bg-white p-3 dark:border-indigo-500/30 dark:bg-slate-900/60">
+            {oc.visita_data && !visitaAberta ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"><CalendarClock className="h-5 w-5" aria-hidden="true" /></span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Visita presencial agendada</p>
+                    <p className={cn('text-sm font-bold text-[#10233f] dark:text-slate-100', cancelarVisita && 'line-through opacity-60')}>{formatarVisita(oc.visita_data, oc.visita_hora)}</p>
+                    {cancelarVisita && <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">O cancelamento será registrado ao adicionar o andamento.</p>}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 pl-[52px]">
+                  {cancelarVisita ? (
+                    <button type="button" onClick={() => setCancelarVisita(false)} className={cn(botaoSecundario, 'min-h-10 px-3 text-xs')}>
+                      <Undo2 className="h-4 w-4" aria-hidden="true" /> Desfazer
+                    </button>
+                  ) : (
+                    <>
+                      <button type="button" onClick={abrirVisita} className={cn(botaoSecundario, 'min-h-10 px-3 text-xs')}>
+                        <CalendarClock className="h-4 w-4" aria-hidden="true" /> Reagendar
+                      </button>
+                      <button type="button" onClick={() => { setCancelarVisita(true); setMensagem(null); }} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-600 dark:border-rose-500/30 dark:bg-transparent dark:text-rose-300">
+                        <X className="h-4 w-4" aria-hidden="true" /> Cancelar visita
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                <label className="flex cursor-pointer select-none items-start gap-3">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={visitaAberta}
+                    aria-labelledby="cco-visita-rotulo"
+                    aria-describedby="cco-visita-ajuda"
+                    onClick={() => (visitaAberta ? fecharVisita() : abrirVisita())}
+                    className={cn(
+                      'relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600',
+                      visitaAberta ? 'bg-indigo-600' : 'bg-[#d5dde8] dark:bg-slate-700',
+                    )}
+                  >
+                    <span className={cn('absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition-transform', visitaAberta && 'translate-x-5')} />
+                  </button>
+                  <span className="min-w-0">
+                    <span id="cco-visita-rotulo" className="flex items-center gap-1.5 text-sm font-bold text-[#10233f] dark:text-slate-100">
+                      <CalendarClock className="h-4 w-4 text-indigo-600 dark:text-indigo-300" aria-hidden="true" />
+                      {oc.visita_data ? 'Reagendar visita presencial' : 'Agendar visita presencial à unidade'}
+                    </span>
+                    <span id="cco-visita-ajuda" className="block text-xs text-[#5f7391] dark:text-slate-400">Use quando não for possível verificar as imagens remotamente. A unidade vê a data no histórico.</span>
+                  </span>
+                </label>
+
+                {visitaAberta && (
+                  <div className="mt-3 space-y-2.5 border-t border-indigo-100 pt-3 dark:border-indigo-500/20">
+                    <div className="flex flex-wrap gap-1.5" aria-label="Atalhos de data">
+                      {[
+                        { rotulo: 'Hoje', valor: hoje },
+                        { rotulo: 'Amanhã', valor: somarDias(hoje, 1) },
+                        { rotulo: 'Próximo dia útil', valor: proximoDiaUtil(hoje) },
+                      ].map((atalho) => (
+                        <button
+                          key={atalho.rotulo}
+                          type="button"
+                          onClick={() => { setVisitaData(atalho.valor); setErroVisita(''); }}
+                          aria-pressed={visitaData === atalho.valor}
+                          className={cn(
+                            'min-h-9 rounded-full border px-3 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600',
+                            visitaData === atalho.valor
+                              ? 'border-indigo-600 bg-indigo-600 text-white'
+                              : 'border-[#cfdbea] bg-white text-[#3b4d68] hover:border-indigo-300 hover:bg-indigo-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
+                          )}
+                        >
+                          {atalho.rotulo}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
+                      <Campo id="cco-visita-data" rotulo="Data da visita" obrigatorio erro={erroVisita || null}>
+                        <input
+                          id="cco-visita-data"
+                          type="date"
+                          value={visitaData}
+                          min={hoje}
+                          max={somarDias(hoje, VISITA_MAX_DIAS)}
+                          onChange={(e) => { setVisitaData(e.target.value); setErroVisita(''); }}
+                          aria-invalid={Boolean(erroVisita)}
+                          className={cn(caixaCampo(erroVisita), 'font-medium')}
+                        />
+                      </Campo>
+                      <Campo id="cco-visita-hora" rotulo="Horário (opcional)">
+                        <input id="cco-visita-hora" type="time" value={visitaHora} onChange={(e) => setVisitaHora(e.target.value)} className={cn(caixaCampo(), 'font-medium')} />
+                      </Campo>
+                    </div>
+                    {visitaData && !erroVisita && (
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300" aria-live="polite">
+                        <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> {formatarVisita(visitaData, visitaHora)}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           <fieldset>
             <legend className="mb-1.5 block text-sm font-bold text-[#10233f] dark:text-slate-200">Situação após o andamento</legend>

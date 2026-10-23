@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CalendarDays, Cctv, Check, ChevronDown, ClipboardList, Clock, Loader2, MoonStar, Pencil, Plus, RotateCcw, Save, Send, ShieldCheck, Wrench, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Cctv, Check, ChevronDown, ClipboardList, Clock, Loader2, MapPin, MoonStar, Pencil, Plus, RotateCcw, Save, Send, ShieldCheck, Wrench, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   TIPOS_PROBLEMA_CAMERA,
@@ -14,7 +14,7 @@ import {
 import { CcoOcorrencia, CcoTipoRegistro, UserProfile } from '@/types';
 import { Campo, CampoHora, MensagemErro, caixaCampo, horaValida } from './campos';
 import { CampoFoto, FotoSelecionada } from './CampoFoto';
-import { SeletorCameras } from './SeletorCameras';
+import { SeletorCameras, SeletorLocais } from './SeletorCameras';
 import { Cartao, Confirmacao, IconeTitulo, botaoPrimario, botaoSecundario } from './ui';
 
 const DESCRICAO_MIN = 10;
@@ -134,6 +134,7 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
   const [descricao, setDescricao] = useState(() => edicao?.descricao ?? '');
   const [tipoRegistro, setTipoRegistro] = useState<CcoTipoRegistro>(() => edicao?.tipo_registro ?? 'ocorrencia');
   const [cameras, setCameras] = useState<string[]>(() => edicao?.cameras ?? []);
+  const [locais, setLocais] = useState<string[]>(() => edicao?.locais ?? []);
   const [tipoProblema, setTipoProblema] = useState(() => edicao?.tipo_problema || TIPOS_PROBLEMA_CAMERA[0]);
   const [tiposExtras, setTiposExtras] = useState<string[]>(lerTiposExtras);
   const [novoTipo, setNovoTipo] = useState('');
@@ -180,7 +181,7 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
   const formulario = useRef<HTMLFormElement>(null);
 
   const camera = tipoRegistro === 'camera';
-  const temDados = Boolean(horaInicio || horaFim || emAndamento || descricao.trim() || foto || cameras.length || data !== hojeBrasilia());
+  const temDados = Boolean(horaInicio || horaFim || emAndamento || descricao.trim() || foto || cameras.length || locais.length || data !== hojeBrasilia());
   const duracao =
     !emAndamento && horaValida(horaInicio) && horaValida(horaFim)
       ? (minutos(horaFim) - minutos(horaInicio) + 1440) % 1440
@@ -285,6 +286,7 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
     setDiaSeguinte(false);
     setDescricao('');
     setCameras([]);
+    setLocais([]);
     setTipoProblema(TIPOS_PROBLEMA_CAMERA[0]);
     setNovoTipo('');
     setFoto(null);
@@ -314,6 +316,7 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
           tipo_registro: tipoRegistro,
           cameras: camera ? cameras : null,
           tipo_problema: camera ? tipoFinal : null,
+          locais: camera || !locais.length ? null : locais,
           alterar_foto: fotoAlterada,
           foto: fotoAlterada ? foto?.blob ?? null : null,
         });
@@ -333,6 +336,7 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
         tipo_registro: tipoRegistro,
         cameras: camera ? cameras : null,
         tipo_problema: camera ? tipoFinal : null,
+        locais: camera || !locais.length ? null : locais,
         foto: foto?.blob ?? null,
       });
       // Só limpa depois de confirmado que os dados foram salvos.
@@ -543,6 +547,15 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
                 <Clock className="h-5 w-5 text-[#3b4d68] dark:text-slate-400" aria-hidden="true" />
                 {emAndamento ? 'Em andamento' : `Duração: ${duracao === null ? '—' : formatarDuracao(duracao)}`}
               </p>
+              {!camera && (
+                <div className="w-full min-w-0 xl:w-auto xl:min-w-[260px] xl:flex-1">
+                  <label htmlFor="cco-locais" className="mb-1.5 flex items-center gap-1.5 text-[15px] font-bold text-[#10233f] dark:text-slate-200">
+                    <MapPin className="h-4 w-4 text-[#0b63ce] dark:text-sky-300" aria-hidden="true" /> Local da ocorrência
+                    <span className="text-xs font-semibold text-[#5f7391] dark:text-slate-400">(opcional)</span>
+                  </label>
+                  <SeletorLocais id="cco-locais" valor={locais} disabled={ocupado} onChange={setLocais} />
+                </div>
+              )}
             </div>
             <span className="hidden w-px self-stretch bg-[#d3deec] lg:block dark:bg-slate-700" aria-hidden="true" />
             <label className="flex cursor-pointer select-none items-center gap-4 lg:w-[300px] lg:pl-4">

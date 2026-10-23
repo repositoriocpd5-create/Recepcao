@@ -300,6 +300,11 @@ export interface CcoOcorrencia {
   tipo_registro?: CcoTipoRegistro;
   cameras?: string[] | null;
   tipo_problema?: string | null;
+  /** Onde aconteceu (registro de ocorrência). */
+  locais?: string[] | null;
+  /** Visita presencial agendada pelo CCO (AAAA-MM-DD / HH:MM:SS). */
+  visita_data?: string | null;
+  visita_hora?: string | null;
   foto_path?: string | null;
   /** Quando o administrador abriu a ocorrência pela primeira vez; até lá a unidade pode editar. */
   visualizada_em?: string | null;
@@ -348,6 +353,7 @@ export interface CcoNovaOcorrencia {
   tipo_registro: CcoTipoRegistro;
   cameras: string[] | null;
   tipo_problema: string | null;
+  locais?: string[] | null;
   foto?: Blob | null;
 }
 
@@ -362,4 +368,8 @@ export interface CcoAtualizacao {
   situacao?: CcoSituacao;
   responsavel_id?: string | null;
   observacao?: string;
+  /** Agenda (ou reagenda) a visita presencial: data AAAA-MM-DD e hora opcional HH:MM. */
+  visita?: { data: string; hora: string | null };
+  /** Cancela a visita presencial agendada. */
+  remover_visita?: boolean;
 }

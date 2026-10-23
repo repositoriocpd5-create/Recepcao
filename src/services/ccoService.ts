@@ -43,6 +43,22 @@ export const CAMERAS_SUGERIDAS = [
   'Secretaria',
 ];
 
+// ─── Local da ocorrência ───
+/** Sugestões de onde a ocorrência aconteceu; a unidade também pode digitar outro local. */
+export const LOCAIS_SUGERIDOS = [
+  'Portão principal',
+  'Entrada / recepção',
+  'Pátio',
+  'Sala de aula',
+  'Corredor',
+  'Banheiro',
+  'Quadra',
+  'Refeitório / cozinha',
+  'Secretaria',
+  'Estacionamento',
+  'Muro / área externa',
+];
+
 export const TIPOS_PROBLEMA_CAMERA = [
   'Sem imagem',
   'Imagem com falha ou chuviscada',
@@ -408,9 +424,11 @@ export const ccoService = {
           .upload(foto_path, foto, { contentType: 'image/jpeg', upsert: true, cacheControl: '3600' });
         if (error) throw new Error(mensagemErro(error, 'Não foi possível enviar a foto'));
       }
+      // Sem locais, não envia a coluna (compatível com o banco antes da migração 20261023160000).
+      const { locais, ...semLocais } = campos;
       const { data, error } = await supabase
         .from('cco_ocorrencias')
-        .insert({ ...campos, descricao: campos.descricao.trim(), foto_path })
+        .insert({ ...semLocais, ...(locais?.length ? { locais } : {}), descricao: campos.descricao.trim(), foto_path })
         .select('*')
         .single();
       if (error) {
@@ -491,6 +509,9 @@ export const ccoService = {
         p_responsavel_id: alteracao.responsavel_id || null,
         p_remover_responsavel: alteracao.responsavel_id === null,
         p_observacao: alteracao.observacao?.trim() || null,
+        // Parâmetros da visita só quando usados (compatível com o banco antes da migração 20261023160000).
+        ...(alteracao.visita ? { p_visita_data: alteracao.visita.data, p_visita_hora: alteracao.visita.hora || null } : {}),
+        ...(alteracao.remover_visita ? { p_remover_visita: true } : {}),
       });
       if (error) throw new Error(mensagemErro(error, 'Não foi possível atualizar a ocorrência'));
       return data as CcoOcorrencia;
@@ -510,12 +531,17 @@ export const ccoService = {
     // Mesmas regras da função cco_atualizar_ocorrencia do banco.
     const finalizando = alteracao.situacao === 'concluida' && oc.situacao !== 'concluida';
     const reabrindo = oc.situacao === 'concluida' && Boolean(alteracao.situacao) && alteracao.situacao !== 'concluida';
-    if (oc.situacao === 'concluida' && !reabrindo && (observacao || alteracao.responsavel_id !== undefined)) {
+    const visitaNova = alteracao.visita;
+    const horaVisitaAtual = oc.visita_hora?.slice(0, 5) || null;
+    const mudouVisita = (Boolean(alteracao.remover_visita) && Boolean(oc.visita_data))
+      || (Boolean(visitaNova) && (visitaNova!.data !== oc.visita_data || (visitaNova!.hora || null) !== horaVisitaAtual));
+    if (oc.situacao === 'concluida' && !reabrindo && (observacao || alteracao.responsavel_id !== undefined || mudouVisita)) {
       throw new Error('Ocorrência finalizada: reabra para registrar novos andamentos.');
     }
     if (reabrindo && perfil !== 'admin') throw new Error('Somente o administrador reabre uma ocorrência finalizada.');
     if (finalizando && (!observacao || observacao.length < 5)) throw new Error('Descreva a solução para finalizar a ocorrência.');
     if (reabrindo && (!observacao || observacao.length < 5)) throw new Error('Informe o motivo da reabertura.');
+    if (visitaNova && mudouVisita && visitaNova.data < hojeBrasilia()) throw new Error('A data da visita não pode estar no passado.');
     let acao = 'CCO_ATUALIZACAO';
     let tipoTexto: 'andamento' | 'solucao' | 'reabertura' = 'andamento';
 
@@ -538,6 +564,16 @@ export const ccoService = {
       alteracoes.responsavel = { de: oc.responsavel_nome, para: responsavel.nome_completo };
       oc.responsavel_id = responsavel.id;
       oc.responsavel_nome = responsavel.nome_completo;
+    }
+    if (mudouVisita) {
+      const quando = (d: string, h: string | null) => `${d.split('-').reverse().join('/')}${h ? ` às ${h}` : ''}`;
+      const descricao = alteracao.remover_visita
+        ? `Visita presencial à unidade cancelada (estava agendada para ${quando(oc.visita_data!, horaVisitaAtual)}).`
+        : `Visita presencial à unidade ${oc.visita_data ? 'reagendada' : 'agendada'} para ${quando(visitaNova!.data, visitaNova!.hora)}. A equipe do CCO irá à unidade verificar as imagens no local.`;
+      adicionarHistoricoDemo({ ...autor, tipo: 'andamento', descricao });
+      alteracoes.visita = { de: oc.visita_data || null, para: alteracao.remover_visita ? null : visitaNova!.data };
+      oc.visita_data = alteracao.remover_visita ? null : visitaNova!.data;
+      oc.visita_hora = alteracao.remover_visita ? null : visitaNova!.hora ? `${visitaNova!.hora}:00` : null;
     }
     if (observacao) {
       adicionarHistoricoDemo({ ...autor, tipo: tipoTexto, descricao: observacao });
@@ -712,6 +748,8 @@ export const ccoService = {
         p_tipo_problema: campos.tipo_problema,
         p_alterar_foto: alterar_foto,
         p_foto_path: foto_path,
+        // Locais só quando há algo a gravar ou a limpar (compatível com o banco antes da migração).
+        ...(campos.tipo_registro !== 'camera' && (campos.locais?.length || atual.locais?.length) ? { p_locais: campos.locais ?? [] } : {}),
       });
       if (error) throw new Error(mensagemErro(error, 'Não foi possível salvar as alterações'));
       void this.analisarGravidade(id).catch(() => {});
@@ -736,6 +774,7 @@ export const ccoService = {
       hora_fim: campos.em_andamento ? null : campos.hora_fim,
       cameras: campos.tipo_registro === 'camera' ? campos.cameras : null,
       tipo_problema: campos.tipo_registro === 'camera' ? campos.tipo_problema : null,
+      locais: campos.tipo_registro === 'camera' || !campos.locais?.length ? null : campos.locais,
       foto_path,
       updated_at: new Date().toISOString(),
     };

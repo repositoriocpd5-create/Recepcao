@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   Building2,
+  CalendarClock,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -40,11 +41,11 @@ import {
   gravidadeDe,
   motivoSemEdicao,
 } from '@/services/ccoService';
-import { SUGESTAO_IMAGENS } from '@/lib/gravidadeCco';
+import { SUGESTAO_IMAGENS, primeiroNome } from '@/lib/gravidadeCco';
 import { CcoHistorico, CcoOcorrencia, CcoSituacao, UserProfile } from '@/types';
 import { Campo, CampoHora, caixaCampo, completarHora, horaValida } from './campos';
 import { Carregando, ESTILO_SITUACAO, SituacaoBadge, botaoPrimario } from './ui';
-import { Atendimento } from './Atendimento';
+import { Atendimento, formatarVisita } from './Atendimento';
 import { useUnidade } from '../hooks';
 import { LOCALIZACOES_UNIDADES } from '@/services/localizacoesUnidades';
 
@@ -404,7 +405,10 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
                       <Sparkles className="h-3 w-3" aria-hidden="true" /> {gravidade.origem === 'ia' ? 'Sugestão da IA' : 'Alerta automático'}
                     </span>
                   </p>
-                  <p className="mt-0.5 text-[13px] font-semibold leading-snug text-rose-900 dark:text-rose-100">{SUGESTAO_IMAGENS}</p>
+                  <p className="mt-0.5 text-[13px] font-semibold leading-snug text-rose-900 dark:text-rose-100">
+                    {primeiroNome(user.nome_completo) && <strong className="font-extrabold">Ei {primeiroNome(user.nome_completo)}! </strong>}
+                    {SUGESTAO_IMAGENS}
+                  </p>
                   <p className="mt-1 text-xs text-rose-800/90 dark:text-rose-200/80">
                     Período: {formatarData(oc.data_ocorrencia)}, {descreverHorario(oc)}
                     {oc.cameras?.length ? ` · Câmeras: ${oc.cameras.join(', ')}` : ''}.
@@ -419,7 +423,13 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
             <Dado icone={CalendarDays} rotulo="Data da ocorrência">{formatarData(oc.data_ocorrencia)}</Dado>
             <Dado icone={Clock} rotulo="Horário">{descreverHorario(oc)}</Dado>
             <Dado icone={Building2} rotulo="Unidade escolar">{oc.unidade_nome}</Dado>
+            {oc.locais?.length ? <Dado icone={MapPin} rotulo="Local da ocorrência">{oc.locais.join(', ')}</Dado> : null}
             <Dado icone={UserRound} rotulo="Responsável no CCO">{oc.responsavel_nome || 'Ainda não definido'}</Dado>
+            {oc.visita_data && (
+              <Dado icone={CalendarClock} rotulo="Visita presencial">
+                {formatarVisita(oc.visita_data, oc.visita_hora)}
+              </Dado>
+            )}
             <Dado icone={FileText} rotulo="Registrada em">
               {formatarDataHora(oc.created_at)}
               {oc.criado_por_nome && <span className="block text-xs font-medium text-[#5f7391] dark:text-slate-400">por {oc.criado_por_nome}</span>}

@@ -36,6 +36,12 @@ export function classificarPorPalavras(texto: string): ResultadoGravidade {
 }
 
 /** Texto da sugestão mostrada ao administrador quando o caso é grave. */
+/** Primeiro nome para a saudação do alerta ("Wesley Pinheiro…" → "Wesley"; "cpdinfra" → "Cpdinfra"). */
+export const primeiroNome = (nome?: string | null) => {
+  const primeiro = (nome || '').trim().split(/\s+/)[0] || '';
+  return primeiro ? primeiro.charAt(0).toLocaleUpperCase('pt-BR') + primeiro.slice(1).toLocaleLowerCase('pt-BR') : '';
+};
+
 export const SUGESTAO_IMAGENS =
   'Extraia agora as imagens das câmeras do período informado e guarde uma cópia na nuvem para averiguação posterior. ' +
   'As gravações costumam ser sobrescritas em poucos dias e podem ser pedidas pela polícia, pelo Conselho Tutelar ou pela Justiça.';
