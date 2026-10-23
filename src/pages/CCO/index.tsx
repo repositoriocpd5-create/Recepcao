@@ -192,6 +192,7 @@ const InicioUnidade: React.FC<{ user: UserProfile }> = ({ user }) => {
             onAbrir={(oc) => detalhe.abrir(oc.id)}
             acaoLinha={acaoEditar(user)}
             acaoCompacta
+            mostrarVisualizacao
             vazio={<ListaVazia titulo="Nenhum registro enviado" texto="Suas ocorrências e relatos de problemas aparecerão aqui." />}
           />
         )}
@@ -252,6 +253,7 @@ export const CcoOcorrenciasPage: React.FC = () => {
               onAbrir={(oc) => detalhe.abrir(oc.id)}
               acaoLinha={acaoEditar(user)}
               acaoCompacta
+              mostrarVisualizacao
               vazio={
                 ativos ? (
                   <ListaVazia titulo="Nenhuma ocorrência com estes filtros." texto="Ajuste ou limpe os filtros." />

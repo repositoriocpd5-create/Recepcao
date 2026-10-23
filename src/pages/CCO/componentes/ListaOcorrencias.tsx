@@ -1,7 +1,7 @@
 import React from 'react';
-import { Camera, ChevronRight, FileText, MoonStar } from 'lucide-react';
+import { Camera, ChevronRight, Eye, EyeOff, FileText, MoonStar } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { SITUACOES, descreverHorario, formatarData } from '@/services/ccoService';
+import { SITUACOES, descreverHorario, formatarData, formatarDataHora } from '@/services/ccoService';
 import { CcoOcorrencia } from '@/types';
 import { SituacaoBadge } from './ui';
 import { ImportanciaBadge } from './TabelaAdmin';
@@ -18,7 +18,27 @@ interface Props {
   acaoCompacta?: boolean;
   /** Administrador: mostra o nível de importância ao lado do protocolo. */
   mostrarImportancia?: boolean;
+  /** Unidade escolar: coluna Status dizendo se o administrador já visualizou o registro. */
+  mostrarVisualizacao?: boolean;
 }
+
+/** Se o administrador do CCO já abriu o registro (ícone + texto, não depende só da cor). */
+export const VisualizacaoBadge: React.FC<{ oc: CcoOcorrencia }> = ({ oc }) =>
+  oc.visualizada_em ? (
+    <span
+      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800 ring-1 ring-teal-200 dark:bg-teal-500/10 dark:text-teal-200 dark:ring-teal-500/30"
+      title={`Visualizado pelo administrador em ${formatarDataHora(oc.visualizada_em)}`}
+    >
+      <Eye className="h-3.5 w-3.5" aria-hidden="true" /> Visualizado
+    </span>
+  ) : (
+    <span
+      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
+      title="O administrador ainda não abriu este registro"
+    >
+      <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> Não visualizado
+    </span>
+  );
 
 export const ListaVazia: React.FC<{ titulo: string; texto?: string }> = ({ titulo, texto }) => (
   <div className="flex flex-col items-center gap-3 px-4 py-10 text-center sm:flex-row sm:justify-center sm:text-left">
@@ -33,12 +53,14 @@ export const ListaVazia: React.FC<{ titulo: string; texto?: string }> = ({ titul
 );
 
 /** Lista de ocorrências: tabela no computador, cartões no celular. */
-export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostrarUnidade, vazio, acaoLinha, acaoCompacta, mostrarImportancia }) => {
+export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostrarUnidade, vazio, acaoLinha, acaoCompacta, mostrarImportancia, mostrarVisualizacao }) => {
   if (!ocorrencias.length) return <>{vazio ?? <ListaVazia titulo="Nenhuma ocorrência registrada." />}</>;
 
   const colunas = mostrarUnidade
     ? 'lg:grid-cols-[150px_150px_minmax(0,1.1fr)_minmax(0,1.6fr)_150px_20px]'
-    : 'lg:grid-cols-[150px_170px_minmax(0,1fr)_150px_20px]';
+    : mostrarVisualizacao
+      ? 'lg:grid-cols-[150px_150px_minmax(0,1fr)_140px_150px_20px]'
+      : 'lg:grid-cols-[150px_170px_minmax(0,1fr)_150px_20px]';
 
   return (
     <div>
@@ -51,6 +73,7 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
         {mostrarUnidade && <span>Unidade</span>}
         <span>Resumo</span>
         <span>Situação</span>
+        {mostrarVisualizacao && <span>Status</span>}
         <span />
       </div>
       <ul className="divide-y divide-[#edf2f8] dark:divide-slate-800">
@@ -59,7 +82,7 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
             <button
               type="button"
               onClick={() => onAbrir(oc)}
-              aria-label={`Abrir ocorrência ${oc.protocolo}, ${formatarData(oc.data_ocorrencia)}, situação ${SITUACOES[oc.situacao].rotulo}`}
+              aria-label={`Abrir ocorrência ${oc.protocolo}, ${formatarData(oc.data_ocorrencia)}, situação ${SITUACOES[oc.situacao].rotulo}${mostrarVisualizacao ? `, ${oc.visualizada_em ? 'visualizado' : 'não visualizado'} pelo administrador` : ''}`}
               className={cn(
                 'group grid w-full min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 px-4 py-3.5 text-left transition-colors hover:bg-[#f5f9fe] focus-visible:bg-[#f5f9fe] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#0b63ce] sm:px-6 lg:gap-4 dark:hover:bg-slate-800/40 dark:focus-visible:bg-slate-800/40',
                 colunas,
@@ -69,7 +92,10 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
                 {oc.protocolo}
                 {mostrarImportancia && <ImportanciaBadge oc={oc} className="font-sans" />}
               </span>
-              <span className="lg:hidden"><SituacaoBadge situacao={oc.situacao} /></span>
+              <span className="flex flex-wrap justify-end gap-1.5 lg:hidden">
+                <SituacaoBadge situacao={oc.situacao} />
+                {mostrarVisualizacao && <VisualizacaoBadge oc={oc} />}
+              </span>
 
               <span className="col-span-2 flex flex-wrap items-center gap-x-1.5 text-[13px] text-[#3b4d68] lg:col-span-1 lg:block dark:text-slate-300">
                 <span className="font-semibold">{formatarData(oc.data_ocorrencia)}</span>
@@ -94,6 +120,7 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
               </span>
 
               <span className="hidden lg:block"><SituacaoBadge situacao={oc.situacao} /></span>
+              {mostrarVisualizacao && <span className="hidden lg:block"><VisualizacaoBadge oc={oc} /></span>}
               <ChevronRight className="hidden h-5 w-5 text-[#9aaac0] transition-transform group-hover:translate-x-0.5 group-hover:text-[#0b63ce] lg:block" aria-hidden="true" />
             </button>
             {acaoLinha && (
