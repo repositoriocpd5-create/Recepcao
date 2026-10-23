@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CalendarDays, Camera, Check, ChevronDown, ClipboardList, Clock, Loader2, MoonStar, Pencil, Plus, RotateCcw, Save, Send, ShieldCheck, Wrench, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Cctv, Check, ChevronDown, ClipboardList, Clock, Loader2, MoonStar, Pencil, Plus, RotateCcw, Save, Send, ShieldCheck, Wrench, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   TIPOS_PROBLEMA_CAMERA,
@@ -73,23 +73,44 @@ const formatarDuracao = (total: number) => {
   return m ? `${h} h ${String(m).padStart(2, '0')} min` : `${h} h`;
 };
 
-const TIPOS: { valor: CcoTipoRegistro; titulo: string; texto: string; icone: React.ReactNode }[] = [
+/** Cada tipo tem cor própria (azul = ocorrência, âmbar = câmera de segurança) para não confundir os dois. */
+const TIPOS: {
+  valor: CcoTipoRegistro;
+  titulo: string;
+  texto: string;
+  icone: React.ReactNode;
+  cor: { ativo: string; inativo: string; icone: string; iconeAtivo: string; radio: string };
+}[] = [
   {
     valor: 'ocorrencia',
     titulo: 'Registrar uma ocorrência',
     texto: 'Comunique um fato ocorrido na unidade escolar.',
     icone: <ClipboardList className="h-7 w-7" aria-hidden="true" />,
+    cor: {
+      ativo: 'border-[#3b8cf0] bg-[#f3f8ff] dark:border-sky-500 dark:bg-sky-500/10',
+      inativo: 'hover:border-[#9cc3f2]',
+      icone: 'bg-[#e6f0fc] text-[#0b63ce] dark:bg-sky-500/15 dark:text-sky-300',
+      iconeAtivo: 'bg-[#0b63ce] text-white dark:bg-sky-500 dark:text-white',
+      radio: 'accent-[#0b63ce]',
+    },
   },
   {
     valor: 'camera',
     titulo: 'Relatar problema em câmera(s)',
-    texto: 'Informe falhas em uma ou mais câmeras.',
+    texto: 'Informe falhas em uma ou mais câmeras de segurança.',
     icone: (
       <span className="relative inline-block" aria-hidden="true">
-        <Camera className="h-8 w-8" />
-        <Wrench className="absolute -bottom-1 -right-2 h-[18px] w-[18px] rounded-full bg-white p-px dark:bg-[#121826]" />
+        <Cctv className="h-8 w-8" />
+        <Wrench className="absolute -bottom-1 -right-2 h-[18px] w-[18px] rounded-full bg-white p-px text-[#b45309] dark:bg-[#121826] dark:text-amber-300" />
       </span>
     ),
+    cor: {
+      ativo: 'border-[#f59e0b] bg-[#fffbeb] dark:border-amber-500 dark:bg-amber-500/10',
+      inativo: 'hover:border-[#fcd34d]',
+      icone: 'bg-[#fef3c7] text-[#b45309] dark:bg-amber-500/15 dark:text-amber-300',
+      iconeAtivo: 'bg-[#d97706] text-white dark:bg-amber-500 dark:text-white',
+      radio: 'accent-[#d97706]',
+    },
   },
 ];
 
@@ -378,8 +399,8 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
                   className={cn(
                     'flex min-h-[88px] cursor-pointer items-center gap-4 rounded-xl border-2 px-4 py-3 transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#0b63ce]',
                     ativo
-                      ? 'border-[#3b8cf0] bg-[#f3f8ff] dark:border-sky-500 dark:bg-sky-500/10'
-                      : 'border-[#dbe6f3] bg-white hover:border-[#b9cfe9] dark:border-slate-700 dark:bg-transparent',
+                      ? tipo.cor.ativo
+                      : cn('border-[#dbe6f3] bg-white dark:border-slate-700 dark:bg-transparent', tipo.cor.inativo),
                     ocupado && 'cursor-not-allowed opacity-70',
                   )}
                 >
@@ -394,9 +415,9 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
                       alterou();
                       if (erros.cameras) setErros((atual) => ({ ...atual, cameras: undefined }));
                     }}
-                    className="h-6 w-6 shrink-0 cursor-pointer accent-[#0b63ce] focus-visible:outline-none"
+                    className={cn('h-6 w-6 shrink-0 cursor-pointer focus-visible:outline-none', tipo.cor.radio)}
                   />
-                  <span className={cn('grid h-16 w-16 shrink-0 place-items-center rounded-full text-[#0b63ce] dark:text-sky-300', ativo ? 'bg-transparent' : 'bg-[#eef4fc] dark:bg-slate-800')}>
+                  <span className={cn('grid h-16 w-16 shrink-0 place-items-center rounded-full transition-colors', ativo ? tipo.cor.iconeAtivo : tipo.cor.icone)}>
                     {tipo.icone}
                   </span>
                   <span className="min-w-0">
