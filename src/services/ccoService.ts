@@ -309,6 +309,11 @@ const textoParaAnalise = (oc: Pick<CcoOcorrencia, 'descricao' | 'tipo_registro' 
 /** Gravidade a mostrar: a análise gravada ou, enquanto ela não chega, as palavras-chave. */
 export function gravidadeDe(oc: CcoOcorrencia): ResultadoGravidade & { origem: 'ia' | 'palavras'; provisoria: boolean } {
   if (oc.ia_analisada_em && typeof oc.ia_grave === 'boolean') {
+    // A lista atual de palavras confirma o alerta mesmo em análises antigas (critérios novos).
+    if (!oc.ia_grave) {
+      const palavras = classificarPorPalavras(textoParaAnalise(oc));
+      if (palavras.grave) return { ...palavras, origem: 'palavras', provisoria: false };
+    }
     return { grave: oc.ia_grave, categoria: oc.ia_categoria ?? null, motivo: oc.ia_motivo ?? null, origem: oc.ia_origem ?? 'palavras', provisoria: false };
   }
   return { ...classificarPorPalavras(textoParaAnalise(oc)), origem: 'palavras', provisoria: true };
