@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, CheckCircle2, Loader2, Lock, MessageSquarePlus, RotateCcw, Sparkles, Undo2, X } from 'lucide-react';
+import { CalendarClock, CheckCircle2, ExternalLink, Loader2, Lock, MessageSquarePlus, RotateCcw, Sparkles, Undo2, X } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 import { perfilCco } from '@/lib/modulos';
-import { SITUACOES, ccoService, hojeBrasilia } from '@/services/ccoService';
+import { SITUACOES, ccoService, descreverHorario, formatarData, hojeBrasilia } from '@/services/ccoService';
 import { ROTULO_ORIGEM_SUGESTAO, SugestaoSituacao } from '@/lib/sugestaoSituacao';
 import { CcoOcorrencia, CcoSituacao, UserProfile } from '@/types';
 import { Campo, caixaCampo } from './campos';
@@ -54,6 +54,110 @@ const Aviso: React.FC<{ mensagem: { tipo: 'ok' | 'erro'; texto: string } | null 
     {mensagem?.texto}
   </p>
 );
+
+const URL_NOVO_TICKET_7LAN = 'https://ticket.7lan.com.br/v/tickets/new';
+const MESA_7LAN = 'Incidentes - Itaguaí';
+
+/**
+ * Problema em câmera: abre o novo ticket da 7LAN (o login é feito pelo administrador) com o texto do
+ * chamado copiado, e registra o número do chamado no andamento da ocorrência.
+ */
+const ChamadoSeteLan: React.FC<{ oc: CcoOcorrencia; user: UserProfile; onSalvo: (oc: CcoOcorrencia) => void }> = ({ oc, user, onSalvo }) => {
+  const [numero, setNumero] = useState('');
+  const [copiado, setCopiado] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [mensagem, setMensagem] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+
+  const titulo = `${oc.protocolo} - ${oc.unidade_nome} - ${oc.tipo_problema || 'Problema em câmera'}`;
+  const textoChamado = [
+    `Unidade: ${oc.unidade_nome}`,
+    `Protocolo CCO: ${oc.protocolo}`,
+    `Problema: ${oc.tipo_problema || 'Problema em câmera'}`,
+    `Câmeras: ${oc.cameras?.length ? oc.cameras.join(', ') : 'não informadas'}`,
+    `Período: ${formatarData(oc.data_ocorrencia)}, ${descreverHorario(oc)}`,
+    oc.locais?.length ? `Local: ${oc.locais.join(', ')}` : '',
+    `Relato: ${oc.descricao}`,
+  ].filter(Boolean).join('\n');
+
+  const [avisoScript, setAvisoScript] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+  const copiarScript = async () => {
+    try {
+      const resposta = await fetch('/7lan-preenchimento.user.js', { cache: 'no-store' });
+      const codigo = await resposta.text();
+      if (!resposta.ok || !codigo.startsWith('// ==UserScript==')) throw new Error('arquivo indisponível');
+      await navigator.clipboard.writeText(codigo);
+      setAvisoScript({ tipo: 'ok', texto: 'Script copiado. Cole no Tampermonkey (novo script) e salve.' });
+    } catch {
+      setAvisoScript({ tipo: 'erro', texto: 'Não foi possível copiar. Reinicie o servidor do sistema e tente de novo, ou peça o arquivo ao suporte.' });
+    }
+  };
+
+  const abrirTicket = async () => {
+    try {
+      await navigator.clipboard.writeText(`${titulo}\n\n${textoChamado}`);
+      setCopiado(true);
+    } catch { setCopiado(false); }
+    // O fragmento (#) não vai para o servidor da 7LAN; o script de usuário instalado no navegador o lê e preenche o ticket.
+    const dados = encodeURIComponent(JSON.stringify({ v: 1, titulo, descricao: textoChamado, mesa: MESA_7LAN }));
+    window.open(`${URL_NOVO_TICKET_7LAN}#sme=${dados}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const registrar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const limpo = numero.trim().replace(/^#/, '');
+    if (!/^\d{1,9}$/.test(limpo)) return setMensagem({ tipo: 'erro', texto: 'Informe só o número do chamado, por exemplo 11877.' });
+    setSalvando(true);
+    setMensagem(null);
+    try {
+      const atualizada = await ccoService.atualizarOcorrencia(user, oc.id, { observacao: `Chamado aberto na 7LAN (câmeras): #${limpo}.` });
+      setNumero('');
+      setMensagem({ tipo: 'ok', texto: `Chamado #${limpo} registrado no andamento.` });
+      onSalvo(atualizada);
+    } catch (err) {
+      setMensagem({ tipo: 'erro', texto: err instanceof Error ? err.message : 'Não foi possível registrar o chamado.' });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-500/30 dark:bg-sky-950/20">
+      <h3 className="mb-1 text-xs font-extrabold uppercase tracking-wider text-[#4c6283] dark:text-slate-400">Chamado na 7LAN (câmeras)</h3>
+      <p className="text-xs text-[#5f7391] dark:text-slate-400">
+        Abre o novo ticket da 7LAN em outra aba e preenche título, descrição e mesa (Incidentes - Itaguaí) com o{' '}
+        script de preenchimento (instalação única no Tampermonkey). Sem o script, o texto fica copiado para colar. Depois de salvar, informe o número abaixo.
+      </p>
+      <details className="mt-2 rounded-xl border border-sky-200 bg-white/70 p-3 text-xs text-[#3b4d68] dark:border-sky-500/30 dark:bg-slate-900/40 dark:text-slate-300">
+        <summary className="cursor-pointer font-bold text-[#0b63ce] dark:text-sky-300">Instalar o preenchimento automático (uma vez)</summary>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>Instale a extensão Tampermonkey no Chrome e, em <code>chrome://extensions</code>, ligue o "Modo do desenvolvedor".</li>
+          <li>
+            <button type="button" onClick={() => void copiarScript()} className="font-bold text-[#0b63ce] underline underline-offset-2 dark:text-sky-300">Copiar o script</button>
+            {' '}ou <a href="/7lan-preenchimento.user.js" target="_blank" rel="noreferrer" className="font-bold text-[#0b63ce] underline underline-offset-2 dark:text-sky-300">abrir o arquivo</a> (o Tampermonkey oferece "Instalar").
+          </li>
+          <li>Se copiou: Tampermonkey &gt; "Criar um novo script", apague todo o conteúdo, cole e salve com Ctrl+S.</li>
+        </ol>
+        {avisoScript && <p aria-live="polite" className={cn('mt-2 font-semibold', avisoScript.tipo === 'erro' ? 'text-rose-600 dark:text-rose-400' : 'text-green-700 dark:text-green-400')}>{avisoScript.texto}</p>}
+      </details>
+      <button type="button" onClick={() => void abrirTicket()} className={cn(botaoSecundario, 'mt-3 min-h-11 px-4 text-sm')}>
+        <ExternalLink className="h-4 w-4" aria-hidden="true" /> Abrir chamado na 7LAN
+      </button>
+      {copiado && <p aria-live="polite" className="mt-1.5 text-xs font-semibold text-green-700 dark:text-green-400">Texto do chamado também copiado (título na primeira linha), caso o preenchimento automático não esteja instalado.</p>}
+      <form onSubmit={registrar} noValidate className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+        <div className="sm:w-52">
+          <Campo id="cco-numero-7lan" rotulo="Número do chamado">
+            <input id="cco-numero-7lan" inputMode="numeric" value={numero} onChange={(e) => { setNumero(e.target.value); setMensagem(null); }} placeholder="Ex.: 11877" maxLength={10} className={caixaCampo()} />
+          </Campo>
+        </div>
+        <button type="submit" disabled={salvando || !numero.trim()} className={cn(botaoPrimario, 'min-h-11 px-4 text-sm')}>
+          {salvando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />}
+          Registrar no andamento
+        </button>
+      </form>
+      <Aviso mensagem={mensagem} />
+    </div>
+  );
+};
 
 /** Equipe CCO e administrador: registrar andamentos, finalizar e (só admin) reabrir. */
 export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo }) => {
@@ -467,6 +571,8 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
         </form>
       )}
       {finalizada && mensagem && <Aviso mensagem={mensagem} />}
+
+      {admin && !finalizada && oc.tipo_registro === 'camera' && <ChamadoSeteLan oc={oc} user={user} onSalvo={onSalvo} />}
 
       <Modal
         isOpen={modal !== null}
