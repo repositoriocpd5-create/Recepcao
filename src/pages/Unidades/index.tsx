@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { dataService } from '@/services/dataService';
 import { CATEGORIAS_POR_TIPO, ORDEM_CATEGORIAS } from '@/services/ramaisUnidades';
-import { LOCALIZACOES_UNIDADES } from '@/services/localizacoesUnidades';
+import { localizacaoPadrao } from '@/services/localizacoesUnidades';
 import { RamalContato, RamalUnidade, RamalUnidadeTipo, Servidor } from '@/types';
 import { ComboServidor, OpcaoServidor, ehDirigenteEscolar, lotadoNaUnidade } from './ComboServidor';
 import { cn } from '@/lib/utils';
@@ -65,7 +65,7 @@ const FORM_NOVO: Formulario = {
 
 /** Preenche o formulário; a localização padrão (planilha de mapas) entra quando a unidade ainda não tem a sua gravada. */
 function formularioDe(u: RamalUnidade): Formulario {
-  const padrao = LOCALIZACOES_UNIDADES[u.nome];
+  const padrao = localizacaoPadrao(u);
   const num = (v: number | null | undefined, p?: number) => String(v ?? p ?? '');
   return {
     nome: u.nome,
@@ -81,7 +81,7 @@ function formularioDe(u: RamalUnidade): Formulario {
     email: u.email ?? '',
     endereco: u.endereco ?? padrao?.endereco ?? '',
     bairro: u.bairro ?? padrao?.bairro ?? '',
-    cep: u.cep ?? '',
+    cep: u.cep ?? padrao?.cep ?? '',
     latitude: num(u.latitude, padrao?.lat),
     longitude: num(u.longitude, padrao?.lng),
     mapa_url: u.mapa_url ?? padrao?.mapa_url ?? '',
@@ -100,7 +100,7 @@ const coordenada = (texto: string, limite: number): number | null | 'erro' => {
 
 /** Quanto do cadastro está preenchido (direção, ramal, e-mail, endereço e localização). */
 function completude(u: RamalUnidade) {
-  const padrao = LOCALIZACOES_UNIDADES[u.nome];
+  const padrao = localizacaoPadrao(u);
   const itens = [
     !!u.diretor?.trim(),
     u.ramais.length > 0,

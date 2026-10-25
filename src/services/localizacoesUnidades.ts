@@ -1,4 +1,4 @@
-import { LocalizacaoUnidade } from '@/types';
+import { LocalizacaoUnidade, RamalUnidade } from '@/types';
 
 /**
  * Localização das unidades escolares (planilha maps.xlsx, links do Google Maps).
@@ -72,3 +72,18 @@ export const LOCALIZACOES_UNIDADES: Record<string, LocalizacaoUnidade> = {
   "E. M. VER. PROFESSOR ARTHUR BRITO DE CASTRO": { lat: -22.838425, lng: -43.714736, bairro: "Piranema", endereco: "Rua Antonio M Rereira, Piranema", mapa_url: "https://maps.app.goo.gl/8JiaYt2Cw18kEs2M6" },
   "E. M. VER. TACIANO FERNANDES NUNES": { lat: -22.8730463, lng: -43.800151, bairro: "Brisa Mar", endereco: "Avenida Governador Mário Covas, Brisa Mar", mapa_url: "https://maps.app.goo.gl/QLxMXdv64HAbZhA2A" },
 };
+
+/** Todos os departamentos da SMEDU funcionam no mesmo prédio. */
+export const LOCALIZACAO_DEPARTAMENTOS: LocalizacaoUnidade = {
+  lat: -22.8686368970542,
+  lng: -43.78889502338,
+  bairro: 'Engenho',
+  endereco: 'Rua Ary Parreiras, nº 1242',
+  cep: '23820-380',
+  mapa_url: 'https://maps.app.goo.gl/Pk8wnD23ZyUeiHwBA',
+  foto_url: 'https://streetviewpixels-pa.googleapis.com/v1/thumbnail?panoid=jwBbo0RjJlhZnKB-LabdJg&cb_client=search.gws-prod.grass&w=408&h=240&yaw=321.9729&pitch=1.3461014&thumbfov=100',
+};
+
+/** Localização padrão da unidade: a do prédio da SMEDU para departamentos, a da planilha para escolas. */
+export const localizacaoPadrao = (u: Pick<RamalUnidade, 'nome' | 'tipo'>): LocalizacaoUnidade | undefined =>
+  u.tipo === 'departamento' ? LOCALIZACAO_DEPARTAMENTOS : LOCALIZACOES_UNIDADES[u.nome];

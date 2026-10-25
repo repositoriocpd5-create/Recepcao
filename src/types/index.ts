@@ -105,6 +105,7 @@ export interface LocalizacaoUnidade {
   endereco: string | null;
   mapa_url: string | null;
   foto_url?: string | null;
+  cep?: string | null;
 }
 
 export interface ServidorSetorVinculo {
