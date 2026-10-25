@@ -49,7 +49,7 @@ const FotoUnidade: React.FC<{ url: string; nome: string }> = ({ url, nome }) => 
 const PreviaFoto: React.FC<{ url: string; nome: string }> = ({ url, nome }) => {
   const [erro, setErro] = useState(false);
   if (erro) return null;
-  return <img src={url} alt={`Fachada de ${nome}`} loading="lazy" onError={() => setErro(true)} className="h-40 w-full object-cover" />;
+  return <img src={url} alt={`Fachada de ${nome}`} loading="lazy" onError={() => setErro(true)} className="aspect-[16/10] w-full object-cover" />;
 };
 
 // As siglas precisam terminar em fronteira de palavra: "E. M. EIDER RIBEIRO" não é EMEI.
@@ -392,19 +392,25 @@ export const UnidadesPage: React.FC = () => {
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-5">
       {/* Cabeçalho */}
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+      <header className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
           <p className="text-[11px] font-extrabold uppercase tracking-[.14em] text-[#0b63ce] dark:text-sky-300">Administração</p>
-          <h1 className="text-2xl font-extrabold tracking-tight text-[#0d2240] dark:text-slate-50 sm:text-[28px]">Cadastro de unidades</h1>
-          <p className="mt-0.5 max-w-2xl text-sm text-[#5f7391] dark:text-slate-400">
+          <h1 className="text-[22px] font-extrabold leading-tight tracking-tight text-[#0d2240] dark:text-slate-50 sm:text-[28px]">Cadastro de unidades</h1>
+          <p className="mt-0.5 hidden max-w-2xl text-sm text-[#5f7391] dark:text-slate-400 sm:block">
             Edite os dados das escolas e dos departamentos: nomes, diretores, ramais, contatos e localização. As alterações valem para Ramais, Recepção e CCO.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <Button variant="outline" onClick={() => void carregar()} isLoading={carregando} aria-label="Atualizar lista"><RefreshCw className="h-4 w-4" /></Button>
-          <Button onClick={() => abrir(null)}><Plus className="h-4 w-4" /> Nova unidade</Button>
+          <Button onClick={() => abrir(null)} className="hidden sm:inline-flex"><Plus className="h-4 w-4" /> Nova unidade</Button>
         </div>
       </header>
+
+      {/* Atalho flutuante para o celular, acima da barra de navegação */}
+      <button type="button" onClick={() => abrir(null)} aria-label="Nova unidade"
+        className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 items-center gap-2 rounded-full bg-[#005a9c] px-5 text-sm font-extrabold text-white shadow-[0_14px_30px_-8px_rgba(0,90,156,.7)] transition active:scale-95 sm:hidden">
+        <Plus className="h-5 w-5" /> Nova unidade
+      </button>
 
       {aviso && (
         <p role="status" className={cn('flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-lg', aviso.tipo === 'sucesso' ? 'bg-[#102755]' : 'bg-rose-600')}>
@@ -423,7 +429,7 @@ export const UnidadesPage: React.FC = () => {
       )}
 
       {/* Indicadores */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4">
         {[
           { icone: Building2, valor: resumo.total, rotulo: 'Cadastros ativos', tom: 'text-[#005a9c] bg-[#e6f1fb] dark:bg-sky-500/15 dark:text-sky-300' },
           { icone: School, valor: resumo.escolas, rotulo: 'Escolas e creches', tom: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/15 dark:text-emerald-300' },
@@ -439,7 +445,7 @@ export const UnidadesPage: React.FC = () => {
               </span>
             </>
           );
-          const base = 'flex items-center gap-3 rounded-2xl border border-[#e2eaf4] bg-white p-3.5 shadow-[0_10px_30px_-24px_rgba(16,48,96,.5)] dark:border-slate-800 dark:bg-[#121826]';
+          const base = 'flex w-[44%] min-w-[150px] shrink-0 snap-start items-center gap-3 rounded-2xl border sm:w-auto sm:min-w-0 sm:shrink border-[#e2eaf4] bg-white p-3.5 shadow-[0_10px_30px_-24px_rgba(16,48,96,.5)] dark:border-slate-800 dark:bg-[#121826]';
           return filtro ? (
             <button key={rotulo} type="button" aria-pressed={soSemDiretor} onClick={() => { setAba('todas'); setSoSemDiretor((v) => !v); }}
               className={cn(base, 'transition hover:border-[#9fc9ed] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce]', soSemDiretor && 'border-amber-400 ring-2 ring-amber-300/50')}>{conteudo}</button>
@@ -506,7 +512,7 @@ export const UnidadesPage: React.FC = () => {
               return (
                 <li key={u.id} className="group/card relative">
                   <button type="button" onClick={() => abrir(u)} aria-label={`Editar ${u.nome}`}
-                    className={cn('group flex h-full w-full flex-col gap-3 rounded-2xl border bg-white p-4 text-left shadow-[0_10px_30px_-24px_rgba(16,48,96,.5)] transition hover:-translate-y-0.5 hover:border-[#9fc9ed] hover:shadow-[0_18px_34px_-22px_rgba(16,48,96,.55)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:bg-[#121826]',
+                    className={cn('group flex h-full w-full flex-col gap-3 rounded-2xl border bg-white p-3.5 text-left active:scale-[.985] sm:p-4 shadow-[0_10px_30px_-24px_rgba(16,48,96,.5)] transition hover:-translate-y-0.5 hover:border-[#9fc9ed] hover:shadow-[0_18px_34px_-22px_rgba(16,48,96,.55)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:bg-[#121826]',
                       u.ativo ? 'border-[#e2eaf4] dark:border-slate-800' : 'border-dashed border-[#cfdbea] opacity-80 dark:border-slate-700')}>
                     <div className="flex items-start gap-3">
                       {!depto && u.foto_url?.trim()
@@ -543,7 +549,10 @@ export const UnidadesPage: React.FC = () => {
                     </div>
                   </button>
                   {!depto && (
-                    <div role="tooltip" className="pointer-events-none invisible absolute left-1/2 top-full z-30 mt-2 hidden w-72 -translate-x-1/2 translate-y-1 overflow-hidden rounded-2xl border border-[#d5e2f2] bg-white opacity-0 shadow-[0_24px_50px_-18px_rgba(8,43,87,.55)] transition duration-150 group-hover/card:visible group-hover/card:translate-y-0 group-hover/card:opacity-100 group-focus-within/card:visible group-focus-within/card:translate-y-0 group-focus-within/card:opacity-100 dark:border-slate-700 dark:bg-[#121826] md:block">
+                    <>
+                    {/* Véu que desfoca o restante da tela enquanto a prévia está aberta */}
+                    <div aria-hidden="true" className="pointer-events-none invisible fixed inset-0 z-[60] hidden bg-[#06142b]/35 opacity-0 backdrop-blur-[6px] transition duration-200 group-hover/card:visible group-hover/card:opacity-100 group-hover/card:delay-150 group-focus-within/card:visible group-focus-within/card:opacity-100 md:block" />
+                    <div role="tooltip" className="pointer-events-none invisible fixed left-1/2 top-1/2 z-[61] hidden w-[22rem] max-w-[90vw] -translate-x-1/2 -translate-y-[46%] scale-95 overflow-hidden rounded-3xl border border-white/70 bg-white opacity-0 shadow-[0_30px_70px_-20px_rgba(4,24,56,.75)] ring-1 ring-[#0b63ce]/15 transition duration-200 group-hover/card:visible group-hover/card:-translate-y-1/2 group-hover/card:scale-100 group-hover/card:opacity-100 group-hover/card:delay-150 group-focus-within/card:visible group-focus-within/card:-translate-y-1/2 group-focus-within/card:scale-100 group-focus-within/card:opacity-100 dark:border-slate-700 dark:bg-[#121826] md:block">
                       {u.foto_url?.trim() && <PreviaFoto url={u.foto_url.trim()} nome={u.nome} />}
                       <div className="space-y-2 p-3 text-[13px]">
                         <p className="font-extrabold leading-snug text-[#0d2240] dark:text-slate-100">{u.nome}</p>
@@ -557,8 +566,19 @@ export const UnidadesPage: React.FC = () => {
                             <p className="font-semibold text-[#10233f] dark:text-slate-200">{u.vice_diretor}</p>
                           </div>
                         )}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#6b7f9b]">Bairro</p>
+                            <p className="font-semibold text-[#10233f] dark:text-slate-200">{u.bairro?.trim() || 'Não informado'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#6b7f9b]">{u.ramais.length > 1 ? 'Ramais' : 'Ramal'}</p>
+                            <p className="font-semibold text-[#10233f] dark:text-slate-200">{u.ramais.length ? u.ramais.map((r) => r.numero).join(' · ') : 'Sem ramal'}</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                    </>
                   )}
                 </li>
               );
@@ -724,12 +744,12 @@ export const UnidadesPage: React.FC = () => {
                   <div className="flex items-center gap-3">
                     {editando && ehAdmin && (
                       <Button type="button" variant="outline" onClick={() => { setErroForm(''); setConfirmarExclusao(true); }} aria-label={`Excluir ${editando.nome}`}>
-                        <Trash2 className="h-4 w-4 text-rose-600" /> Excluir
+                        <Trash2 className="h-4 w-4 text-rose-600" /><span className="hidden sm:inline">Excluir</span>
                       </Button>
                     )}
                     <span className="hidden text-xs font-semibold text-[#6b7f9b] dark:text-slate-400 sm:inline">{alterado ? '● Alterações não salvas' : 'Sem alterações'}</span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-1 gap-2 sm:flex-none [&>button]:min-h-11 [&>button]:flex-1 sm:[&>button]:flex-none">
                     <Button type="button" variant="outline" onClick={() => fechar()}>Cancelar</Button>
                     <Button type="submit" isLoading={salvando} disabled={!alterado && !!editando}>{editando ? 'Salvar alterações' : 'Adicionar'}</Button>
                   </div>
