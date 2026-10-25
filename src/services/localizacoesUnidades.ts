@@ -36,7 +36,7 @@ export const LOCALIZACOES_UNIDADES: Record<string, LocalizacaoUnidade> = {
   "E. E. M. CHAPERÓ": { lat: -22.8032343, lng: -43.7789338, bairro: "Chaperó", endereco: "Rua Cinco, Chaperó", mapa_url: "https://maps.app.goo.gl/twNB9EQ2hdoeHP6P6" },
   "E. E. M. DRº JORGE ABRAHÃO": { lat: -22.8622688, lng: -43.8854982, bairro: "Mazomba", endereco: "Estrada do Mazomba, Mazomba", mapa_url: "https://maps.app.goo.gl/coupA8vE7vD4SeES8" },
   "E. E. M. FAZENDA SANTA CÂNDIDA": { lat: -22.8487804, lng: -43.8204122, bairro: "Santa Cândida", endereco: "Rua Guarani, Santa Cândida", mapa_url: "https://maps.app.goo.gl/G9hGaHcA5tuxVuzV8" },
-  "E. E. M. SANTA ROSA": { lat: -22.8065586, lng: -43.7423286, bairro: "Chaperó", endereco: "Estrada Santa Rosa, Chaperó", mapa_url: "https://maps.app.goo.gl/nSjEyEvdQ2zPXt4c7" },
+  "E. E. M. SANTA ROSA": { lat: -22.8065586, lng: -43.7423286, bairro: "Chaperó", endereco: "Estrada Santa Rosa, Chaperó", mapa_url: "https://maps.app.goo.gl/nSjEyEvdQ2zPXt4c7", foto_url: "https://streetviewpixels-pa.googleapis.com/v1/thumbnail?panoid=VBfc6YtI6Cbm7UFnELOjKg&cb_client=maps_sv.tactile&w=800&h=480&yaw=18.43039&pitch=-0.4266729&thumbfov=100" },
   "E. E. M. TACIANO BASILIO": { lat: -22.7395634, lng: -43.8141954, bairro: "Ibituporanga", endereco: "Ibituporanga", mapa_url: "https://maps.app.goo.gl/R4BknkXd1HSSSCBo8" },
   "E. M. ALEXANDRE IGNÁCIO": { lat: -22.759181, lng: -43.788868, bairro: "Ibituporanga", endereco: "Ibituporanga", mapa_url: "https://maps.app.goo.gl/hRYs3fDFMRbC8Kbz7" },
   "E. M. AMAURI FERREIRA": { lat: -22.8964446, lng: -43.8445906, bairro: "Somel", endereco: "Rua Joaquim Conde, Somel", mapa_url: "https://maps.app.goo.gl/K9CQfh5uLS3KsKnB7" },

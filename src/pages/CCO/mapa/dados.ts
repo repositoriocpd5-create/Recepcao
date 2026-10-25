@@ -118,10 +118,12 @@ export const distanciaKm = (a: { lat: number; lng: number }, b: { lat: number; l
 };
 
 /** Ordem de visita a partir da sede: sempre a unidade mais próxima ainda não visitada. */
-export function ordenarRota(paradas: UnidadeMapa[]): { ordem: UnidadeMapa[]; km: number } {
+export type Origem = { lat: number; lng: number };
+
+export function ordenarRota(paradas: UnidadeMapa[], origem: Origem = SEDE): { ordem: UnidadeMapa[]; km: number } {
   const restantes = [...paradas];
   const ordem: UnidadeMapa[] = [];
-  let atual: { lat: number; lng: number } = SEDE;
+  let atual: Origem = origem;
   let km = 0;
   while (restantes.length) {
     let melhor = 0;
@@ -146,8 +148,8 @@ export interface RotaPorRuas {
  * Rota de carro pelas ruas (OSRM, dados do OpenStreetMap): escolhe a melhor ordem de visita
  * saindo da sede e devolve o trajeto, a distância e o tempo estimado.
  */
-export async function buscarRotaPorRuas(paradas: UnidadeMapa[], sinal?: AbortSignal): Promise<RotaPorRuas> {
-  const pontos = [SEDE, ...paradas].map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
+export async function buscarRotaPorRuas(paradas: UnidadeMapa[], sinal?: AbortSignal, origem: Origem = SEDE): Promise<RotaPorRuas> {
+  const pontos = [origem, ...paradas].map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
   const url = `https://router.project-osrm.org/trip/v1/driving/${pontos}?source=first&roundtrip=false&geometries=geojson&overview=full`;
   const resposta = await fetch(url, { signal: sinal });
   if (!resposta.ok) throw new Error('Serviço de rotas indisponível.');
@@ -168,17 +170,17 @@ export async function buscarRotaPorRuas(paradas: UnidadeMapa[], sinal?: AbortSig
   };
 }
 
-/** "Como chegar" no Google Maps, da sede até uma unidade. */
-export const comoChegar = (u: UnidadeMapa) =>
-  `https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=${SEDE.lat},${SEDE.lng}&destination=${u.lat},${u.lng}`;
+/** "Como chegar" no Google Maps, da origem (sede ou posição do usuário) até uma unidade. */
+export const comoChegar = (u: UnidadeMapa, origem: Origem = SEDE) =>
+  `https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=${origem.lat},${origem.lng}&destination=${u.lat},${u.lng}`;
 
 /** Rota no Google Maps (carro), saindo da sede e terminando na última unidade. */
-export const linkGoogleMaps = (ordem: UnidadeMapa[]) => {
+export const linkGoogleMaps = (ordem: UnidadeMapa[], origem: Origem = SEDE) => {
   if (!ordem.length) return '';
   const ponto = (p: { lat: number; lng: number }) => `${p.lat},${p.lng}`;
   const destino = ordem[ordem.length - 1];
   const paradas = ordem.slice(0, -1).map(ponto).join('|');
-  return `https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=${ponto(SEDE)}&destination=${ponto(destino)}${paradas ? `&waypoints=${encodeURIComponent(paradas)}` : ''}`;
+  return `https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=${ponto(origem)}&destination=${ponto(destino)}${paradas ? `&waypoints=${encodeURIComponent(paradas)}` : ''}`;
 };
 
 /** Planilha (CSV para Excel) das unidades exibidas. */

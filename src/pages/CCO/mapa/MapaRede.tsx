@@ -9,6 +9,8 @@ interface Props {
   rota: UnidadeMapa[];
   /** Trajeto pelas ruas; sem ele, a rota aparece em linha reta tracejada. */
   trajeto?: [number, number][] | null;
+  /** Posição do usuário (quando a rota sai de onde ele está). */
+  minhaPosicao?: { lat: number; lng: number } | null;
   /** Unidades com ocorrência que acabou de chegar (anel animado no marcador). */
   destaques?: string[];
   onSelecionar: (id: string) => void;
@@ -53,7 +55,7 @@ const iconeSede = L.divIcon({
 });
 
 /** Mapa (Leaflet + OpenStreetMap/CARTO) com as unidades, a sede e a rota escolhida. */
-export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto, destaques = [], onSelecionar }) => {
+export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto, minhaPosicao, destaques = [], onSelecionar }) => {
   const caixa = useRef<HTMLDivElement>(null);
   const mapa = useRef<L.Map | null>(null);
   const camadaMarcadores = useRef<L.LayerGroup | null>(null);
@@ -180,9 +182,32 @@ export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto
       L.polyline(trajeto, { color: '#0b63ce', weight: 5, opacity: 0.95 }).addTo(camada);
       return;
     }
-    const pontos: [number, number][] = [[SEDE.lat, SEDE.lng], ...rota.map((u) => [u.lat, u.lng] as [number, number])];
+    const origem = minhaPosicao ?? SEDE;
+    const pontos: [number, number][] = [[origem.lat, origem.lng], ...rota.map((u) => [u.lat, u.lng] as [number, number])];
     L.polyline(pontos, { color: '#0b63ce', weight: 4, opacity: 0.6, dashArray: '8 8' }).addTo(camada);
-  }, [rota, trajeto]);
+  }, [rota, trajeto, minhaPosicao]);
+
+  // "Você está aqui": ponto azul pulsante na posição do usuário.
+  const marcadorEu = useRef<L.Marker | null>(null);
+  useEffect(() => {
+    const m = mapa.current;
+    if (!m) return;
+    marcadorEu.current?.remove();
+    marcadorEu.current = null;
+    if (!minhaPosicao) return;
+    marcadorEu.current = L.marker([minhaPosicao.lat, minhaPosicao.lng], {
+      icon: L.divIcon({
+        className: '',
+        html: '<span style="display:block;width:18px;height:18px;border-radius:9999px;background:#0b63ce;border:3px solid #fff;box-shadow:0 0 0 6px rgba(11,99,206,.25),0 2px 6px rgba(0,0,0,.4)"></span>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+      }),
+      zIndexOffset: 900,
+      keyboard: false,
+      title: 'Você está aqui',
+    }).bindTooltip('Você está aqui', { direction: 'top', offset: [0, -10] }).addTo(m);
+    return () => { marcadorEu.current?.remove(); marcadorEu.current = null; };
+  }, [minhaPosicao]);
 
   // Leva a unidade escolhida para o centro.
   useEffect(() => {

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowRight,
+  Bell,
   CheckCircle2,
   ClipboardList,
   Copy,
@@ -12,6 +13,7 @@ import {
   Lock,
   Pencil,
   Plus,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { perfilCco } from '@/lib/modulos';
@@ -26,6 +28,7 @@ import { Carregando, Cartao, IconeTitulo, SituacaoBadge, botaoPrimario, botaoSec
 import { Modal } from '@/components/ui/Modal';
 import { useDetalheNaUrl, useOcorrencias, useUnidade } from './hooks';
 import { PainelEquipe } from './PainelEquipe';
+import { tocarSomAlerta, useTempoRealCco } from './tempoReal';
 
 const SemUnidade: React.FC = () => (
   <Cartao className="flex items-start gap-3 p-5">
@@ -120,6 +123,25 @@ const InicioUnidade: React.FC<{ user: UserProfile }> = ({ user }) => {
     ? (emEdicao.data ? motivoSemEdicao(user, emEdicao.data) : 'Ocorrência não encontrada.')
     : null;
 
+  // Aviso de atualização pelo administrador: toast + som.
+  const [toastAtualizacao, setToastAtualizacao] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toastAtualizacao) return;
+    const t = window.setTimeout(() => setToastAtualizacao(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [toastAtualizacao]);
+
+  const aoAtualizada = useCallback((oc: CcoOcorrencia) => {
+    // Só interessa se a ocorrência pertence a esta unidade.
+    if (oc.unidade_id !== user.unidade_id) return;
+    tocarSomAlerta('atualizacao');
+    setToastAtualizacao(
+      `A ocorrência ${oc.protocolo} foi atualizada pelo administrador. Abra para ver o histórico.`,
+    );
+  }, [user.unidade_id]);
+
+  useTempoRealCco(undefined, aoAtualizada);
+
   return (
     <div className="space-y-5">
       <CabecalhoCco
@@ -208,6 +230,26 @@ const InicioUnidade: React.FC<{ user: UserProfile }> = ({ user }) => {
         }}
       />
       <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user} onFechar={detalhe.fechar} />
+
+      {/* Toast: administrador atualizou uma ocorrencia da unidade */}
+      {toastAtualizacao && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed bottom-24 left-1/2 z-[70] flex w-[calc(100%-32px)] max-w-md -translate-x-1/2 items-center gap-3 rounded-2xl bg-[#0d2240] px-4 py-3 text-sm font-semibold text-white shadow-xl md:bottom-6 dark:bg-slate-800"
+        >
+          <Bell className="h-5 w-5 shrink-0 text-sky-400" aria-hidden="true" />
+          <span className="flex-1">{toastAtualizacao}</span>
+          <button
+            type="button"
+            onClick={() => setToastAtualizacao(null)}
+            aria-label="Fechar aviso"
+            className="grid h-8 w-8 place-items-center rounded-lg hover:bg-white/10"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

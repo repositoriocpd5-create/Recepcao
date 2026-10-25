@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,14 +13,33 @@ export interface ModalProps {
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '5xl' | '6xl';
   /** 'destaque': cabeçalho azul-escuro de largura total, usado na identificação de pessoas. */
   variant?: 'padrao' | 'destaque';
+  /** Contêiner para o portal do modal (padrão: elemento em tela cheia ativo ou document.body). */
+  container?: HTMLElement | null;
 }
 
 // Pilha de modais abertos: só o do topo responde ao Esc, e a rolagem da página
 // fica travada enquanto houver algum modal aberto.
 const openModals: string[] = [];
 
+const getFullscreenElement = (): HTMLElement | null => {
+  if (typeof document === 'undefined') return null;
+  const fs =
+    document.fullscreenElement ||
+    (document as any).webkitFullscreenElement ||
+    (document as any).mozFullScreenElement ||
+    (document as any).msFullscreenElement;
+  return fs instanceof HTMLElement ? fs : null;
+};
+
 const syncBodyScroll = () => {
-  document.body.style.overflow = openModals.length ? 'hidden' : '';
+  const travado = openModals.length > 0;
+  if (typeof document !== 'undefined') {
+    document.body.style.overflow = travado ? 'hidden' : '';
+    const fs = getFullscreenElement();
+    if (fs) {
+      fs.style.overflow = travado ? 'hidden' : '';
+    }
+  }
 };
 
 export const Modal: React.FC<ModalProps> = ({
@@ -32,10 +51,29 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 'lg',
   variant = 'padrao',
+  container,
 }) => {
   const modalId = useId();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+
+  const [fullscreenEl, setFullscreenEl] = useState<HTMLElement | null>(() => getFullscreenElement());
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setFullscreenEl(getFullscreenElement());
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -55,6 +93,9 @@ export const Modal: React.FC<ModalProps> = ({
 
   if (!isOpen) return null;
 
+  const portalTarget = container || fullscreenEl || (typeof document !== 'undefined' ? document.body : null);
+  if (!portalTarget) return null;
+
   const maxWidths = {
     sm: 'max-w-sm',
     md: 'max-w-md',
@@ -68,7 +109,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   if (variant === 'destaque') {
     return createPortal(
-      <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ paddingBottom: 'var(--keyboard-inset, 0px)' }}>
+      <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[1200] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ paddingBottom: 'var(--keyboard-inset, 0px)' }}>
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={onClose} />
         <div
           className={cn(
@@ -105,12 +146,12 @@ export const Modal: React.FC<ModalProps> = ({
           <div className="relative -mt-4 flex-1 overflow-y-auto rounded-t-3xl bg-white dark:bg-[#121826]">{children}</div>
         </div>
       </div>,
-      document.body,
+      portalTarget,
     );
   }
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ paddingBottom: 'var(--keyboard-inset, 0px)' }}>
+    <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[1200] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ paddingBottom: 'var(--keyboard-inset, 0px)' }}>
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
@@ -149,6 +190,6 @@ export const Modal: React.FC<ModalProps> = ({
         <div className="py-4 overflow-y-auto flex-1 sm:py-3">{children}</div>
       </div>
     </div>,
-    document.body,
+    portalTarget,
   );
 };

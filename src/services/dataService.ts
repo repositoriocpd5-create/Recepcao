@@ -13,6 +13,7 @@ import {
   UserProfile,
   Cracha,
   CrachaStatus,
+  CrachaModelo,
   ServidorSetorVinculo,
   RamalUnidade,
   RamalContato,
@@ -43,6 +44,7 @@ const STORAGE_KEYS = {
   AGENDAMENTOS: 'sme_agendamentos',
   AUDITORIA: 'sme_auditoria',
   CRACHAS: 'smedu_crachas',
+  CRACHA_MODELO: 'smedu_cracha_modelo',
   SERVIDOR_SETOR_VINCULOS: 'sme_servidor_setor_vinculos',
   USUARIOS: 'sme_admin_users',
   RAMAIS_UNIDADES: 'sme_ramais_unidades',
@@ -246,6 +248,16 @@ export const dataService = {
       .filter((u) => u.ativo);
   },
 
+  /** Todas as unidades e departamentos, inclusive as removidas da lista de ramais (tela de cadastro). */
+  async getUnidadesCadastro(): Promise<RamalUnidade[]> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('ramais_unidades').select('*').order('nome');
+      const lista = requireLiveResult(data, error, 'Não foi possível carregar as unidades') as Partial<RamalUnidade>[];
+      return lista.map(normalizarRamalUnidade);
+    }
+    return getStorage<Partial<RamalUnidade>[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS).map(normalizarRamalUnidade);
+  },
+
   async salvarRamalUnidade(unidade: Partial<RamalUnidade>): Promise<RamalUnidade> {
     const dados: Partial<RamalUnidade> = { ...unidade };
     if (unidade.ramais) {
@@ -265,6 +277,9 @@ export const dataService = {
         return query.select('*').single();
       };
       let { data, error } = await gravar(campos);
+      if (error && /(diretor|vice_diretor|diretor_servidor_id|vice_servidor_id|email|telefone|cep|observacoes)/.test(error.message) && /column|coluna|schema cache/i.test(error.message)) {
+        throw new Error('O banco ainda não tem os novos campos do cadastro. Execute a migrações 20261024100000_unidades_cadastro_completo.sql e 20261024120000_unidade_diretor_vinculo.sql no Supabase.');
+      }
       const semColuna = !!error && /ramais/.test(error.message) && /column|coluna|schema cache/i.test(error.message);
       // Banco sem a migração 20261020140000: um único ramal ainda cabe na coluna ramal.
       if (semColuna && (dados.ramais?.length ?? 0) <= 1) {
@@ -453,6 +468,28 @@ export const dataService = {
       return requireLiveResult(data, error, 'Não foi possível carregar crachás') as Cracha[];
     }
     return getStorage<Cracha[]>(STORAGE_KEYS.CRACHAS, []);
+  },
+
+  /** Modelo visual dos crachás; null quando ainda não foi personalizado. */
+  async getCrachaModelo(): Promise<Partial<CrachaModelo> | null> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('cracha_modelo').select('config').eq('id', 1).maybeSingle();
+      if (!error) return (data?.config as Partial<CrachaModelo> | undefined) ?? null;
+    }
+    return getStorage<Partial<CrachaModelo> | null>(STORAGE_KEYS.CRACHA_MODELO, null);
+  },
+
+  async salvarCrachaModelo(modelo: CrachaModelo): Promise<void> {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('cracha_modelo').upsert({ id: 1, config: modelo, updated_at: new Date().toISOString() });
+      if (error) {
+        throw new Error(/relation|does not exist|schema cache/i.test(error.message)
+          ? 'O banco ainda não tem a tabela do modelo de crachá. Execute a migração 20261024110000_cracha_modelo.sql no Supabase.'
+          : `Não foi possível salvar o modelo: ${error.message}`);
+      }
+      return;
+    }
+    setStorage(STORAGE_KEYS.CRACHA_MODELO, modelo);
   },
 
   async salvarCracha(cracha: Partial<Cracha>): Promise<Cracha> {

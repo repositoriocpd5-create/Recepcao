@@ -18,6 +18,7 @@ import { AdministracaoPage } from '@/pages/Administracao';
 import { CrachasPage } from '@/pages/Crachas';
 import { ManualPage } from '@/pages/Manual';
 import { RamaisPage } from '@/pages/Ramais';
+import { UnidadesPage } from '@/pages/Unidades';
 import { CcoAjudaPage, CcoInicioPage, CcoOcorrenciasPage } from '@/pages/CCO';
 import { EscolherModuloPage } from '@/pages/EscolherModulo';
 import { MapaRedePage } from '@/pages/CCO/mapa';
@@ -107,6 +108,7 @@ export const AppRoutes: React.FC = () => {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="movimentacoes" element={<MovimentacoesPage />} />
           <Route path="ramais" element={<RamaisPage />} />
+          <Route path="unidades" element={<ProtectedRoute requiredRole="admin"><UnidadesPage /></ProtectedRoute>} />
           <Route path="visitantes" element={<VisitantesPage />} />
           <Route path="servidores" element={<ServidoresPage />} />
           <Route path="autorizacoes" element={<AutorizacoesPage />} />
@@ -133,6 +135,7 @@ export const AppRoutes: React.FC = () => {
           <Route path="ocorrencias" element={<CcoOcorrenciasPage />} />
           <Route path="ajuda" element={<CcoAjudaPage />} />
           <Route path="mapa" element={<ProtectedRoute requiredRole="cco_admin"><MapaRedePage /></ProtectedRoute>} />
+          <Route path="unidades" element={<ProtectedRoute requiredRole="admin"><UnidadesPage /></ProtectedRoute>} />
           <Route path="log" element={<ProtectedRoute requiredRole="cco_admin"><LogDoCco /></ProtectedRoute>} />
           {/* Mesmas telas da administração, sem sair do módulo CCO. */}
           <Route path="usuarios" element={<ProtectedRoute requiredRole="admin"><AdministracaoPage /></ProtectedRoute>} />

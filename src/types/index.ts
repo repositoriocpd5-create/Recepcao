@@ -84,6 +84,18 @@ export interface RamalUnidade {
   bairro?: string | null;
   endereco?: string | null;
   mapa_url?: string | null;
+  foto_url?: string | null;
+  /** Diretor(a) da escola ou responsável pelo departamento. */
+  diretor?: string | null;
+  /** Vice-diretor(a) ou substituto(a) do responsável. */
+  vice_diretor?: string | null;
+  /** Servidor do Quadro da SMEDU vinculado como diretor(a) / vice. */
+  diretor_servidor_id?: string | null;
+  vice_servidor_id?: string | null;
+  email?: string | null;
+  telefone?: string | null;
+  cep?: string | null;
+  observacoes?: string | null;
 }
 
 export interface LocalizacaoUnidade {
@@ -92,6 +104,7 @@ export interface LocalizacaoUnidade {
   bairro: string | null;
   endereco: string | null;
   mapa_url: string | null;
+  foto_url?: string | null;
 }
 
 export interface ServidorSetorVinculo {
@@ -217,6 +230,30 @@ export interface Cracha {
   ativo: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+/** Aparência e numeração dos crachás impressos (editável pelo administrador). */
+export interface CrachaModelo {
+  /** Imagem da logo em data URL; vazio = brasão padrão. */
+  logo: string | null;
+  linha1: string;
+  linha2: string;
+  /** Palavra em destaque na faixa (ex.: VISITANTE). */
+  rotulo: string;
+  corPrimaria: string;
+  corSecundaria: string;
+  /** O código de barras é prefixo + número (com zeros à esquerda): termina sempre no número do crachá. */
+  prefixo: string;
+  digitosNumero: number;
+  mostrarNumero: boolean;
+  /** Chaves de FONTES (ver pages/Crachas/modelo.ts) e tamanhos em % do padrão. */
+  fonteTexto: string;
+  fonteFaixa: string;
+  tamTexto: number;
+  tamFaixa: number;
+  tamCodigo: number;
+  textoApresente: string;
+  textoDevolva: string;
 }
 
 export interface AtribuicaoCracha {

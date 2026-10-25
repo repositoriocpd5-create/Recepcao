@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Map as MapIcon, FileText, HelpCircle, BadgeCheck, BookOpen, Briefcase, Building2, Calendar, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Home, LayoutDashboard, MoreHorizontal, ShieldCheck, Users, ArrowRightLeft, Phone, X } from 'lucide-react';
+import { Map as MapIcon, FileText, HelpCircle, BadgeCheck, BookOpen, Briefcase, Building2, Calendar, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Home, LayoutDashboard, MoreHorizontal, ShieldCheck, Users, ArrowRightLeft, Phone, School, X } from 'lucide-react';
 import { isInstallAvailable, openInstallSheet, usePwa } from '@/pwa/pwa';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTecladoVirtual } from '@/hooks/useTecladoVirtual';
@@ -40,6 +40,7 @@ export const MobileBottomNav = () => {
     ...(user?.role === 'admin' ? [{ label: 'Agendamentos', path: '/agendamentos', icon: Calendar, tom: TONS.ambar }] : []),
     { label: 'Crachás', path: '/crachas', icon: BadgeCheck, tom: TONS.ciano },
     ...(user?.role === 'admin' ? [{ label: 'Log do sistema', path: '/log-do-sistema', icon: FileSpreadsheet, tom: TONS.violeta }] : []),
+    ...(user?.role === 'admin' ? [{ label: 'Cadastro de unidades', path: '/unidades', icon: School, tom: TONS.verde }] : []),
     { label: 'Departamentos & Setores', path: '/departamentos', icon: Building2, tom: TONS.azul },
     ...(user?.role === 'admin' ? [{ label: 'Administração', path: '/administracao', icon: ShieldCheck, tom: TONS.rosa }] : []),
     { label: 'Manual de Uso', path: '/manual', icon: BookOpen, tom: TONS.cinza },
@@ -73,6 +74,7 @@ export const MobileBottomNav = () => {
       ...(user?.role === 'admin'
         ? [
             { label: 'Mapa', path: '/cco/mapa', icon: MapIcon, end: false },
+            { label: 'Unidades', path: '/cco/unidades', icon: School, end: false },
             { label: 'Usuários', path: '/cco/usuarios', icon: ShieldCheck, end: false },
             { label: 'Log', path: '/cco/log', icon: FileSpreadsheet, end: false },
           ]

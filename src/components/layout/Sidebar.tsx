@@ -22,6 +22,7 @@ import {
   HelpCircle,
   ScrollText,
   Map as MapIcon,
+  School,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserAvatar } from '@/components/ui/UserAvatar';
@@ -82,7 +83,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
     ...(user?.role === 'admin' ? [{ name: 'Log do sistema', path: '/log-do-sistema', icon: ScrollText }] : []),
     { name: 'Departamentos & Setores', path: '/departamentos', icon: Building2 },
     ...(user?.role === 'admin'
-      ? [{ name: 'Administração', path: '/administracao', icon: ShieldCheck }]
+      ? [{ name: 'Cadastro de unidades', path: '/unidades', icon: School }, { name: 'Administração', path: '/administracao', icon: ShieldCheck }]
       : []),
   ];
 
@@ -103,6 +104,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
           seta: true,
           itens: [
             { name: 'Mapa', path: '/cco/mapa', icon: MapIcon },
+            { name: 'Cadastro de unidades', path: '/cco/unidades', icon: School },
             { name: 'Usuários e unidades', path: '/cco/usuarios', icon: ShieldCheck },
             { name: 'Log do sistema', path: '/cco/log', icon: ScrollText },
           ],

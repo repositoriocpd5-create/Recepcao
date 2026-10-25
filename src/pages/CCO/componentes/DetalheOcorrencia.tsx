@@ -26,6 +26,9 @@ import {
   ChevronDown,
   MapPin,
   ExternalLink,
+  Camera,
+  Maximize2,
+  Navigation,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
@@ -87,6 +90,143 @@ const UnidadeComEndereco: React.FC<{ oc: CcoOcorrencia }> = ({ oc }) => {
     </span>
   );
 };
+
+/**
+ * Exibe a imagem da fachada da escola obtida via Google Street View (ou cadastro).
+ * Inclui badges com gradiente e glassmorphism, indicador do Street View, link para abrir no Maps,
+ * e suporte a ampliação em modal em alta resolução.
+ */
+const FotoFachadaUnidade: React.FC<{ oc: CcoOcorrencia }> = ({ oc }) => {
+  const unidade = useUnidade(oc.unidade_id);
+  const padrao = LOCALIZACOES_UNIDADES[unidade.data?.nome ?? oc.unidade_nome];
+  const fotoUrl = unidade.data?.foto_url ?? padrao?.foto_url ?? null;
+  const bairro = unidade.data?.bairro ?? padrao?.bairro ?? null;
+  const endereco = unidade.data?.endereco ?? padrao?.endereco ?? null;
+  const lat = unidade.data?.latitude ?? padrao?.lat;
+  const lng = unidade.data?.longitude ?? padrao?.lng;
+  const link = unidade.data?.mapa_url ?? padrao?.mapa_url ?? (lat != null && lng != null ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}` : null);
+
+  const [ampliada, setAmpliada] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+  const [falha, setFalha] = useState(false);
+
+  if (!fotoUrl || falha) return null;
+
+  return (
+    <>
+      <section
+        aria-label="Fachada da unidade escolar"
+        className="group relative overflow-hidden rounded-2xl border border-[#cfe0f5] bg-[#0c1a30] shadow-[0_12px_28px_-16px_rgba(16,48,96,0.35)] transition-all hover:border-[#9fc3ec] dark:border-slate-800 dark:bg-[#0b101c]"
+      >
+        <div className="relative aspect-[16/7.5] w-full overflow-hidden sm:aspect-[21/8.5]">
+          {carregando && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+              <Loader2 className="h-6 w-6 animate-spin text-sky-400" />
+            </div>
+          )}
+          <img
+            src={fotoUrl}
+            alt={`Fachada da escola ${oc.unidade_nome}`}
+            onLoad={() => setCarregando(false)}
+            onError={() => { setCarregando(false); setFalha(true); }}
+            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+          />
+
+          {/* Gradiente escuro para legibilidade */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/40" />
+
+          {/* Barra superior de informações e ações */}
+          <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-md">
+              <Camera className="h-3 w-3 text-sky-400" aria-hidden="true" />
+              Fachada escolar · Google Street View
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setAmpliada(true)}
+                title="Ampliar visualização da fachada"
+                className="grid h-7 w-7 place-items-center rounded-lg border border-white/20 bg-black/60 text-white backdrop-blur-md transition-colors hover:bg-black/90 hover:text-sky-300"
+              >
+                <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="sr-only">Ampliar imagem</span>
+              </button>
+              {link && (
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Abrir no Google Maps"
+                  className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/20 bg-[#0b63ce]/90 px-2.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-md transition-colors hover:bg-[#0b63ce]"
+                >
+                  <Navigation className="h-3 w-3" aria-hidden="true" />
+                  Ver no Maps
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Barra inferior: Nome e endereço com clique para ampliar */}
+          <button
+            type="button"
+            onClick={() => setAmpliada(true)}
+            className="absolute inset-x-0 bottom-0 block p-3.5 text-left transition-opacity hover:opacity-95"
+          >
+            <p className="text-[11px] font-extrabold uppercase tracking-wider text-sky-300 drop-shadow">
+              Unidade Escolar
+            </p>
+            <p className="text-base font-extrabold leading-tight text-white drop-shadow-md sm:text-lg">
+              {oc.unidade_nome}
+            </p>
+            {(endereco || bairro) && (
+              <p className="mt-0.5 line-clamp-1 text-xs text-slate-200/90 drop-shadow">
+                {endereco || `${bairro}, Itaguaí - RJ`}
+              </p>
+            )}
+          </button>
+        </div>
+      </section>
+
+      {/* Modal de ampliação em tela cheia com alta resolução */}
+      <Modal
+        isOpen={ampliada}
+        onClose={() => setAmpliada(false)}
+        title={`Fachada · ${oc.unidade_nome}`}
+        description={endereco || (bairro ? `${bairro}, Itaguaí - RJ` : 'Itaguaí - RJ')}
+        maxWidth="5xl"
+        icon={<Building2 className="h-6 w-6 text-[#0b63ce]" />}
+      >
+        <div className="space-y-3">
+          <div className="relative overflow-hidden rounded-2xl border border-[#cfe0f5] bg-black dark:border-slate-800">
+            <img
+              src={fotoUrl}
+              alt={`Fachada da escola ${oc.unidade_nome}`}
+              className="max-h-[75vh] w-full object-contain"
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <span className="flex items-center gap-1.5 text-xs text-[#5f7391] dark:text-slate-400">
+              <Camera className="h-4 w-4 text-[#0b63ce]" aria-hidden="true" />
+              Imagem capturada pelo Google Street View
+            </span>
+            {link && (
+              <a
+                href={link}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0b63ce] underline underline-offset-2 hover:text-[#094ca0] dark:text-sky-300"
+              >
+                Explorar arredores no Google Maps <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+            )}
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
+};
+
 
 interface Props {
   ocorrenciaId: string | null;
@@ -418,6 +558,8 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
               </div>
             </section>
           )}
+
+          <FotoFachadaUnidade oc={oc} />
 
           <dl className="grid grid-cols-1 gap-3 rounded-2xl border border-[#e2eaf4] p-3 sm:grid-cols-3 dark:border-slate-800">
             <Dado icone={CalendarDays} rotulo="Data da ocorrência">{formatarData(oc.data_ocorrencia)}</Dado>
