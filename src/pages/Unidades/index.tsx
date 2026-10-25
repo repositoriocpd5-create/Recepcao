@@ -57,6 +57,9 @@ interface Formulario {
   ativo: boolean;
 }
 
+/** Marca de que o departamento não tem o segundo diretor (conta como informado no percentual). */
+const SEM_DIRETOR_2 = 'NÃO EXISTE';
+
 const FORM_NOVO: Formulario = {
   nome: '', tipo: 'unidade_escolar', categoria: 'Escolas Municipais', lotacao: '', diretor: '', vice_diretor: '', diretor_servidor_id: null, vice_servidor_id: null,
   ramais: [{ numero: '', descricao: '' }], telefone: '', email: '', endereco: '', bairro: '', cep: '',
@@ -107,6 +110,7 @@ function completude(u: RamalUnidade) {
     !!u.email?.trim(),
     !!(u.endereco || padrao?.endereco),
     (u.latitude ?? padrao?.lat) != null,
+    ...(u.tipo === 'departamento' ? [!!u.vice_diretor?.trim()] : []),
   ];
   return Math.round((itens.filter(Boolean).length / itens.length) * 100);
 }
@@ -536,8 +540,22 @@ export const UnidadesPage: React.FC = () => {
                     Dirigente Escolar desta unidade no Quadro de Servidores. Salve para confirmar o vínculo.
                   </p>
                 )}
-                <ComboServidor label={rotuloVice} nome={form.vice_diretor} servidorId={form.vice_servidor_id} opcoes={opcoes} carregando={carregando}
-                  onChange={(nome, id) => setForm((f) => ({ ...f, vice_diretor: nome, vice_servidor_id: id }))} />
+                {!ehEscola && form.vice_diretor === SEM_DIRETOR_2 ? (
+                  <div>
+                    <Rotulo>{rotuloVice}</Rotulo>
+                    <p className="mt-1 rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-[#3d5170] dark:bg-slate-800 dark:text-slate-200">Não existe</p>
+                  </div>
+                ) : (
+                  <ComboServidor label={rotuloVice} nome={form.vice_diretor} servidorId={form.vice_servidor_id} opcoes={opcoes} carregando={carregando}
+                    onChange={(nome, id) => setForm((f) => ({ ...f, vice_diretor: nome, vice_servidor_id: id }))} />
+                )}
+                {!ehEscola && (
+                  <label className="flex items-center gap-2 text-sm font-semibold text-[#3d5170] dark:text-slate-200">
+                    <input type="checkbox" className="h-4 w-4 rounded border-slate-300" checked={form.vice_diretor === SEM_DIRETOR_2}
+                      onChange={(e) => setForm((f) => ({ ...f, vice_diretor: e.target.checked ? SEM_DIRETOR_2 : '', vice_servidor_id: null }))} />
+                    Não existe segundo diretor
+                  </label>
+                )}
               </Secao>
 
               <Secao icone={<Phone className="h-5 w-5" />} titulo="Contatos" dica="Ramais internos, telefone externo e e-mail.">
