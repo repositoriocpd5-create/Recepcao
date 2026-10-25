@@ -315,6 +315,24 @@ export const dataService = {
     return nova;
   },
 
+  async excluirRamalUnidade(id: string, operador?: UserProfile | null): Promise<void> {
+    if (operador?.role !== 'admin') {
+      throw new Error('Apenas administradores podem excluir unidades.');
+    }
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('ramais_unidades').delete().eq('id', id).select('id');
+      if (error) {
+        throw new Error(/foreign key|violates/i.test(error.message)
+          ? 'Esta unidade possui registros vinculados (ocorrências). Desative-a em vez de excluir.'
+          : `Não foi possível excluir a unidade: ${error.message}`);
+      }
+      if (!data?.length) throw new Error('Não foi possível excluir: sem permissão ou unidade não encontrada.');
+      return;
+    }
+    const lista = getStorage<Partial<RamalUnidade>[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS);
+    setStorage(STORAGE_KEYS.RAMAIS_UNIDADES, lista.filter((item) => item.id !== id));
+  },
+
   async getServidorSetorVinculos(): Promise<ServidorSetorVinculo[]> {
     if (isSupabaseConfigured) {
       const { data, error } = await supabase.from('servidor_setor_vinculos').select('servidor_id, setor_id, requer_autorizacao');

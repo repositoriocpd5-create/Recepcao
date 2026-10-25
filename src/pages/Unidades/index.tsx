@@ -14,9 +14,11 @@ import {
   RefreshCw,
   School,
   Search,
+  Trash2,
   UserRound,
   X,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -27,7 +29,36 @@ import { RamalContato, RamalUnidade, RamalUnidadeTipo, Servidor } from '@/types'
 import { ComboServidor, OpcaoServidor, ehDirigenteEscolar, lotadoNaUnidade } from './ComboServidor';
 import { cn } from '@/lib/utils';
 
-type Aba = 'todas' | 'unidade_escolar' | 'departamento' | 'inativas';
+type Aba = 'todas' | 'unidade_escolar' | 'departamento' | 'creche' | 'ciep' | 'emei' | 'inativas';
+
+// Subtipos de escola reconhecidos pelo início do nome: "CRECHE M. …", "CIEP …" e "E. M. E. I. …".
+// Miniatura da fachada no card; se a imagem falhar, volta ao ícone de escola.
+const FotoUnidade: React.FC<{ url: string; nome: string }> = ({ url, nome }) => {
+  const [erro, setErro] = useState(false);
+  if (erro) {
+    return (
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300" aria-hidden="true">
+        <School className="h-5 w-5" />
+      </span>
+    );
+  }
+  return <img src={url} alt={`Fachada de ${nome}`} loading="lazy" onError={() => setErro(true)} className="h-12 w-12 shrink-0 rounded-xl border border-[#e2eaf4] object-cover dark:border-slate-700" />;
+};
+
+// Foto grande exibida no balão ao passar o mouse; some se a imagem falhar.
+const PreviaFoto: React.FC<{ url: string; nome: string }> = ({ url, nome }) => {
+  const [erro, setErro] = useState(false);
+  if (erro) return null;
+  return <img src={url} alt={`Fachada de ${nome}`} loading="lazy" onError={() => setErro(true)} className="h-40 w-full object-cover" />;
+};
+
+// As siglas precisam terminar em fronteira de palavra: "E. M. EIDER RIBEIRO" não é EMEI.
+const SUBTIPOS: Record<'creche' | 'ciep' | 'emei', (nome: string) => boolean> = {
+  creche: (n) => /^CRECHE\s+M\b/i.test(n.trim()),
+  ciep: (n) => /^CIEP\b/i.test(n.trim()),
+  emei: (n) => /^E\.?\s*M\.?\s*E\.?\s*I\b/i.test(n.trim()),
+};
+const ehSubtipo = (u: RamalUnidade, aba: Aba) => aba in SUBTIPOS && u.tipo === 'unidade_escolar' && SUBTIPOS[aba as keyof typeof SUBTIPOS](u.nome);
 
 const normalizar = (texto: string) =>
   texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -158,6 +189,10 @@ export const UnidadesPage: React.FC = () => {
   const [salvando, setSalvando] = useState(false);
   const [confirmarSaida, setConfirmarSaida] = useState(false);
   const [fotoComErro, setFotoComErro] = useState(false);
+  const { user } = useAuth();
+  const ehAdmin = user?.role === 'admin';
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const primeiroCampo = useRef<HTMLInputElement>(null);
 
   const carregar = useCallback(async () => {
@@ -214,6 +249,9 @@ export const UnidadesPage: React.FC = () => {
     total: ativas.length,
     escolas: ativas.filter((u) => u.tipo === 'unidade_escolar').length,
     departamentos: ativas.filter((u) => u.tipo === 'departamento').length,
+    creches: ativas.filter((u) => ehSubtipo(u, 'creche')).length,
+    cieps: ativas.filter((u) => ehSubtipo(u, 'ciep')).length,
+    emeis: ativas.filter((u) => ehSubtipo(u, 'emei')).length,
     semDiretor: ativas.filter((u) => !u.diretor?.trim()).length,
     inativas: unidades.length - ativas.length,
   }), [unidades, ativas]);
@@ -222,7 +260,7 @@ export const UnidadesPage: React.FC = () => {
   const filtradas = useMemo(() => {
     const ordem = (c: string) => { const i = ORDEM_CATEGORIAS.indexOf(c); return i < 0 ? ORDEM_CATEGORIAS.length : i; };
     return unidades
-      .filter((u) => (aba === 'inativas' ? !u.ativo : u.ativo && (aba === 'todas' || u.tipo === aba)))
+      .filter((u) => (aba === 'inativas' ? !u.ativo : u.ativo && (aba === 'todas' || u.tipo === aba || ehSubtipo(u, aba))))
       .filter((u) => !categoria || u.categoria === categoria)
       .filter((u) => !soSemDiretor || !u.diretor?.trim())
       .filter((u) => {
@@ -253,6 +291,7 @@ export const UnidadesPage: React.FC = () => {
     setOriginal(JSON.stringify(u ? formularioDe(u) : f));
     setErroForm('');
     setConfirmarSaida(false);
+    setConfirmarExclusao(false);
     setFotoComErro(false);
     setAberto(true);
   };
@@ -323,6 +362,22 @@ export const UnidadesPage: React.FC = () => {
       setErroForm(/duplicate|unique/i.test(msg) ? 'Já existe uma unidade com este nome.' : msg);
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const excluir = async () => {
+    if (!editando) return;
+    setExcluindo(true);
+    try {
+      await dataService.excluirRamalUnidade(editando.id, user);
+      setUnidades((lista) => lista.filter((u) => u.id !== editando.id));
+      setAviso({ tipo: 'sucesso', texto: `"${editando.nome}" excluída.` });
+      fechar(true);
+    } catch (err) {
+      setConfirmarExclusao(false);
+      setErroForm(err instanceof Error ? err.message : 'Não foi possível excluir a unidade.');
+    } finally {
+      setExcluindo(false);
     }
   };
 
@@ -409,6 +464,9 @@ export const UnidadesPage: React.FC = () => {
           {([
             ['todas', 'Todas', resumo.total],
             ['unidade_escolar', 'Escolas', resumo.escolas],
+            ['creche', 'Creches', resumo.creches],
+            ['ciep', 'CIEP', resumo.cieps],
+            ['emei', 'EMEI', resumo.emeis],
             ['departamento', 'Departamentos', resumo.departamentos],
             ['inativas', 'Inativas', resumo.inativas],
           ] as [Aba, string, number][]).map(([valor, rotulo, total]) => (
@@ -446,14 +504,18 @@ export const UnidadesPage: React.FC = () => {
               const pct = completude(u);
               const depto = u.tipo === 'departamento';
               return (
-                <li key={u.id}>
+                <li key={u.id} className="group/card relative">
                   <button type="button" onClick={() => abrir(u)} aria-label={`Editar ${u.nome}`}
                     className={cn('group flex h-full w-full flex-col gap-3 rounded-2xl border bg-white p-4 text-left shadow-[0_10px_30px_-24px_rgba(16,48,96,.5)] transition hover:-translate-y-0.5 hover:border-[#9fc9ed] hover:shadow-[0_18px_34px_-22px_rgba(16,48,96,.55)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:bg-[#121826]',
                       u.ativo ? 'border-[#e2eaf4] dark:border-slate-800' : 'border-dashed border-[#cfdbea] opacity-80 dark:border-slate-700')}>
                     <div className="flex items-start gap-3">
-                      <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', depto ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300')} aria-hidden="true">
-                        {depto ? <Building2 className="h-5 w-5" /> : <School className="h-5 w-5" />}
-                      </span>
+                      {!depto && u.foto_url?.trim()
+                        ? <FotoUnidade url={u.foto_url.trim()} nome={u.nome} />
+                        : (
+                          <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', depto ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300')} aria-hidden="true">
+                            {depto ? <Building2 className="h-5 w-5" /> : <School className="h-5 w-5" />}
+                          </span>
+                        )}
                       <div className="min-w-0 flex-1">
                         <h2 className="line-clamp-2 text-[14px] font-extrabold leading-snug text-[#0d2240] dark:text-slate-100">{u.nome}</h2>
                         <p className="mt-0.5 truncate text-xs text-[#5f7391] dark:text-slate-400">{u.categoria}{u.bairro ? ` · ${u.bairro}` : ''}</p>
@@ -480,6 +542,24 @@ export const UnidadesPage: React.FC = () => {
                       {!u.ativo && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600 dark:bg-slate-700 dark:text-slate-300">Inativa</span>}
                     </div>
                   </button>
+                  {!depto && (
+                    <div role="tooltip" className="pointer-events-none invisible absolute left-1/2 top-full z-30 mt-2 hidden w-72 -translate-x-1/2 translate-y-1 overflow-hidden rounded-2xl border border-[#d5e2f2] bg-white opacity-0 shadow-[0_24px_50px_-18px_rgba(8,43,87,.55)] transition duration-150 group-hover/card:visible group-hover/card:translate-y-0 group-hover/card:opacity-100 group-focus-within/card:visible group-focus-within/card:translate-y-0 group-focus-within/card:opacity-100 dark:border-slate-700 dark:bg-[#121826] md:block">
+                      {u.foto_url?.trim() && <PreviaFoto url={u.foto_url.trim()} nome={u.nome} />}
+                      <div className="space-y-2 p-3 text-[13px]">
+                        <p className="font-extrabold leading-snug text-[#0d2240] dark:text-slate-100">{u.nome}</p>
+                        <div>
+                          <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#6b7f9b]">Diretor(a)</p>
+                          <p className="font-semibold text-[#10233f] dark:text-slate-200">{u.diretor?.trim() || 'Não informado'}</p>
+                        </div>
+                        {u.vice_diretor?.trim() && (
+                          <div>
+                            <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#6b7f9b]">Diretor(a) Adjunto(a)</p>
+                            <p className="font-semibold text-[#10233f] dark:text-slate-200">{u.vice_diretor}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -623,7 +703,15 @@ export const UnidadesPage: React.FC = () => {
 
             <footer className="shrink-0 border-t border-[#e2eaf4] bg-white px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 dark:border-slate-800 dark:bg-[#121826] sm:px-6">
               {erroForm && <p role="alert" className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{erroForm}</p>}
-              {confirmarSaida ? (
+              {confirmarExclusao && editando ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm font-semibold text-[#0d2240] dark:text-slate-100">Excluir "{editando.nome}" definitivamente? Esta ação não pode ser desfeita.</p>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => setConfirmarExclusao(false)} disabled={excluindo}>Cancelar</Button>
+                    <Button type="button" variant="danger" isLoading={excluindo} onClick={() => void excluir()}>Excluir</Button>
+                  </div>
+                </div>
+              ) : confirmarSaida ? (
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm font-semibold text-[#0d2240] dark:text-slate-100">Descartar as alterações?</p>
                   <div className="flex gap-2">
@@ -633,7 +721,14 @@ export const UnidadesPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold text-[#6b7f9b] dark:text-slate-400">{alterado ? '● Alterações não salvas' : 'Sem alterações'}</span>
+                  <div className="flex items-center gap-3">
+                    {editando && ehAdmin && (
+                      <Button type="button" variant="outline" onClick={() => { setErroForm(''); setConfirmarExclusao(true); }} aria-label={`Excluir ${editando.nome}`}>
+                        <Trash2 className="h-4 w-4 text-rose-600" /> Excluir
+                      </Button>
+                    )}
+                    <span className="hidden text-xs font-semibold text-[#6b7f9b] dark:text-slate-400 sm:inline">{alterado ? '● Alterações não salvas' : 'Sem alterações'}</span>
+                  </div>
                   <div className="flex gap-2">
                     <Button type="button" variant="outline" onClick={() => fechar()}>Cancelar</Button>
                     <Button type="submit" isLoading={salvando} disabled={!alterado && !!editando}>{editando ? 'Salvar alterações' : 'Adicionar'}</Button>
