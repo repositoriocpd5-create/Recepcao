@@ -110,7 +110,7 @@ function completude(u: RamalUnidade) {
     !!u.email?.trim(),
     !!(u.endereco || padrao?.endereco),
     (u.latitude ?? padrao?.lat) != null,
-    ...(u.tipo === 'departamento' ? [!!u.vice_diretor?.trim()] : []),
+    !!u.vice_diretor?.trim(),
   ];
   return Math.round((itens.filter(Boolean).length / itens.length) * 100);
 }
@@ -328,7 +328,7 @@ export const UnidadesPage: React.FC = () => {
 
   const ehEscola = form.tipo === 'unidade_escolar';
   const rotuloDirecao = ehEscola ? 'Diretor(a)' : 'Diretor(a) 1';
-  const rotuloVice = ehEscola ? 'Vice-diretor(a)' : 'Diretor(a) 2 (opcional)';
+  const rotuloVice = ehEscola ? 'Diretor(a) Adjunto(a)' : 'Diretor(a) 2 (opcional)';
   const nomeMudou = !!editando && normalizar(form.nome) !== normalizar(editando.nome);
   const latNum = coordenada(form.latitude, 90);
   const lngNum = coordenada(form.longitude, 180);
@@ -540,7 +540,7 @@ export const UnidadesPage: React.FC = () => {
                     Dirigente Escolar desta unidade no Quadro de Servidores. Salve para confirmar o vínculo.
                   </p>
                 )}
-                {!ehEscola && form.vice_diretor === SEM_DIRETOR_2 ? (
+                {form.vice_diretor === SEM_DIRETOR_2 ? (
                   <div>
                     <Rotulo>{rotuloVice}</Rotulo>
                     <p className="mt-1 rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-[#3d5170] dark:bg-slate-800 dark:text-slate-200">Não existe</p>
@@ -549,13 +549,11 @@ export const UnidadesPage: React.FC = () => {
                   <ComboServidor label={rotuloVice} nome={form.vice_diretor} servidorId={form.vice_servidor_id} opcoes={opcoes} carregando={carregando}
                     onChange={(nome, id) => setForm((f) => ({ ...f, vice_diretor: nome, vice_servidor_id: id }))} />
                 )}
-                {!ehEscola && (
-                  <label className="flex items-center gap-2 text-sm font-semibold text-[#3d5170] dark:text-slate-200">
-                    <input type="checkbox" className="h-4 w-4 rounded border-slate-300" checked={form.vice_diretor === SEM_DIRETOR_2}
-                      onChange={(e) => setForm((f) => ({ ...f, vice_diretor: e.target.checked ? SEM_DIRETOR_2 : '', vice_servidor_id: null }))} />
-                    Não existe segundo diretor
-                  </label>
-                )}
+                <label className="flex items-center gap-2 text-sm font-semibold text-[#3d5170] dark:text-slate-200">
+                  <input type="checkbox" className="h-4 w-4 rounded border-slate-300" checked={form.vice_diretor === SEM_DIRETOR_2}
+                    onChange={(e) => setForm((f) => ({ ...f, vice_diretor: e.target.checked ? SEM_DIRETOR_2 : '', vice_servidor_id: null }))} />
+                  Não existe segundo(a) diretor(a)
+                </label>
               </Secao>
 
               <Secao icone={<Phone className="h-5 w-5" />} titulo="Contatos" dica="Ramais internos, telefone externo e e-mail.">
