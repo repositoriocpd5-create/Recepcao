@@ -323,8 +323,8 @@ export const UnidadesPage: React.FC = () => {
   };
 
   const ehEscola = form.tipo === 'unidade_escolar';
-  const rotuloDirecao = ehEscola ? 'Diretor(a)' : 'Responsável (chefia)';
-  const rotuloVice = ehEscola ? 'Vice-diretor(a)' : 'Substituto(a) / adjunto(a)';
+  const rotuloDirecao = ehEscola ? 'Diretor(a)' : 'Diretor(a) 1';
+  const rotuloVice = ehEscola ? 'Vice-diretor(a)' : 'Diretor(a) 2 (opcional)';
   const nomeMudou = !!editando && normalizar(form.nome) !== normalizar(editando.nome);
   const latNum = coordenada(form.latitude, 90);
   const lngNum = coordenada(form.longitude, 180);
@@ -527,7 +527,7 @@ export const UnidadesPage: React.FC = () => {
                 </div>
               </Secao>
 
-              <Secao icone={<UserRound className="h-5 w-5" />} titulo={ehEscola ? 'Direção' : 'Responsáveis'} dica={ehEscola ? 'Quem responde pela escola.' : 'Quem chefia o departamento.'}>
+              <Secao icone={<UserRound className="h-5 w-5" />} titulo={ehEscola ? 'Direção' : 'Responsáveis'} dica={ehEscola ? 'Quem responde pela escola.' : 'Até dois diretores do departamento.'}>
                 <ComboServidor label={rotuloDirecao} nome={form.diretor} servidorId={form.diretor_servidor_id} opcoes={opcoes} carregando={carregando}
                   onChange={(nome, id) => { setForm((f) => ({ ...f, diretor: nome, diretor_servidor_id: id })); setAutoDiretor(''); }} />
                 {autoDiretor && form.diretor === autoDiretor && (
