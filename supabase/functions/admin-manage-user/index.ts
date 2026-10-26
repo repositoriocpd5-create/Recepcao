@@ -15,7 +15,7 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-const ROLES = ["admin", "gestor", "recepcionista", "atendente", "unidade_escolar", "cco", "cco_admin"];
+const ROLES = ["admin", "gestor", "recepcionista", "atendente", "unidade_escolar", "cco", "cco_admin", "cpd_os", "agenda_mkt"];
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // "Banimento" longo = conta suspensa (não consegue entrar); "none" reativa.

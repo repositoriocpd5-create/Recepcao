@@ -19,6 +19,8 @@ import {
   Building2,
   Camera,
   Search,
+  ClipboardList,
+  CalendarDays,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -92,9 +94,21 @@ const ROLE_CONFIG: Record<
     icon: <Crown className="w-3.5 h-3.5" />,
     descricao: 'Administra somente o CCO (todas as unidades, exclusões, reaberturas e log do CCO). Não acessa a Recepção',
   },
+  cpd_os: {
+    label: 'CPD_OS',
+    variant: 'neutral',
+    icon: <ClipboardList className="w-3.5 h-3.5" />,
+    descricao: 'Acessa somente a chave CPD_OS. Não acessa a Recepção nem o CCO',
+  },
+  agenda_mkt: {
+    label: 'AGENDAMKT',
+    variant: 'neutral',
+    icon: <CalendarDays className="w-3.5 h-3.5" />,
+    descricao: 'Acessa somente a chave AgendaMKT. Não acessa a Recepção nem o CCO',
+  },
 };
 
-const ROLES_OPTIONS: UserRole[] = ['admin', 'gestor', 'recepcionista', 'atendente', 'unidade_escolar', 'cco', 'cco_admin'];
+const ROLES_OPTIONS: UserRole[] = ['admin', 'gestor', 'recepcionista', 'atendente', 'unidade_escolar', 'cco', 'cco_admin', 'cpd_os', 'agenda_mkt'];
 /** Papéis da recepção que podem, além disso, integrar a equipe do CCO. */
 const ROLES_RECEPCAO_COM_CCO: UserRole[] = ['gestor', 'recepcionista', 'atendente'];
 
@@ -264,7 +278,7 @@ export const AdministracaoPage: React.FC = () => {
         ? await dataService.salvarUsuarioSistema({ ...editingUser, ...dados }, formSenha || undefined)
         : await dataService.criarUsuarioSistema(dados, formSenha);
     } catch (err: any) {
-      const papelNovo = formRole === 'unidade_escolar' || formRole === 'cco' || formRole === 'cco_admin';
+      const papelNovo = formRole === 'unidade_escolar' || formRole === 'cco' || formRole === 'cco_admin' || formRole === 'cpd_os' || formRole === 'agenda_mkt';
       setFormErro(papelNovo && /papel \(role\) inválido/i.test(err.message || '')
         ? 'O Supabase ainda não conhece os papéis do CCO: publique a nova versão da função "admin-manage-user" e aplique as migrações do CCO.'
         : err.message || 'Não foi possível salvar o usuário.');

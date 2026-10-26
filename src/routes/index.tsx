@@ -21,6 +21,7 @@ import { RamaisPage } from '@/pages/Ramais';
 import { UnidadesPage } from '@/pages/Unidades';
 import { CcoAjudaPage, CcoInicioPage, CcoOcorrenciasPage } from '@/pages/CCO';
 import { EscolherModuloPage } from '@/pages/EscolherModulo';
+import { SistemasExternosPage } from '@/pages/SistemasExternos';
 import { MapaRedePage } from '@/pages/CCO/mapa';
 import { PrimeiroAcessoPage } from '@/pages/PrimeiroAcesso';
 import { Modulo, acessaCco, acessaRecepcao, rotaInicial } from '@/lib/modulos';
@@ -94,6 +95,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/primeiro-acesso" element={<PrimeiroAcessoPage />} />
 
       <Route path="/" element={<ProtectedRoute><RotaInicial /></ProtectedRoute>} />
+      <Route path="/sistemas" element={<ProtectedRoute><SistemasExternosPage /></ProtectedRoute>} />
       <Route path="/escolher-modulo" element={<ProtectedRoute><EscolherModuloPage /></ProtectedRoute>} />
 
       <Route

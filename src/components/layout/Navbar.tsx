@@ -66,6 +66,8 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
     unidade_escolar: { label: 'Unidade escolar', email: getRoleEmail('unidade_escolar', 'unidade@sme.gov.br') },
     cco: { label: 'Equipe CCO', email: getRoleEmail('cco', 'cco@sme.gov.br') },
     cco_admin: { label: 'Admin do CCO', email: getRoleEmail('cco_admin', 'paulo.sergio@edu.itaguai.rj.gov.br') },
+    cpd_os: { label: 'CPD_OS', email: getRoleEmail('cpd_os', 'cpd_os@sme.gov.br') },
+    agenda_mkt: { label: 'AgendaMKT', email: getRoleEmail('agenda_mkt', 'agendamkt@sme.gov.br') },
   };
 
   const openProfileLogin = (role: UserRole) => {

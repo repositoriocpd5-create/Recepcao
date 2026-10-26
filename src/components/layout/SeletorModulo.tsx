@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CalendarDays, Camera, ClipboardList, UserCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Modulo, acessaDoisModulos, moduloDaRota } from '@/lib/modulos';
+import { Modulo, acessaCco, acessaRecepcao, moduloDaRota, sistemasExternosDoUsuario, totalDestinos } from '@/lib/modulos';
 import { cn } from '@/lib/utils';
 
 const OPCOES: { modulo: Modulo; rotulo: string; destino: string; icone: typeof Camera }[] = [
@@ -10,13 +10,7 @@ const OPCOES: { modulo: Modulo; rotulo: string; destino: string; icone: typeof C
   { modulo: 'cco', rotulo: 'CCO', destino: '/cco', icone: Camera },
 ];
 
-/** Sistemas externos do CPD. Endereços vêm do .env (VITE_CPD_OS_URL / VITE_AGENDA_MKT_URL); sem endereço, a chave fica desativada. */
-const EXTERNOS: { rotulo: string; url: string; icone: typeof Camera }[] = [
-  { rotulo: 'CPD_OS', url: import.meta.env.VITE_CPD_OS_URL ?? '', icone: ClipboardList },
-  { rotulo: 'AgendaMKT', url: import.meta.env.VITE_AGENDA_MKT_URL ?? '', icone: CalendarDays },
-];
-
-/** Troca entre Recepção e CCO; só aparece para quem acessa os dois módulos. */
+/** Troca entre Recepção, CCO e sistemas externos; só aparece para quem tem dois ou mais destinos. */
 export const SeletorModulo: React.FC<{ variante?: 'claro' | 'azul'; className?: string; onTrocar?: () => void }> = ({
   variante = 'claro',
   className,
@@ -25,7 +19,9 @@ export const SeletorModulo: React.FC<{ variante?: 'claro' | 'azul'; className?: 
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  if (!acessaDoisModulos(user)) return null;
+  if (totalDestinos(user) < 2) return null;
+  const externos = sistemasExternosDoUsuario(user);
+  const opcoes = OPCOES.filter((o) => (o.modulo === 'cco' ? acessaCco(user) : acessaRecepcao(user)));
   const atual = moduloDaRota(location.pathname);
 
   return (
@@ -38,7 +34,7 @@ export const SeletorModulo: React.FC<{ variante?: 'claro' | 'azul'; className?: 
         className,
       )}
     >
-      {OPCOES.map(({ modulo, rotulo, destino, icone: Icone }) => {
+      {opcoes.map(({ modulo, rotulo, destino, icone: Icone }) => {
         const ativo = atual === modulo;
         return (
           <button
@@ -61,9 +57,9 @@ export const SeletorModulo: React.FC<{ variante?: 'claro' | 'azul'; className?: 
           </button>
         );
       })}
-      {EXTERNOS.map(({ rotulo, url, icone: Icone }) => (
+      {externos.map(({ id, rotulo, url }) => { const Icone = id === 'cpd_os' ? ClipboardList : CalendarDays; return (
         <button
-          key={rotulo}
+          key={id}
           type="button"
           disabled={!url}
           title={url ? `Abrir ${rotulo}` : `${rotulo}: endereço ainda não configurado`}
@@ -76,7 +72,7 @@ export const SeletorModulo: React.FC<{ variante?: 'claro' | 'azul'; className?: 
           <Icone className="h-3.5 w-3.5" aria-hidden="true" />
           {rotulo}
         </button>
-      ))}
+      ); })}
     </div>
   );
 };

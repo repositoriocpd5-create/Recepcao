@@ -9,7 +9,7 @@ export type PerfilCco = 'unidade' | 'equipe' | 'admin';
 type Usuario = (Pick<UserProfile, 'role' | 'acesso_cco'> & { id?: string }) | null | undefined;
 
 /** Papéis que só existem no CCO (não entram na Recepção). */
-const PAPEIS_SO_CCO = ['unidade_escolar', 'cco', 'cco_admin'];
+const PAPEIS_SO_CCO = ['unidade_escolar', 'cco', 'cco_admin', 'cpd_os', 'agenda_mkt'];
 
 export const acessaRecepcao = (user: Usuario) => Boolean(user && !PAPEIS_SO_CCO.includes(user.role));
 
@@ -26,6 +26,21 @@ export const acessaCco = (user: Usuario) => perfilCco(user) !== null;
 
 /** Quem acessa os dois módulos vê o seletor Recepção ↔ CCO. */
 export const acessaDoisModulos = (user: Usuario) => acessaRecepcao(user) && acessaCco(user);
+
+/** Sistemas externos do CPD (chaves do seletor). Endereços vêm do .env; o administrador acessa todos. */
+export interface SistemaExterno { id: 'cpd_os' | 'agenda_mkt'; rotulo: string; url: string; descricao: string }
+
+export const SISTEMAS_EXTERNOS: SistemaExterno[] = [
+  { id: 'cpd_os', rotulo: 'CPD_OS', url: import.meta.env.VITE_CPD_OS_URL ?? '', descricao: 'Ordens de serviço do CPD.' },
+  { id: 'agenda_mkt', rotulo: 'AgendaMKT', url: import.meta.env.VITE_AGENDA_MKT_URL ?? '', descricao: 'Agenda de marketing.' },
+];
+
+export const sistemasExternosDoUsuario = (user: Usuario): SistemaExterno[] =>
+  !user ? [] : SISTEMAS_EXTERNOS.filter((s) => user.role === 'admin' || user.role === s.id);
+
+/** Quantos destinos o usuário tem (Recepção, CCO e sistemas externos): com 2 ou mais, vê o seletor. */
+export const totalDestinos = (user: Usuario) =>
+  Number(acessaRecepcao(user)) + Number(acessaCco(user)) + sistemasExternosDoUsuario(user).length;
 
 export const moduloDaRota = (pathname: string): Modulo => (pathname === '/cco' || pathname.startsWith('/cco/') ? 'cco' : 'recepcao');
 
@@ -59,7 +74,9 @@ export const rotaInicial = (user: Usuario) => {
     const ultimo = ultimoModulo(user);
     return ultimo ? ROTA_DO_MODULO[ultimo] : '/escolher-modulo';
   }
-  return acessaRecepcao(user) ? '/recepcao' : acessaCco(user) ? '/cco' : '/login';
+  if (acessaRecepcao(user)) return '/recepcao';
+  if (acessaCco(user)) return '/cco';
+  return sistemasExternosDoUsuario(user).length ? '/sistemas' : '/login';
 };
 
 export const ROTULO_PAPEL: Record<string, string> = {
@@ -70,4 +87,6 @@ export const ROTULO_PAPEL: Record<string, string> = {
   unidade_escolar: 'Unidade escolar',
   cco: 'Equipe CCO',
   cco_admin: 'Administrador do CCO',
+  cpd_os: 'CPD_OS',
+  agenda_mkt: 'AgendaMKT',
 };

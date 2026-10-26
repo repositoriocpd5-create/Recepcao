@@ -1,5 +1,5 @@
 /** unidade_escolar, cco e cco_admin são papéis só do módulo CCO (Central Controle Operacional). */
-export type UserRole = 'admin' | 'recepcionista' | 'gestor' | 'atendente' | 'unidade_escolar' | 'cco' | 'cco_admin';
+export type UserRole = 'admin' | 'recepcionista' | 'gestor' | 'atendente' | 'unidade_escolar' | 'cco' | 'cco_admin' | 'cpd_os' | 'agenda_mkt';
 
 export type PessoaTipo = 'servidor' | 'visitante';
 
