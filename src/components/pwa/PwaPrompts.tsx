@@ -230,7 +230,7 @@ export const PwaPrompts = () => {
             <button type="button" onClick={dismiss} className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full text-[#526d91] hover:bg-[#f2f7ff] dark:text-slate-400 dark:hover:bg-slate-800" aria-label="Fechar"><X className="h-5 w-5" /></button>
 
             <div className="flex flex-col items-center pt-3 text-center">
-              <img src="/icons/icon-192.png?v=4" alt="" width={80} height={80} className="h-20 w-20 rounded-[22px] shadow-[0_14px_28px_-12px_rgba(0,90,156,.75)]" />
+              <img src="/icons/icon-192.png?v=5" alt="" width={80} height={80} className="h-20 w-20 rounded-[22px] shadow-[0_14px_28px_-12px_rgba(0,90,156,.75)]" />
               <h2 id="pwa-install-title" className="mt-4 text-xl font-extrabold">Deseja instalar o App?</h2>
               <p id="pwa-install-desc" className="mt-1 text-sm text-[#52647d] dark:text-slate-400">
                 Tenha o <strong className="text-[#005a9c] dark:text-sky-300">SMEDU Recepção</strong> na tela inicial do seu aparelho.

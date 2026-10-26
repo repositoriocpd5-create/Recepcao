@@ -16,8 +16,8 @@ const pwaServiceWorker = (): Plugin => ({
     const precache = [
       '/index.html',
       '/manifest.webmanifest',
-      '/icons/icon-192.png?v=4',
-      '/icons/icon-512.png?v=4',
+      '/icons/icon-192.png?v=5',
+      '/icons/icon-512.png?v=5',
       '/assets/brasao_itaguai.png',
       ...buildFiles,
     ];

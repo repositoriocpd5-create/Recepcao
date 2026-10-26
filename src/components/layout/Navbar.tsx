@@ -265,7 +265,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
 
             {isInstallAvailable(pwa) && (
               <button type="button" onClick={() => { setIsAccountOpen(false); openInstallSheet(); }} className="mt-5 flex min-h-12 w-full items-center gap-3 rounded-xl border border-[#d7e6f6] bg-[#f4f9ff] px-3 text-left text-sm font-bold text-[#005a9c] hover:bg-[#e8f3ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#087ef5] dark:border-slate-800 dark:bg-[#101625] dark:text-sky-300 dark:hover:bg-slate-800">
-                <img src="/icons/icon-192.png?v=4" alt="" className="h-8 w-8 rounded-lg" />
+                <img src="/icons/icon-192.png?v=5" alt="" className="h-8 w-8 rounded-lg" />
                 <span className="flex-1">Instalar aplicativo<span className="block text-[11px] font-medium text-[#68809f] dark:text-slate-400">Acesso rápido pela tela inicial</span></span>
                 <Download className="h-4 w-4" />
               </button>
