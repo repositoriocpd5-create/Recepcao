@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CalendarDays, Camera, ClipboardList, UserCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +19,7 @@ export const SeletorModulo: React.FC<{ variante?: 'claro' | 'azul'; className?: 
   onTrocar,
 }) => {
   const { user } = useAuth();
+  const [aviso, setAviso] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   if (totalDestinos(user) < 2) return null;
@@ -64,7 +66,7 @@ export const SeletorModulo: React.FC<{ variante?: 'claro' | 'azul'; className?: 
           type="button"
           disabled={!url}
           title={url ? `Abrir ${rotulo}` : `${rotulo}: endereço ainda não configurado`}
-          onClick={() => { void abrirSistemaExterno(sistema); onTrocar?.(); }}
+          onClick={() => { void abrirSistemaExterno(sistema).then((m) => { setAviso(m); if (m) window.setTimeout(() => setAviso(null), 12000); }); onTrocar?.(); }}
           className={cn(
             'inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
             variante === 'azul' ? 'text-white/85 hover:bg-white/10 focus-visible:outline-white' : 'text-[#526d91] hover:text-[#005a9c] focus-visible:outline-[#087ef5] dark:text-slate-400 dark:hover:text-slate-200',
@@ -74,6 +76,10 @@ export const SeletorModulo: React.FC<{ variante?: 'claro' | 'azul'; className?: 
           {rotulo}
         </button>
       ); })}
+      {aviso && createPortal(
+        <p role="alert" className="fixed right-4 top-20 z-[80] max-w-sm rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 shadow-lg ring-1 ring-amber-300">{aviso}</p>,
+        document.body,
+      )}
     </div>
   );
 };
