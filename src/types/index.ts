@@ -26,6 +26,9 @@ export interface UserProfile {
   unidade_id?: string | null;
   /** Operador da recepção que também integra a equipe do CCO. */
   acesso_cco?: boolean;
+  /** Chaves externas liberadas ao usuário (o administrador acessa todas). */
+  acesso_cpd_os?: boolean;
+  acesso_agenda_mkt?: boolean;
   /** Unidades que a equipe CCO acompanha; vazio = todas. */
   cco_unidades?: string[] | null;
   ultimo_acesso?: string;

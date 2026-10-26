@@ -6,7 +6,7 @@ export type Modulo = 'recepcao' | 'cco';
 /** Como o usuário enxerga o CCO: a unidade vê só as próprias ocorrências; equipe e admin, as das unidades autorizadas. */
 export type PerfilCco = 'unidade' | 'equipe' | 'admin';
 
-type Usuario = (Pick<UserProfile, 'role' | 'acesso_cco'> & { id?: string }) | null | undefined;
+type Usuario = (Pick<UserProfile, 'role' | 'acesso_cco' | 'acesso_cpd_os' | 'acesso_agenda_mkt'> & { id?: string }) | null | undefined;
 
 /** Papéis que só existem no CCO (não entram na Recepção). */
 const PAPEIS_SO_CCO = ['unidade_escolar', 'cco', 'cco_admin', 'cpd_os', 'agenda_mkt'];
@@ -53,7 +53,7 @@ export const SISTEMAS_EXTERNOS: SistemaExterno[] = [
 ];
 
 export const sistemasExternosDoUsuario = (user: Usuario): SistemaExterno[] =>
-  !user ? [] : SISTEMAS_EXTERNOS.filter((s) => user.role === 'admin' || user.role === s.id);
+  !user ? [] : SISTEMAS_EXTERNOS.filter((s) => user.role === 'admin' || user.role === s.id || Boolean(s.id === 'cpd_os' ? user.acesso_cpd_os : user.acesso_agenda_mkt));
 
 /** Quantos destinos o usuário tem (Recepção, CCO e sistemas externos): com 2 ou mais, vê o seletor. */
 export const totalDestinos = (user: Usuario) =>

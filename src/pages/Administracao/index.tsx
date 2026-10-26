@@ -109,6 +109,8 @@ const ROLE_CONFIG: Record<
 };
 
 const ROLES_OPTIONS: UserRole[] = ['admin', 'gestor', 'recepcionista', 'atendente', 'unidade_escolar', 'cco', 'cco_admin', 'cpd_os', 'agenda_mkt'];
+/** Papéis aos quais dá para liberar as chaves CPD_OS e AgendaMKT (o admin já acessa todas; cpd_os e agenda_mkt já são a própria chave). */
+const PAPEIS_COM_CHAVES: UserRole[] = ['gestor', 'recepcionista', 'atendente', 'unidade_escolar', 'cco', 'cco_admin'];
 /** Papéis da recepção que podem, além disso, integrar a equipe do CCO. */
 const ROLES_RECEPCAO_COM_CCO: UserRole[] = ['gestor', 'recepcionista', 'atendente'];
 
@@ -150,6 +152,8 @@ export const AdministracaoPage: React.FC = () => {
   // CCO: unidade do usuário escolar, acesso da equipe e unidades acompanhadas.
   const [formUnidade, setFormUnidade] = useState('');
   const [formAcessoCco, setFormAcessoCco] = useState(false);
+  const [formAcessoCpdOs, setFormAcessoCpdOs] = useState(false);
+  const [formAcessoAgendaMkt, setFormAcessoAgendaMkt] = useState(false);
   const [formCcoRestrito, setFormCcoRestrito] = useState(false);
   const [formCcoUnidades, setFormCcoUnidades] = useState<string[]>([]);
   const [buscaUnidade, setBuscaUnidade] = useState('');
@@ -185,6 +189,8 @@ export const AdministracaoPage: React.FC = () => {
     setFormErro('');
     setFormUnidade('');
     setFormAcessoCco(false);
+    setFormAcessoCpdOs(false);
+    setFormAcessoAgendaMkt(false);
     setFormCcoRestrito(false);
     setFormCcoUnidades([]);
     setBuscaUnidade('');
@@ -203,6 +209,8 @@ export const AdministracaoPage: React.FC = () => {
     setFormErro('');
     setFormUnidade(u.unidade_id || '');
     setFormAcessoCco(Boolean(u.acesso_cco));
+    setFormAcessoCpdOs(Boolean(u.acesso_cpd_os));
+    setFormAcessoAgendaMkt(Boolean(u.acesso_agenda_mkt));
     setFormCcoRestrito(Boolean(u.cco_unidades?.length));
     setFormCcoUnidades(u.cco_unidades || []);
     setBuscaUnidade('');
@@ -268,6 +276,8 @@ export const AdministracaoPage: React.FC = () => {
       matricula: matricula || (editingUser && editingUser.matricula === undefined ? undefined : null),
       unidade_id: formRole === 'unidade_escolar' ? formUnidade : null,
       acesso_cco: ROLES_RECEPCAO_COM_CCO.includes(formRole) && formAcessoCco,
+      acesso_cpd_os: PAPEIS_COM_CHAVES.includes(formRole) && formAcessoCpdOs,
+      acesso_agenda_mkt: PAPEIS_COM_CHAVES.includes(formRole) && formAcessoAgendaMkt,
       cco_unidades: equipeCcoNoForm && formCcoRestrito ? formCcoUnidades : null,
     };
 
@@ -716,6 +726,18 @@ export const AdministracaoPage: React.FC = () => {
                 {unidadesEscolares.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
               <p className="mt-1 text-[11px] text-[#627fa5] dark:text-slate-400">O usuário entra direto no CCO e só vê as ocorrências desta unidade. O nome da escola e o responsável são preenchidos automaticamente.</p>
+            </div>
+          )}
+
+          {PAPEIS_COM_CHAVES.includes(formRole) && (
+            <div className="space-y-2 rounded-xl border-2 border-[#dce6f3] p-3 dark:border-slate-800">
+              <span className="block text-xs font-bold text-[#0d1f45] dark:text-slate-100">Chaves liberadas (além do papel)</span>
+              <label className="flex cursor-pointer items-center gap-3 text-xs text-[#0d1f45] dark:text-slate-200">
+                <input type="checkbox" checked={formAcessoCpdOs} onChange={(e) => setFormAcessoCpdOs(e.target.checked)} className="h-4 w-4 accent-[#0b63ce]" /> CPD_OS
+              </label>
+              <label className="flex cursor-pointer items-center gap-3 text-xs text-[#0d1f45] dark:text-slate-200">
+                <input type="checkbox" checked={formAcessoAgendaMkt} onChange={(e) => setFormAcessoAgendaMkt(e.target.checked)} className="h-4 w-4 accent-[#0b63ce]" /> AgendaMKT
+              </label>
             </div>
           )}
 

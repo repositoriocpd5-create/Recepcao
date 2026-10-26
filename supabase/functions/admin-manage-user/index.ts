@@ -43,6 +43,8 @@ const camposCco = (payload: Record<string, unknown>, role: string) => {
     campos.unidade_id = unidade || null;
   }
   if (typeof payload.acesso_cco === "boolean") campos.acesso_cco = payload.acesso_cco;
+  if (typeof payload.acesso_cpd_os === "boolean") campos.acesso_cpd_os = payload.acesso_cpd_os;
+  if (typeof payload.acesso_agenda_mkt === "boolean") campos.acesso_agenda_mkt = payload.acesso_agenda_mkt;
   if ("cco_unidades" in payload) {
     const lista = Array.isArray(payload.cco_unidades) ? payload.cco_unidades.map(texto).filter(Boolean) : [];
     if (lista.some((id) => !UUID_REGEX.test(id))) throw new HttpError(400, "Lista de unidades inválida.");

@@ -88,6 +88,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ativo: profile.ativo,
                 unidade_id: profile.unidade_id ?? null,
                 acesso_cco: profile.acesso_cco ?? false,
+                acesso_cpd_os: profile.acesso_cpd_os ?? false,
+                acesso_agenda_mkt: profile.acesso_agenda_mkt ?? false,
                 cco_unidades: profile.cco_unidades ?? null,
               };
               setUser(u);
@@ -142,6 +144,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ativo: true,
             unidade_id: profile?.unidade_id ?? null,
             acesso_cco: profile?.acesso_cco ?? false,
+            acesso_cpd_os: profile?.acesso_cpd_os ?? false,
+            acesso_agenda_mkt: profile?.acesso_agenda_mkt ?? false,
             cco_unidades: profile?.cco_unidades ?? null,
           };
           setUser(u);
@@ -210,6 +214,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ativo: profile.ativo,
       unidade_id: profile.unidade_id ?? null,
       acesso_cco: profile.acesso_cco ?? false,
+                acesso_cpd_os: profile.acesso_cpd_os ?? false,
+                acesso_agenda_mkt: profile.acesso_agenda_mkt ?? false,
       cco_unidades: profile.cco_unidades ?? null,
     };
     setUser(u);
