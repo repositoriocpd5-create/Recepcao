@@ -27,12 +27,12 @@ export const acessaCco = (user: Usuario) => perfilCco(user) !== null;
 /** Quem acessa os dois módulos vê o seletor Recepção ↔ CCO. */
 export const acessaDoisModulos = (user: Usuario) => acessaRecepcao(user) && acessaCco(user);
 
-/** Sistemas externos do CPD (chaves do seletor). Endereços vêm do .env; o administrador acessa todos. */
+/** Sistemas externos do CPD (chaves do seletor). Endereços padrão abaixo (podem ser trocados por VITE_CPD_OS_URL / VITE_AGENDA_MKT_URL); o administrador acessa todos. */
 export interface SistemaExterno { id: 'cpd_os' | 'agenda_mkt'; rotulo: string; url: string; descricao: string }
 
 export const SISTEMAS_EXTERNOS: SistemaExterno[] = [
-  { id: 'cpd_os', rotulo: 'CPD_OS', url: import.meta.env.VITE_CPD_OS_URL ?? '', descricao: 'Ordens de serviço do CPD.' },
-  { id: 'agenda_mkt', rotulo: 'AgendaMKT', url: import.meta.env.VITE_AGENDA_MKT_URL ?? '', descricao: 'Agenda de marketing.' },
+  { id: 'cpd_os', rotulo: 'CPD_OS', url: import.meta.env.VITE_CPD_OS_URL || 'https://cpdos.netlify.app/login', descricao: 'Ordens de serviço do CPD.' },
+  { id: 'agenda_mkt', rotulo: 'AgendaMKT', url: import.meta.env.VITE_AGENDA_MKT_URL || 'https://mkt-smedu.netlify.app/', descricao: 'Agenda de marketing.' },
 ];
 
 export const sistemasExternosDoUsuario = (user: Usuario): SistemaExterno[] =>
