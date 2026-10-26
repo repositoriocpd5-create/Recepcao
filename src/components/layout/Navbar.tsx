@@ -125,8 +125,8 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
       </div>
 
       <div className="hidden md:flex items-center justify-between gap-4">
-        {/* Brand identity */}
-        <div className="flex items-center gap-3">
+        {/* Brand identity: é a parte que encolhe (texto com reticências) para os botões de módulo nunca perderem o nome. */}
+        <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             onClick={onToggleSidebar}
@@ -143,23 +143,23 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
               className="w-9 h-9 object-contain"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-extrabold tracking-wider text-[#071d41] uppercase dark:text-slate-100">
+              <h1 className="truncate text-sm font-extrabold tracking-wider text-[#071d41] uppercase dark:text-slate-100">
                 SECRETARIA MUNICIPAL DE EDUCAÇÃO
               </h1>
               <span className="text-[10px] bg-[#edf5fc] text-[#005a9c] px-2 py-0.5 rounded font-mono border border-[#b9d9f3] dark:bg-slate-800 dark:text-emerald-400 dark:border-emerald-500/20">
                 SMEDU
               </span>
             </div>
-            <p className="text-xs text-[#627289] dark:text-slate-400">
+            <p className="truncate text-xs text-[#627289] dark:text-slate-400">
               {subtitulo}
             </p>
           </div>
         </div>
 
         {/* Status Pills and User actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           {/* Quick role switcher for testing */}
           {user && !isSupabaseLive && (
             <div className="hidden xl:flex items-center gap-1 bg-[#151c2c] border border-slate-700/80 rounded-lg p-0.5 text-xs">

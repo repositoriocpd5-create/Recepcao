@@ -52,14 +52,15 @@ export const SeletorModulo: React.FC<{ variante?: 'claro' | 'azul'; className?: 
               onTrocar?.();
             }}
             className={cn(
-              'inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1',
+              'inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-bold whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1',
+              bloco && 'flex-1',
               variante === 'azul'
                 ? ativo ? 'bg-white text-[#005a9c] shadow focus-visible:outline-white' : 'text-white/85 hover:bg-white/10 focus-visible:outline-white'
                 : ativo ? 'bg-white text-[#005a9c] shadow-sm ring-1 ring-[#cfe0f5] focus-visible:outline-[#087ef5] dark:bg-slate-700 dark:text-white dark:ring-slate-600' : 'text-[#526d91] hover:text-[#005a9c] focus-visible:outline-[#087ef5] dark:text-slate-400 dark:hover:text-slate-200',
             )}
           >
             <Icone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span className="truncate">{rotulo}</span>
+            <span className={bloco ? 'truncate' : ''}>{rotulo}</span>
           </button>
         );
       })}
@@ -71,12 +72,13 @@ export const SeletorModulo: React.FC<{ variante?: 'claro' | 'azul'; className?: 
           title={url ? `Abrir ${rotulo}` : `${rotulo}: endereço ainda não configurado`}
           onClick={() => { void abrirSistemaExterno(sistema).then((m) => { setAviso(m); if (m) window.setTimeout(() => setAviso(null), 12000); }); onTrocar?.(); }}
           className={cn(
-            'inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
+            'inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-bold whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
+            bloco && 'flex-1',
             variante === 'azul' ? 'text-white/85 hover:bg-white/10 focus-visible:outline-white' : 'text-[#526d91] hover:text-[#005a9c] focus-visible:outline-[#087ef5] dark:text-slate-400 dark:hover:text-slate-200',
           )}
         >
           <Icone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span className="truncate">{rotulo}</span>
+          <span className={bloco ? 'truncate' : ''}>{rotulo}</span>
         </button>
       ); })}
       {aviso && createPortal(
