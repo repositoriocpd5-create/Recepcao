@@ -28,11 +28,28 @@ export const acessaCco = (user: Usuario) => perfilCco(user) !== null;
 export const acessaDoisModulos = (user: Usuario) => acessaRecepcao(user) && acessaCco(user);
 
 /** Sistemas externos do CPD (chaves do seletor). Endereços padrão abaixo (podem ser trocados por VITE_CPD_OS_URL / VITE_AGENDA_MKT_URL); o administrador acessa todos. */
-export interface SistemaExterno { id: 'cpd_os' | 'agenda_mkt'; rotulo: string; url: string; descricao: string }
+export interface SistemaExterno {
+  id: 'cpd_os' | 'agenda_mkt';
+  rotulo: string;
+  url: string;
+  descricao: string;
+  /** Login único: endereço da função sso-cpd no Supabase do sistema e chave pública (anon) dele. */
+  sso?: { funcao: string; anonKey: string; rota: string };
+}
 
 export const SISTEMAS_EXTERNOS: SistemaExterno[] = [
-  { id: 'cpd_os', rotulo: 'CPD_OS', url: import.meta.env.VITE_CPD_OS_URL || 'https://cpdos.netlify.app/login', descricao: 'Ordens de serviço do CPD.' },
-  { id: 'agenda_mkt', rotulo: 'AgendaMKT', url: import.meta.env.VITE_AGENDA_MKT_URL || 'https://mkt-smedu.netlify.app/', descricao: 'Agenda de marketing.' },
+  { id: 'cpd_os', rotulo: 'CPD_OS', url: import.meta.env.VITE_CPD_OS_URL || 'https://cpdos.netlify.app/login', descricao: 'Ordens de serviço do CPD.',
+    sso: {
+      funcao: 'https://fahezcaaktsfvoyjezmy.supabase.co/functions/v1/sso-cpd',
+      anonKey: 'sb_publishable_PvkyzOq3gUDpnt_doNKpyQ_AaqpMvB8',
+      rota: 'https://cpdos.netlify.app/sso',
+    } },
+  { id: 'agenda_mkt', rotulo: 'AgendaMKT', url: import.meta.env.VITE_AGENDA_MKT_URL || 'https://mkt-smedu.netlify.app/', descricao: 'Agenda de marketing.',
+    sso: {
+      funcao: 'https://slpbwbhaqaxiqvfechmm.supabase.co/functions/v1/sso-cpd',
+      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNscGJ3YmhhcWF4aXF2ZmVjaG1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3MDQ5NzYsImV4cCI6MjA3MzI4MDk3Nn0._p17iFrfntGwkixhd4ISXvyPoPlEzdSFBW6rXaCSLF4',
+      rota: 'https://mkt-smedu.netlify.app/sso',
+    } },
 ];
 
 export const sistemasExternosDoUsuario = (user: Usuario): SistemaExterno[] =>

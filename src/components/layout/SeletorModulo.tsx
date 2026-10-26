@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { CalendarDays, Camera, ClipboardList, UserCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Modulo, acessaCco, acessaRecepcao, moduloDaRota, sistemasExternosDoUsuario, totalDestinos } from '@/lib/modulos';
+import { abrirSistemaExterno } from '@/lib/sso';
 import { cn } from '@/lib/utils';
 
 const OPCOES: { modulo: Modulo; rotulo: string; destino: string; icone: typeof Camera }[] = [
@@ -57,13 +58,13 @@ export const SeletorModulo: React.FC<{ variante?: 'claro' | 'azul'; className?: 
           </button>
         );
       })}
-      {externos.map(({ id, rotulo, url }) => { const Icone = id === 'cpd_os' ? ClipboardList : CalendarDays; return (
+      {externos.map((sistema) => { const { id, rotulo, url } = sistema; const Icone = id === 'cpd_os' ? ClipboardList : CalendarDays; return (
         <button
           key={id}
           type="button"
           disabled={!url}
           title={url ? `Abrir ${rotulo}` : `${rotulo}: endereço ainda não configurado`}
-          onClick={() => { window.open(url, '_blank', 'noopener,noreferrer'); onTrocar?.(); }}
+          onClick={() => { void abrirSistemaExterno(sistema); onTrocar?.(); }}
           className={cn(
             'inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
             variante === 'azul' ? 'text-white/85 hover:bg-white/10 focus-visible:outline-white' : 'text-[#526d91] hover:text-[#005a9c] focus-visible:outline-[#087ef5] dark:text-slate-400 dark:hover:text-slate-200',
