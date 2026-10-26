@@ -15,6 +15,7 @@ import {
   School,
   Search,
   Trash2,
+  Upload,
   UserRound,
   X,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { dataService } from '@/services/dataService';
+import { supabase } from '@/lib/supabase';
 import { CATEGORIAS_POR_TIPO, ORDEM_CATEGORIAS } from '@/services/ramaisUnidades';
 import { localizacaoPadrao } from '@/services/localizacoesUnidades';
 import { RamalContato, RamalUnidade, RamalUnidadeTipo, Servidor } from '@/types';
@@ -189,6 +191,8 @@ export const UnidadesPage: React.FC = () => {
   const [salvando, setSalvando] = useState(false);
   const [confirmarSaida, setConfirmarSaida] = useState(false);
   const [fotoComErro, setFotoComErro] = useState(false);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const inputFotoRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const ehAdmin = user?.role === 'admin';
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
@@ -313,6 +317,27 @@ export const UnidadesPage: React.FC = () => {
   }, [aberto, fechar]);
 
   const mudar = <K extends keyof Formulario>(campo: K, valor: Formulario[K]) => setForm((f) => ({ ...f, [campo]: valor }));
+  const enviarFoto = async (arquivo: File | undefined) => {
+    if (!arquivo) return;
+    if (!['image/png', 'image/jpeg'].includes(arquivo.type)) { setErroForm('Envie uma imagem PNG ou JPG.'); return; }
+    if (arquivo.size > 3 * 1024 * 1024) { setErroForm('A imagem deve ter no máximo 3 MB.'); return; }
+    setErroForm('');
+    setEnviandoFoto(true);
+    try {
+      const ext = arquivo.type === 'image/png' ? 'png' : 'jpg';
+      const caminho = `${editando?.id ?? 'novo'}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('unidades-fotos').upload(caminho, arquivo, { contentType: arquivo.type, upsert: false });
+      if (error) throw error;
+      const { data } = supabase.storage.from('unidades-fotos').getPublicUrl(caminho);
+      mudar('foto_url', data.publicUrl);
+      setFotoComErro(false);
+    } catch (e) {
+      setErroForm(e instanceof Error ? `Não foi possível enviar a foto: ${e.message}` : 'Não foi possível enviar a foto.');
+    } finally {
+      setEnviandoFoto(false);
+      if (inputFotoRef.current) inputFotoRef.current.value = '';
+    }
+  };
   const mudarRamal = (i: number, parte: Partial<RamalContato>) =>
     setForm((f) => ({ ...f, ramais: f.ramais.map((r, j) => (j === i ? { ...r, ...parte } : r)) }));
 
@@ -694,6 +719,14 @@ export const UnidadesPage: React.FC = () => {
                 <Input label="Link do Google Maps" value={form.mapa_url} onChange={(e) => mudar('mapa_url', e.target.value)} placeholder="https://maps.app.goo.gl/…" inputMode="url" />
                 <div className="space-y-2">
                   <Input label="Foto da fachada (endereço da imagem)" value={form.foto_url} onChange={(e) => { mudar('foto_url', e.target.value); setFotoComErro(false); }} placeholder="https://…" inputMode="url" />
+                  {ehAdmin && (
+                    <>
+                      <input ref={inputFotoRef} type="file" accept="image/png,image/jpeg" className="sr-only" onChange={(e) => void enviarFoto(e.target.files?.[0])} />
+                      <Button type="button" variant="secondary" disabled={enviandoFoto} onClick={() => inputFotoRef.current?.click()} className="w-full">
+                        <Upload className="h-4 w-4" aria-hidden="true" /> {enviandoFoto ? 'Enviando…' : 'Enviar foto do aparelho (PNG ou JPG)'}
+                      </Button>
+                    </>
+                  )}
                   {form.foto_url.trim() && (
                     fotoComErro ? (
                       <p className="flex items-center gap-2 rounded-lg bg-[#eef3f9] px-3 py-3 text-xs text-[#5f7391] dark:bg-slate-800/60 dark:text-slate-400"><ImageOff className="h-4 w-4" aria-hidden="true" /> Não foi possível carregar esta imagem.</p>
