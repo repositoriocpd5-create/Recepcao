@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "SMEDU Recepção — Controle de Acesso",
-  "short_name": "SMEDU Recepção",
-  "description": "Sistema de recepção e controle de acesso da Secretaria Municipal de Educação de Itaguaí.",
+  "name": "SMEDU Soluções",
+  "short_name": "SMEDU Soluções",
+  "description": "Recepção, CCO e sistemas do CPD da Secretaria Municipal de Educação de Itaguaí.",
   "lang": "pt-BR",
   "dir": "ltr",
   "start_url": "/",

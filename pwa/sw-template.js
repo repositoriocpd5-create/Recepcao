@@ -1,4 +1,4 @@
-/* Service worker do SMEDU Recepção — gerado no build a partir de pwa/sw-template.js. */
+/* Service worker do SMEDU Soluções — gerado no build a partir de pwa/sw-template.js. */
 const VERSION = '__BUILD_VERSION__';
 const CACHE = `smedu-recepcao-${VERSION}`;
 const PRECACHE = __PRECACHE__;
