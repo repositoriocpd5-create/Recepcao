@@ -239,7 +239,7 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
               <button type="button" onClick={() => setIsAccountOpen(false)} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#526d91] hover:bg-[#f2f7ff] dark:text-slate-400 dark:hover:bg-slate-800" aria-label="Fechar"><X className="h-5 w-5" /></button>
             </div>
 
-            <SeletorModulo className="mt-5 flex w-full" onTrocar={() => setIsAccountOpen(false)} />
+            <SeletorModulo bloco className="mt-5" onTrocar={() => setIsAccountOpen(false)} />
 
             <div className="mt-5">
               <p id="aparencia-titulo" className="mb-2 text-xs font-bold uppercase tracking-wider text-[#68809f] dark:text-slate-400">Aparência</p>

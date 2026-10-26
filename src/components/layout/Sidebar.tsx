@@ -169,7 +169,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; isCollapsed?: boolean; onClos
             </div>
           </div>
         )}
-        <SeletorModulo variante="azul" className="mt-3 flex w-full" onTrocar={onClose} />
+        <SeletorModulo variante="azul" bloco className="mt-3" onTrocar={onClose} />
       </div>
       <div aria-hidden="true" className="mx-4 h-px shrink-0 bg-gradient-to-r from-transparent via-white/25 to-transparent md:hidden" />
 
