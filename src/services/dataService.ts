@@ -690,7 +690,33 @@ export const dataService = {
       const { data, error } = await supabase.rpc('rpc_consultar_servidor', {
         p_matricula: limpa,
       });
-      return requireLiveResult(data, error, 'Não foi possível consultar a matrícula') as ConsultaServidorResultado;
+      const resultadoRpc = requireLiveResult(data, error, 'Não foi possível consultar a matrícula') as ConsultaServidorResultado;
+      if (resultadoRpc.encontrado) return resultadoRpc;
+
+      // A função do banco pode estar defasada em relação à tabela que alimenta a lista de nomes
+      // (ex.: servidores sem departamento); a leitura direta usa a mesma fonte da lista.
+      const { data: linhas, error: erroServidor } = await supabase
+        .from('servidores')
+        .select('*, departamento:departamentos(*), setor:setores!servidores_setor_id_fkey(*)')
+        .ilike('matricula', limpa)
+        .limit(1);
+      const servidorDireto = (requireLiveResult(linhas, erroServidor, 'Não foi possível consultar a matrícula') as Servidor[])[0];
+      if (!servidorDireto) return resultadoRpc;
+
+      const { data: movimentos } = await supabase
+        .from('movimentacoes')
+        .select('*')
+        .eq('servidor_id', servidorDireto.id)
+        .eq('status', 'no_predio')
+        .order('data_hora_entrada', { ascending: false })
+        .limit(1);
+      const movimentoAberto = movimentos?.[0] as Movimentacao | undefined;
+      return {
+        encontrado: true,
+        servidor: servidorDireto,
+        no_predio: Boolean(movimentoAberto),
+        movimentacao_atual: movimentoAberto,
+      };
     }
 
     // Fallback de homologação / testes
