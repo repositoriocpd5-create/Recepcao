@@ -30,6 +30,7 @@ import {
   Maximize2,
   Navigation,
   FileDown,
+  X,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
@@ -241,11 +242,11 @@ interface Props {
 }
 
 const Dado: React.FC<{ icone: typeof Clock; rotulo: string; children: React.ReactNode }> = ({ icone: Icone, rotulo, children }) => (
-  <div className="flex min-w-0 items-start gap-2.5">
-    <Icone className="mt-0.5 h-4 w-4 shrink-0 text-[#6b7f9b] dark:text-slate-500" aria-hidden="true" />
+  <div className="flex min-w-0 items-start gap-2 border-b border-[#e2eaf4] px-2 py-2.5 last:border-b-0 sm:border-b-0 sm:not-[&:nth-child(3n)]:border-r dark:border-slate-800">
+    <Icone className="mt-0.5 h-4 w-4 shrink-0 text-[#527297] dark:text-slate-500" aria-hidden="true" />
     <div className="min-w-0">
-      <dt className="text-[11px] font-bold uppercase tracking-wider text-[#6b7f9b] dark:text-slate-500">{rotulo}</dt>
-      <dd className="mt-0.5 break-words text-sm font-semibold text-[#10233f] dark:text-slate-100">{children}</dd>
+      <dt className="text-[10px] font-bold text-[#6b7f9b] dark:text-slate-500">{rotulo}</dt>
+      <dd className="mt-0.5 break-words text-[12px] font-extrabold leading-snug text-[#102f55] dark:text-slate-100">{children}</dd>
     </div>
   </div>
 );
@@ -526,9 +527,9 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
       isOpen={Boolean(ocorrenciaId)}
       onClose={onFechar}
       title={oc ? `Ocorrência ${oc.protocolo}` : 'Ocorrência'}
-      description={oc ? <UnidadeComEndereco oc={oc} /> : undefined}
-      icon={<FileText className="h-6 w-6" />}
       maxWidth="6xl"
+      hideHeader
+      contentClassName="bg-[#f8fbff] dark:bg-[#0f1726]"
     >
       {ocorrencia.isLoading ? (
         <Carregando />
@@ -539,37 +540,58 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
       ) : !oc ? (
         <p className="py-6 text-center text-sm text-[#5f7391] dark:text-slate-400">Ocorrência não encontrada ou sem permissão de acesso.</p>
       ) : (
-        // Computador: duas colunas lado a lado, do topo — dados à esquerda e atendimento (ou histórico) à direita —
-        // para a janela caber na tela sem rolagem.
-        <div className="grid grid-cols-1 gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-          <div className="min-w-0 space-y-3.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <SituacaoBadge situacao={oc.situacao} className="px-3 py-1.5 text-[13px]" />
-            <span className="text-xs text-[#5f7391] dark:text-slate-400">{SITUACOES[oc.situacao].descricao}</span>
-            <div className="ml-auto flex items-center gap-1.5">
+        <div className="min-h-full">
+          <header className="relative overflow-hidden bg-[linear-gradient(120deg,#062652_0%,#074c9b_58%,#0b69ce_100%)] px-4 py-4 text-white sm:px-6 sm:py-5">
+            <div aria-hidden="true" className="absolute -right-24 -top-20 h-64 w-64 rounded-full border border-white/10" />
+            <div aria-hidden="true" className="absolute right-24 top-0 h-full w-1/2 -skew-x-[28deg] bg-white/[0.035]" />
+            <div className="relative flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/10 sm:h-11 sm:w-11" aria-hidden="true">
+                  <FileText className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="truncate text-[17px] font-extrabold tracking-tight sm:text-xl">Ocorrência {oc.protocolo}</h2>
+                  <p className="mt-0.5 truncate text-xs font-bold uppercase tracking-wide text-sky-100">{oc.unidade_nome}</p>
+                </div>
+              </div>
+              <button type="button" onClick={onFechar} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white/90 transition-colors hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" aria-label="Fechar janela">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </header>
+
+          <div className="flex flex-col gap-3 border-b border-[#d9e5f3] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-slate-800 dark:bg-[#121826]">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+              <SituacaoBadge situacao={oc.situacao} className="px-3 py-1.5 text-[13px]" />
+              <span className="text-[13px] text-[#5f7391] dark:text-slate-400">{SITUACOES[oc.situacao].descricao}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => void baixarPdf()}
                 disabled={gerandoPdf}
                 aria-busy={gerandoPdf}
                 title="Gerar ficha da ocorrência em PDF para imprimir ou salvar"
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#c3d9f0] bg-[#f7fbff] px-2.5 text-xs font-bold text-[#0b4fa3] transition-colors hover:border-[#9cc0e8] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] disabled:cursor-progress disabled:opacity-70 dark:border-slate-700 dark:bg-slate-800/60 dark:text-sky-200 dark:hover:bg-slate-800"
+                className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#2b76d0] bg-white px-3 text-[13px] font-bold text-[#075cc4] transition-colors hover:bg-[#edf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] disabled:cursor-progress disabled:opacity-70 dark:border-sky-500/50 dark:bg-transparent dark:text-sky-200 dark:hover:bg-sky-500/10"
               >
-                {gerandoPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <FileDown className="h-3.5 w-3.5" aria-hidden="true" />}
-                {gerandoPdf ? 'Gerando PDF…' : 'PDF'}
+                {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <FileDown className="h-4 w-4" aria-hidden="true" />}
+                {gerandoPdf ? 'Gerando PDF…' : 'Gerar PDF'}
               </button>
-              <button type="button" onClick={copiar} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold text-[#0b63ce] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:text-sky-300 dark:hover:bg-slate-800">
-                {copiado ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
-                {copiado ? 'Copiado' : 'Copiar protocolo'}
+              <button type="button" onClick={copiar} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#075fd0] px-3 text-[13px] font-bold text-white shadow-[0_8px_18px_-12px_rgba(11,99,206,.9)] transition-colors hover:bg-[#0754b6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce]">
+                {copiado ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
+                {copiado ? 'Protocolo copiado' : 'Copiar protocolo'}
               </button>
             </div>
           </div>
 
           {erroPdf && (
-            <p role="alert" className="flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-[13px] font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-200">
+            <p role="alert" className="mx-4 mt-3 flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-[13px] font-semibold text-rose-700 sm:mx-6 dark:bg-rose-950/30 dark:text-rose-200">
               <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" /> {erroPdf}
             </p>
           )}
+
+          <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-5 sm:p-6">
+          <div className="min-w-0 space-y-3.5">
 
           {gravidade?.grave && (
             <section role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 p-3 dark:border-rose-500/40 dark:bg-rose-950/30">
@@ -598,24 +620,27 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
             </section>
           )}
 
-          <FotoFachadaUnidade oc={oc} />
-
-          <dl className="grid grid-cols-1 gap-3 rounded-2xl border border-[#e2eaf4] p-3 sm:grid-cols-3 dark:border-slate-800">
-            <Dado icone={CalendarDays} rotulo="Data da ocorrência">{formatarData(oc.data_ocorrencia)}</Dado>
-            <Dado icone={Clock} rotulo="Horário">{descreverHorario(oc)}</Dado>
-            <Dado icone={Building2} rotulo="Unidade escolar">{oc.unidade_nome}</Dado>
-            {oc.locais?.length ? <Dado icone={MapPin} rotulo="Local da ocorrência">{oc.locais.join(', ')}</Dado> : null}
-            <Dado icone={UserRound} rotulo="Responsável no CCO">{oc.responsavel_nome || 'Ainda não definido'}</Dado>
-            {oc.visita_data && (
-              <Dado icone={CalendarClock} rotulo="Visita presencial">
-                {formatarVisita(oc.visita_data, oc.visita_hora)}
+          <section className="overflow-hidden rounded-xl border border-[#cfe0f2] bg-white shadow-[0_8px_18px_-18px_rgba(11,68,130,.5)] dark:border-slate-800 dark:bg-[#121826]">
+            <h3 className="flex items-center gap-2 border-b border-[#dce8f5] px-3 py-2.5 text-[13px] font-extrabold text-[#102f55] dark:border-slate-800 dark:text-slate-100">
+              <FileText className="h-4 w-4 text-[#0b63ce]" aria-hidden="true" /> Dados da ocorrência
+            </h3>
+            <dl className="grid grid-cols-1 sm:grid-cols-3">
+              <Dado icone={CalendarDays} rotulo="Data da ocorrência">{formatarData(oc.data_ocorrencia)}</Dado>
+              <Dado icone={Clock} rotulo="Horário">{descreverHorario(oc)}</Dado>
+              <Dado icone={Building2} rotulo="Unidade escolar">{oc.unidade_nome}</Dado>
+              {oc.locais?.length ? <Dado icone={MapPin} rotulo="Local da ocorrência">{oc.locais.join(', ')}</Dado> : null}
+              <Dado icone={UserRound} rotulo="Responsável no CCO">{oc.responsavel_nome || 'Ainda não definido'}</Dado>
+              {oc.visita_data && (
+                <Dado icone={CalendarClock} rotulo="Visita presencial">
+                  {formatarVisita(oc.visita_data, oc.visita_hora)}
+                </Dado>
+              )}
+              <Dado icone={FileText} rotulo="Registrada em">
+                {formatarDataHora(oc.created_at)}
+                {oc.criado_por_nome && <span className="block text-[11px] font-medium text-[#5f7391] dark:text-slate-400">por {oc.criado_por_nome}</span>}
               </Dado>
-            )}
-            <Dado icone={FileText} rotulo="Registrada em">
-              {formatarDataHora(oc.created_at)}
-              {oc.criado_por_nome && <span className="block text-xs font-medium text-[#5f7391] dark:text-slate-400">por {oc.criado_por_nome}</span>}
-            </Dado>
-          </dl>
+            </dl>
+          </section>
 
           {perfil === 'unidade' && (
             !semEdicao ? (
@@ -650,9 +675,11 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
           )}
 
           <section>
-            <Titulo>Descrição</Titulo>
-            <p className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-rose-200 border-l-4 border-l-rose-500 bg-rose-50 p-3.5 text-base font-medium leading-relaxed text-[#3b0d17] dark:border-rose-500/30 dark:border-l-rose-400 dark:bg-rose-950/30 dark:text-rose-50">{oc.descricao}</p>
+            <h3 className="mb-2 text-[13px] font-extrabold text-[#17365d] dark:text-slate-200">Descrição</h3>
+            <p className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border-l-[3px] border-l-[#0b63ce] bg-[linear-gradient(100deg,#f6fbff_0%,#dcefff_100%)] px-3 py-3 text-[13px] font-semibold leading-relaxed text-[#193b65] dark:border-l-sky-400 dark:bg-sky-500/10 dark:text-sky-50">{oc.descricao}</p>
           </section>
+
+          <FotoFachadaUnidade oc={oc} />
 
           {oc.foto_path && (
             <section>
@@ -681,6 +708,7 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
             </div>
           )}
           </div>
+        </div>
         </div>
       )}
     </Modal>

@@ -10,6 +10,7 @@ import {
   Copy,
   Eye,
   FileText,
+  FileDown,
   Lock,
   Loader2,
   Printer,
@@ -31,6 +32,7 @@ import { Modal } from '@/components/ui/Modal';
 import { useDetalheNaUrl, useOcorrencias, useUnidade } from './hooks';
 import { PainelEquipe } from './PainelEquipe';
 import { gerarPdfOcorrencia } from './relatorioUnidadePdf';
+import { gerarRelatorioCcoPdf } from './relatorioPdf';
 import { tocarSomAlerta, useTempoRealCco } from './tempoReal';
 
 const SemUnidade: React.FC = () => (
@@ -145,6 +147,8 @@ const InicioUnidade: React.FC<{ user: UserProfile }> = ({ user }) => {
   const detalhe = useDetalheNaUrl();
   const [registrada, setRegistrada] = useState<CcoOcorrencia | null>(null);
   const [salva, setSalva] = useState<CcoOcorrencia | null>(null);
+  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
+  const [erroRelatorio, setErroRelatorio] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
   const editarId = params.get('editar');
   const emEdicao = useQuery({
@@ -156,6 +160,23 @@ const InicioUnidade: React.FC<{ user: UserProfile }> = ({ user }) => {
     refetchOnWindowFocus: false,
   });
   const sairDaEdicao = () => setParams((atual) => { atual.delete('editar'); return atual; }, { replace: true });
+  const gerarRelatorio = async () => {
+    if (gerandoRelatorio || ocorrencias.isLoading) return;
+    setGerandoRelatorio(true);
+    setErroRelatorio(null);
+    try {
+      await gerarRelatorioCcoPdf({
+        ocorrencias: ocorrencias.data || [],
+        user,
+        filtros: `Unidade: ${unidade.data?.nome || 'minha unidade'}`,
+        completo: false,
+      });
+    } catch {
+      setErroRelatorio('Não foi possível gerar o relatório em PDF. Tente novamente.');
+    } finally {
+      setGerandoRelatorio(false);
+    }
+  };
   const edicao = editarId && emEdicao.data && podeEditar(user, emEdicao.data) ? emEdicao.data : undefined;
   const bloqueioEdicao = editarId && emEdicao.isFetched && !edicao
     ? (emEdicao.data ? motivoSemEdicao(user, emEdicao.data) : 'Ocorrência não encontrada.')
@@ -233,15 +254,36 @@ const InicioUnidade: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
 
       <Cartao aria-labelledby="cco-minhas-titulo">
-        <div className="flex items-center justify-between gap-3 border-b border-[#e6edf6] px-4 py-4 sm:px-6 dark:border-slate-800">
+        <div className="flex flex-col gap-3 border-b border-[#e6edf6] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-slate-800">
           <div className="flex items-center gap-3">
             <IconeTitulo className="h-10 w-10"><FileText className="h-5 w-5" aria-hidden="true" /></IconeTitulo>
-            <h2 id="cco-minhas-titulo" className="text-lg font-extrabold text-[#0d2240] dark:text-slate-100">Meus registros</h2>
+            <div>
+              <h2 id="cco-minhas-titulo" className="text-lg font-extrabold text-[#0d2240] dark:text-slate-100">Meus registros</h2>
+              <p className="text-[13px] text-[#5f7391] dark:text-slate-400">Baixe um relatório com todas as ocorrências da sua unidade.</p>
+            </div>
           </div>
-          <Link to="/cco/ocorrencias" className="inline-flex min-h-10 shrink-0 items-center whitespace-nowrap gap-1.5 rounded-lg px-2 text-sm font-bold text-[#0b63ce] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:text-sky-300 dark:hover:bg-slate-800">
-            Ver todos <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void gerarRelatorio()}
+              disabled={gerandoRelatorio || ocorrencias.isLoading}
+              aria-busy={gerandoRelatorio}
+              title="Gerar relatório em PDF com todos os registros da sua unidade"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b63ce] px-3.5 text-sm font-bold text-white shadow-[0_8px_18px_-12px_rgba(11,99,206,.9)] transition-colors hover:bg-[#0a56b4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] disabled:cursor-progress disabled:opacity-60"
+            >
+              {gerandoRelatorio ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <FileDown className="h-4 w-4" aria-hidden="true" />}
+              {gerandoRelatorio ? 'Gerando PDF…' : 'Gerar relatório'}
+            </button>
+            <Link to="/cco/ocorrencias" className="inline-flex min-h-10 shrink-0 items-center whitespace-nowrap gap-1.5 rounded-lg px-2 text-sm font-bold text-[#0b63ce] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:text-sky-300 dark:hover:bg-slate-800">
+              Ver todos <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
+        {erroRelatorio && (
+          <p role="alert" className="mx-4 mt-4 flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 sm:mx-6 dark:bg-rose-950/30 dark:text-rose-200">
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" /> {erroRelatorio}
+          </p>
+        )}
         {ocorrencias.isLoading ? (
           <Carregando texto="Carregando as ocorrências…" />
         ) : ocorrencias.error ? (

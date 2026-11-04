@@ -13,6 +13,10 @@ export interface ModalProps {
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '5xl' | '6xl';
   /** 'destaque': cabeçalho azul-escuro de largura total, usado na identificação de pessoas. */
   variant?: 'padrao' | 'destaque';
+  /** Oculta o cabeçalho padrão para conteúdo que possui cabeçalho próprio. */
+  hideHeader?: boolean;
+  /** Classes adicionais para a área com rolagem do conteúdo. */
+  contentClassName?: string;
   /** Contêiner para o portal do modal (padrão: elemento em tela cheia ativo ou document.body). */
   container?: HTMLElement | null;
 }
@@ -51,6 +55,8 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 'lg',
   variant = 'padrao',
+  hideHeader = false,
+  contentClassName,
   container,
 }) => {
   const modalId = useId();
@@ -165,29 +171,31 @@ export const Modal: React.FC<ModalProps> = ({
           maxWidths[maxWidth]
         )}
       >
-        <div className={cn('flex justify-between border-b border-[#dce4f0] dark:border-slate-800', icon ? 'items-start gap-3 pb-4' : 'items-center pb-3')}>
-          <div className={cn(icon && 'flex items-center gap-3.5')}>
-            {icon && (
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#edf5fc] text-[#0b6bbf] dark:bg-slate-800 dark:text-sky-300">
-                {icon}
+        {!hideHeader && (
+          <div className={cn('flex justify-between border-b border-[#dce4f0] dark:border-slate-800', icon ? 'items-start gap-3 pb-4' : 'items-center pb-3')}>
+            <div className={cn(icon && 'flex items-center gap-3.5')}>
+              {icon && (
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#edf5fc] text-[#0b6bbf] dark:bg-slate-800 dark:text-sky-300">
+                  {icon}
+                </div>
+              )}
+              <div>
+                <h2 className={cn('font-bold text-[#152238] dark:text-slate-100', icon ? 'text-xl' : 'text-lg')}>{title}</h2>
+                {description && <p className={cn('text-[#627289] dark:text-slate-400 mt-0.5', icon ? 'text-sm' : 'text-xs')}>{description}</p>}
               </div>
-            )}
-            <div>
-              <h2 className={cn('font-bold text-[#152238] dark:text-slate-100', icon ? 'text-xl' : 'text-lg')}>{title}</h2>
-              {description && <p className={cn('text-[#627289] dark:text-slate-400 mt-0.5', icon ? 'text-sm' : 'text-xs')}>{description}</p>}
             </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid h-11 w-11 place-items-center rounded-xl text-[#627289] transition-colors hover:bg-[#edf5fc] hover:text-[#005a9c] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+              aria-label="Fechar janela"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-11 w-11 place-items-center rounded-xl text-[#627289] transition-colors hover:bg-[#edf5fc] hover:text-[#005a9c] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-            aria-label="Fechar janela"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        )}
 
-        <div className="py-4 overflow-y-auto flex-1 sm:py-3">{children}</div>
+        <div className={cn('flex-1 overflow-y-auto', hideHeader ? '' : 'py-4 sm:py-3', contentClassName)}>{children}</div>
       </div>
     </div>,
     portalTarget,
