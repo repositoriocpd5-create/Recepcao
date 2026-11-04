@@ -29,6 +29,7 @@ import {
   Camera,
   Maximize2,
   Navigation,
+  FileDown,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
@@ -51,6 +52,7 @@ import { Carregando, ESTILO_SITUACAO, SituacaoBadge, botaoPrimario } from './ui'
 import { Atendimento, formatarVisita } from './Atendimento';
 import { useUnidade } from '../hooks';
 import { LOCALIZACOES_UNIDADES } from '@/services/localizacoesUnidades';
+import { abrirPdfEmNovaAba, gerarPdfDetalhe } from '../detalhePdf';
 
 /**
  * Nome da unidade e, ao lado, a localização do Mapa da Rede: bairro e link para o ponto exato
@@ -450,6 +452,8 @@ const FotoOcorrencia: React.FC<{ caminho: string }> = ({ caminho }) => {
 export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFechar, focarAndamento, onExcluir }) => {
   const queryClient = useQueryClient();
   const [copiado, setCopiado] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [erroPdf, setErroPdf] = useState<string | null>(null);
   const perfil = perfilCco(user);
   const equipe = perfil === 'admin' || perfil === 'equipe';
 
@@ -497,6 +501,22 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
     } catch {}
   };
 
+  const baixarPdf = async () => {
+    if (!oc || gerandoPdf) return;
+    setGerandoPdf(true);
+    setErroPdf(null);
+    try {
+      await abrirPdfEmNovaAba(
+        () => gerarPdfDetalhe({ ocorrencia: oc, historico: historico.data || [], emitidoPor: user.nome_completo }),
+        `${oc.protocolo}.pdf`,
+      );
+    } catch {
+      setErroPdf('Não foi possível gerar o PDF. Tente novamente.');
+    } finally {
+      setGerandoPdf(false);
+    }
+  };
+
   const secaoHistorico = (
     <HistoricoRecolhivel carregando={historico.isLoading} eventos={historico.data || []} />
   );
@@ -526,11 +546,30 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
           <div className="flex flex-wrap items-center gap-2">
             <SituacaoBadge situacao={oc.situacao} className="px-3 py-1.5 text-[13px]" />
             <span className="text-xs text-[#5f7391] dark:text-slate-400">{SITUACOES[oc.situacao].descricao}</span>
-            <button type="button" onClick={copiar} className="ml-auto inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold text-[#0b63ce] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:text-sky-300 dark:hover:bg-slate-800">
-              {copiado ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
-              {copiado ? 'Copiado' : 'Copiar protocolo'}
-            </button>
+            <div className="ml-auto flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => void baixarPdf()}
+                disabled={gerandoPdf}
+                aria-busy={gerandoPdf}
+                title="Gerar ficha da ocorrência em PDF para imprimir ou salvar"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#c3d9f0] bg-[#f7fbff] px-2.5 text-xs font-bold text-[#0b4fa3] transition-colors hover:border-[#9cc0e8] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] disabled:cursor-progress disabled:opacity-70 dark:border-slate-700 dark:bg-slate-800/60 dark:text-sky-200 dark:hover:bg-slate-800"
+              >
+                {gerandoPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <FileDown className="h-3.5 w-3.5" aria-hidden="true" />}
+                {gerandoPdf ? 'Gerando PDF…' : 'PDF'}
+              </button>
+              <button type="button" onClick={copiar} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-bold text-[#0b63ce] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:text-sky-300 dark:hover:bg-slate-800">
+                {copiado ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+                {copiado ? 'Copiado' : 'Copiar protocolo'}
+              </button>
+            </div>
           </div>
+
+          {erroPdf && (
+            <p role="alert" className="flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-[13px] font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-200">
+              <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" /> {erroPdf}
+            </p>
+          )}
 
           {gravidade?.grave && (
             <section role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 p-3 dark:border-rose-500/40 dark:bg-rose-950/30">
