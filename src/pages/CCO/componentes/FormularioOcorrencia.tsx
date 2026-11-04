@@ -511,9 +511,10 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
         )}
 
         <fieldset className="mt-4 rounded-2xl border border-[#dbe6f3] bg-[#f3f8fe] px-4 py-4 sm:px-5 dark:border-slate-800 dark:bg-slate-900/40">
-          <legend className="sr-only">Quando aconteceu</legend>
-          <p className="flex items-center gap-3 text-lg font-extrabold text-[#0d2240] dark:text-slate-100" aria-hidden="true">
-            <Clock className="h-6 w-6 text-[#0b63ce] dark:text-sky-300" /> Quando aconteceu
+          <legend className="sr-only">Quando aconteceu (digite o horário aproximado)</legend>
+          <p className="flex items-start gap-3 text-lg font-extrabold text-[#0d2240] dark:text-slate-100" aria-hidden="true">
+            <Clock className="mt-0.5 h-6 w-6 shrink-0 text-[#0b63ce] dark:text-sky-300" />
+            <span>Quando aconteceu <span className="text-base font-medium text-[#4c6283] dark:text-slate-300">(digite o horário aproximado)</span></span>
           </p>
           <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-center">
             <div className="flex flex-1 flex-wrap items-start gap-x-5 gap-y-3">

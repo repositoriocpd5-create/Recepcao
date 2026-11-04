@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Plus, X } from 'lucide-react';
+import { Check, ChevronDown, Plus, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CAMERAS_SUGERIDAS, LOCAIS_SUGERIDOS } from '@/services/ccoService';
 
@@ -16,6 +16,7 @@ interface Props {
   rotuloLista?: string;
   placeholderOutro?: string;
   rotuloOutro?: string;
+  placeholderBusca?: string;
 }
 
 const NOME_MAX = 60;
@@ -32,16 +33,31 @@ export const SeletorCameras: React.FC<Props> = ({
   rotuloLista = 'Câmeras da unidade',
   placeholderOutro = 'Outra câmera (ex.: Biblioteca)',
   rotuloOutro = 'Nome de outra câmera',
+  placeholderBusca,
 }) => {
   const [aberto, setAberto] = useState(false);
+  const [busca, setBusca] = useState('');
   const [outra, setOutra] = useState('');
   const raiz = useRef<HTMLDivElement>(null);
   const campoOutra = useRef<HTMLInputElement>(null);
+  const campoBusca = useRef<HTMLInputElement>(null);
+  const botaoAbrir = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (aberto) (placeholderBusca ? campoBusca : campoOutra).current?.focus();
+    else setBusca('');
+  }, [aberto, placeholderBusca]);
 
   useEffect(() => {
     if (!aberto) return;
     const fora = (e: MouseEvent) => { if (!raiz.current?.contains(e.target as Node)) setAberto(false); };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAberto(false); };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setAberto(false);
+        botaoAbrir.current?.focus();
+      }
+    };
     document.addEventListener('mousedown', fora);
     document.addEventListener('keydown', esc);
     return () => {
@@ -61,6 +77,9 @@ export const SeletorCameras: React.FC<Props> = ({
   };
 
   const extras = valor.filter((c) => !sugestoes.includes(c));
+  const normalizar = (texto: string) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('pt-BR').trim();
+  const opcoes = [...sugestoes, ...extras];
+  const filtradas = opcoes.filter((opcao) => normalizar(opcao).includes(normalizar(busca)));
 
   return (
     <div ref={raiz} className="relative">
@@ -89,19 +108,18 @@ export const SeletorCameras: React.FC<Props> = ({
           <li>
             <button
               id={id}
+              ref={botaoAbrir}
               type="button"
               disabled={disabled}
-              onClick={() => {
-                setAberto(true);
-                window.setTimeout(() => campoOutra.current?.focus(), 0);
-              }}
+              onClick={() => setAberto((atual) => !atual)}
               aria-expanded={aberto}
               aria-controls={`${id}-lista`}
               aria-invalid={Boolean(erro)}
               aria-describedby={erro ? `${id}-erro` : undefined}
               className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-[15px] font-semibold text-[#0b63ce] hover:bg-[#eaf2fd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] disabled:opacity-50 dark:text-sky-300 dark:hover:bg-slate-800"
             >
-              <Plus className="h-4 w-4" aria-hidden="true" /> Adicionar
+              {placeholderBusca ? <Search className="h-4 w-4" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
+              {placeholderBusca ? (valor.length ? 'Adicionar local' : 'Buscar ou selecionar local') : 'Adicionar'}
             </button>
           </li>
         </ul>
@@ -122,15 +140,44 @@ export const SeletorCameras: React.FC<Props> = ({
           id={`${id}-lista`}
           className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-[#d6e2f0] bg-white shadow-[0_18px_40px_-18px_rgba(16,48,96,.55)] dark:border-slate-700 dark:bg-[#121826]"
         >
-          <ul className="max-h-64 overflow-y-auto py-1.5" aria-label={rotuloLista}>
-            {[...sugestoes, ...extras].map((camera) => {
+          {placeholderBusca && (
+            <div className="border-b border-[#e6edf6] p-3 dark:border-slate-800">
+              <div className="flex min-h-11 items-center gap-2 rounded-lg border border-[#cfdbea] bg-[#f6f9fe] px-3 focus-within:border-[#0b63ce] focus-within:ring-2 focus-within:ring-[#0b63ce]/20 dark:border-slate-700 dark:bg-[#0f1524]">
+                <Search className="h-4 w-4 shrink-0 text-[#0b63ce] dark:text-sky-300" aria-hidden="true" />
+                <input
+                  ref={campoBusca}
+                  type="text"
+                  value={busca}
+                  disabled={disabled}
+                  onChange={(e) => setBusca(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                  placeholder={placeholderBusca}
+                  aria-label="Buscar local da ocorrência"
+                  aria-controls={`${id}-opcoes`}
+                  autoComplete="off"
+                  className="min-w-0 flex-1 bg-transparent py-2 text-base text-[#10233f] outline-none placeholder:text-[#6b7f9b] dark:text-slate-100"
+                />
+                {busca && (
+                  <button type="button" onClick={() => { setBusca(''); campoBusca.current?.focus(); }} aria-label="Limpar busca de local" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[#5f7391] hover:bg-[#e6f0fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] dark:text-slate-300 dark:hover:bg-slate-800">
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+              <p role="status" className="mt-2 text-xs text-[#5f7391] dark:text-slate-400">
+                {busca.trim() ? `${filtradas.length} ${filtradas.length === 1 ? 'local encontrado' : 'locais encontrados'}` : 'Busque pelo nome e selecione um ou mais locais.'}
+              </p>
+            </div>
+          )}
+          <ul id={`${id}-opcoes`} className="max-h-52 overflow-y-auto py-1.5" aria-label={rotuloLista}>
+            {filtradas.map((camera) => {
               const marcada = valor.includes(camera);
               return (
                 <li key={camera}>
                   <button
                     type="button"
-                    role="menuitemcheckbox"
+                    role="checkbox"
                     aria-checked={marcada}
+                    disabled={disabled}
                     onClick={() => alternar(camera)}
                     className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[15px] text-[#10233f] hover:bg-[#f2f7fe] focus-visible:bg-[#f2f7fe] focus-visible:outline-none dark:text-slate-100 dark:hover:bg-slate-800 dark:focus-visible:bg-slate-800"
                   >
@@ -142,11 +189,17 @@ export const SeletorCameras: React.FC<Props> = ({
                 </li>
               );
             })}
+            {filtradas.length === 0 && (
+              <li className="px-4 py-5 text-sm text-[#5f7391] dark:text-slate-400">
+                Nenhum local encontrado. Você pode incluir um novo no campo abaixo.
+              </li>
+            )}
           </ul>
           <div className="flex gap-2 border-t border-[#e6edf6] p-2.5 dark:border-slate-800">
             <input
               ref={campoOutra}
               value={outra}
+              disabled={disabled}
               maxLength={NOME_MAX}
               onChange={(e) => setOutra(e.target.value)}
               onKeyDown={(e) => {
@@ -162,7 +215,7 @@ export const SeletorCameras: React.FC<Props> = ({
             <button
               type="button"
               onClick={adicionarOutra}
-              disabled={!outra.trim()}
+              disabled={disabled || !outra.trim()}
               className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-[#0b63ce] px-3 text-sm font-bold text-white hover:bg-[#0a56b4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] disabled:opacity-50"
             >
               <Plus className="h-4 w-4" aria-hidden="true" /> Incluir
@@ -183,5 +236,6 @@ export const SeletorLocais: React.FC<Omit<Props, 'sugestoes' | 'rotuloSelecionad
     rotuloLista="Locais da unidade"
     placeholderOutro="Outro local (ex.: Biblioteca)"
     rotuloOutro="Nome de outro local"
+    placeholderBusca="Buscar local (ex.: pátio)"
   />
 );
