@@ -11,6 +11,8 @@ import {
   Eye,
   FileText,
   Lock,
+  Loader2,
+  Printer,
   Pencil,
   Plus,
   X,
@@ -28,6 +30,7 @@ import { Carregando, Cartao, IconeTitulo, SituacaoBadge, botaoPrimario, botaoSec
 import { Modal } from '@/components/ui/Modal';
 import { useDetalheNaUrl, useOcorrencias, useUnidade } from './hooks';
 import { PainelEquipe } from './PainelEquipe';
+import { gerarPdfOcorrencia } from './relatorioUnidadePdf';
 import { tocarSomAlerta, useTempoRealCco } from './tempoReal';
 
 const SemUnidade: React.FC = () => (
@@ -49,6 +52,33 @@ const ErroLista: React.FC<{ erro: unknown }> = ({ erro }) => (
 /** Confirmação após o envio: protocolo em destaque e atalho para a ocorrência. */
 const Registrada: React.FC<{ ocorrencia: CcoOcorrencia | null; onVer: () => void; onFechar: () => void }> = ({ ocorrencia, onVer, onFechar }) => {
   const [copiado, setCopiado] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [erroPdf, setErroPdf] = useState<string | null>(null);
+  const imprimir = async () => {
+    if (!ocorrencia || gerandoPdf) return;
+    setGerandoPdf(true);
+    setErroPdf(null);
+    const janela = window.open('about:blank', '_blank');
+    if (janela) janela.opener = null;
+    try {
+      const pdf = await gerarPdfOcorrencia(ocorrencia);
+      const url = URL.createObjectURL(pdf);
+      if (janela && !janela.closed) {
+        janela.location.replace(url);
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${ocorrencia.protocolo}.pdf`;
+        link.click();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 300_000);
+    } catch {
+      janela?.close();
+      setErroPdf('Não foi possível gerar o PDF. Tente novamente.');
+    } finally {
+      setGerandoPdf(false);
+    }
+  };
   if (!ocorrencia) return null;
   return (
     <Modal isOpen onClose={onFechar} title={ocorrencia.tipo_registro === 'camera' ? 'Relato enviado' : 'Ocorrência registrada'} description="O CCO já recebeu o seu registro." maxWidth="md" icon={<CheckCircle2 className="h-6 w-6 text-green-600" />}>
@@ -73,6 +103,14 @@ const Registrada: React.FC<{ ocorrencia: CcoOcorrencia | null; onVer: () => void
           Ocorrência de {formatarData(ocorrencia.data_ocorrencia)} registrada como <SituacaoBadge situacao={ocorrencia.situacao} className="align-middle" />.
           Acompanhe o atendimento em <strong>Minhas ocorrências</strong>.
         </p>
+        <div className="space-y-2">
+          <button type="button" onClick={() => void imprimir()} disabled={gerandoPdf} aria-busy={gerandoPdf} className={`${botaoSecundario} w-full justify-center`}>
+            {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Printer className="h-4 w-4" aria-hidden="true" />}
+            {gerandoPdf ? 'Preparando PDF…' : 'Imprimir PDF'}
+          </button>
+          <p className="text-center text-xs text-[#5f7391] dark:text-slate-400">Abra o comprovante para imprimir ou salvar em PDF.</p>
+          {erroPdf && <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{erroPdf}</p>}
+        </div>
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" onClick={onFechar} className={botaoSecundario}><Plus className="h-4 w-4" aria-hidden="true" /> Registrar outra</button>
           <button type="button" autoFocus onClick={onVer} className={botaoPrimario}><Eye className="h-4 w-4" aria-hidden="true" /> Ver ocorrência</button>
