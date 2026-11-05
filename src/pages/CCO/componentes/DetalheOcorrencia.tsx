@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -430,6 +431,17 @@ const InformarTermino: React.FC<{ oc: CcoOcorrencia; user: UserProfile; onSalvo:
 const FotoOcorrencia: React.FC<{ caminho: string }> = ({ caminho }) => {
   const [ampliada, setAmpliada] = useState(false);
   const url = useQuery({ queryKey: ['cco', 'foto', caminho], queryFn: () => ccoService.urlFoto(caminho), staleTime: 20 * 60_000 });
+  useEffect(() => {
+    if (!ampliada) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setAmpliada(false);
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [ampliada]);
   if (url.isLoading) return <Carregando texto="Carregando a foto…" />;
   if (!url.data) {
     return (
@@ -440,9 +452,25 @@ const FotoOcorrencia: React.FC<{ caminho: string }> = ({ caminho }) => {
   }
   return (
     <>
-      <button type="button" onClick={() => setAmpliada(!ampliada)} className="block w-full overflow-hidden rounded-xl bg-[#e6eef8] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[#0b63ce] dark:bg-slate-800" aria-label={ampliada ? 'Reduzir a foto' : 'Ampliar a foto'}>
-        <img src={url.data} alt="Foto enviada pela unidade" className={cn('w-full object-contain transition-all', ampliada ? 'max-h-[75vh]' : 'max-h-72')} />
+      <button type="button" onClick={() => setAmpliada(true)} className="block w-full cursor-zoom-in overflow-hidden rounded-xl bg-[#e6eef8] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[#0b63ce] dark:bg-slate-800" aria-label="Ver a foto em tela cheia">
+        <img src={url.data} alt="Foto enviada pela unidade" className="max-h-72 w-full object-contain" />
       </button>
+      {ampliada &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Foto em tela cheia"
+            className="fixed inset-0 z-[1000] flex cursor-zoom-out items-center justify-center bg-black/90 p-4"
+            onClick={() => setAmpliada(false)}
+          >
+            <button type="button" onClick={() => setAmpliada(false)} className="absolute right-4 top-4 rounded-full bg-white/15 p-2 text-white hover:bg-white/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" aria-label="Fechar tela cheia">
+              <X className="h-6 w-6" aria-hidden="true" />
+            </button>
+            <img src={url.data} alt="Foto enviada pela unidade" className="max-h-full max-w-full object-contain" />
+          </div>,
+          document.body,
+        )}
       <a href={url.data} target="_blank" rel="noreferrer" className="mt-1.5 inline-block text-xs font-bold text-[#0b63ce] underline underline-offset-2 dark:text-sky-300">
         Abrir a foto em outra aba
       </a>
