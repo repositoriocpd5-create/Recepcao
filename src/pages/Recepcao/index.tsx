@@ -57,7 +57,29 @@ import {
   ConsultaServidorResultado,
   ConsultaVisitanteResultado,
   RamalUnidade,
+  Cracha,
 } from '@/types';
+import { MODELO_PADRAO, partesDaLegenda } from '@/pages/Crachas/modelo';
+
+const QTD_CRACHAS_RAPIDOS = 20;
+
+/** Número curto do crachá (o "1" de "VISITANTE 1" / código …0801). */
+const numeroCurtoDoCracha = (c: Cracha): number | null => {
+  const legenda = partesDaLegenda(c.descricao, MODELO_PADRAO).numero;
+  if (legenda) return Number(legenda);
+  const final = /(\d{4})$/.exec(c.numero);
+  return final ? Number(final[1]) : null;
+};
+
+/** Aceita o código de barras completo ou só o número impresso no crachá (1, 2, 03…). */
+const resolverCracha = (texto: string, lista: Cracha[]): Cracha | undefined => {
+  const valor = texto.trim().toUpperCase();
+  if (!valor) return undefined;
+  const exato = lista.find((c) => c.numero === valor);
+  if (exato) return exato;
+  if (/^\d{1,3}$/.test(valor)) return lista.find((c) => c.ativo && numeroCurtoDoCracha(c) === Number(valor));
+  return undefined;
+};
 import { cn, formatDateTime, formatTime } from '@/lib/utils';
 import { biometricProvider, isBiometricAgentConfigured, DeviceStatus, IdentificationMethod } from '@/services/identification';
 import { generateInstitutionalPdf } from '@/services/pdfService';
@@ -220,6 +242,7 @@ export const RecepcaoPage: React.FC = () => {
   const [formServidorDestinoBusca, setFormServidorDestinoBusca] = useState('');
   const [isServidorDestinoBuscaOpen, setIsServidorDestinoBuscaOpen] = useState(false);
   const [formCracha, setFormCracha] = useState('');
+  const [crachasInventario, setCrachasInventario] = useState<Cracha[]>([]);
   const [formCrachaFeedback, setFormCrachaFeedback] = useState<string | null>(null);
   const [formMotivo, setFormMotivo] = useState('Atendimento institucional');
   const [formObservacoes, setFormObservacoes] = useState('');
@@ -644,6 +667,7 @@ export const RecepcaoPage: React.FC = () => {
 
   const handleIniciarEntrada = (crachaNumero = '') => {
     void carregarDadosIniciais();
+    void dataService.getCrachas().then(setCrachasInventario).catch(() => setCrachasInventario([]));
     setFormCracha(crachaNumero);
     setFormCrachaFeedback(null);
     setFormDestinoDepId('');
@@ -662,7 +686,9 @@ export const RecepcaoPage: React.FC = () => {
       setFormCrachaFeedback(null);
       return true;
     }
-    const cracha = (await dataService.getCrachas()).find((item) => item.numero === numero);
+    const inventario = await dataService.getCrachas();
+    setCrachasInventario(inventario);
+    const cracha = resolverCracha(numero, inventario);
     if (!cracha) {
       setFormCrachaFeedback(`O código ${numero} não está cadastrado no inventário de crachás.`);
       return false;
@@ -840,7 +866,7 @@ export const RecepcaoPage: React.FC = () => {
           departamento_destino_id: destinosValidos[0].departamento_destino_id,
           setor_destino_id: destinosValidos[0].setor_destino_id,
           servidor_destino_id: destinosValidos[0].servidor_destino_id,
-          cracha_numero: formCracha.trim().toUpperCase(),
+          cracha_numero: resolverCracha(formCracha, crachasInventario)?.numero ?? formCracha.trim().toUpperCase(),
           motivo: formMotivo,
           requer_autorizacao: requerAutorizacao,
           observacoes,
@@ -2037,8 +2063,39 @@ export const RecepcaoPage: React.FC = () => {
               <Button type="button" size="sm" variant="outline" className="min-h-11 shrink-0 rounded-xl" onClick={() => setCameraTarget('entrada')} aria-label="Ler com a câmera"><Camera className="w-4 h-4" /><span className="hidden sm:inline">Ler com a câmera</span></Button>
             </div>
             <p className="text-xs text-[#627289] dark:text-slate-400">
-              O leitor USB preenche este campo automaticamente. Deixe em branco se não houver entrega de crachá.
+              O leitor USB preenche este campo automaticamente. Você também pode digitar só o número do crachá ou tocar nele abaixo. Deixe em branco se não houver entrega de crachá.
             </p>
+            <div role="radiogroup" aria-label="Número do crachá" className="grid grid-cols-5 gap-2 border-t border-[#dce4f0] pt-3 sm:grid-cols-10 dark:border-slate-800">
+              {Array.from({ length: QTD_CRACHAS_RAPIDOS }, (_, i) => i + 1).map((n) => {
+                const cracha = crachasInventario.find((c) => c.ativo && numeroCurtoDoCracha(c) === n);
+                const disponivel = Boolean(cracha && cracha.situacao === 'disponivel');
+                const selecionado = Boolean(cracha) && resolverCracha(formCracha, crachasInventario)?.id === cracha?.id;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={selecionado}
+                    disabled={!disponivel}
+                    title={!cracha ? 'Crachá não cadastrado' : disponivel ? `Crachá ${n}` : `Crachá ${n} indisponível (${cracha.situacao.replace('_', ' ')})`}
+                    onClick={() => {
+                      if (!cracha) return;
+                      setFormCracha(selecionado ? '' : cracha.numero);
+                      setFormCrachaFeedback(selecionado ? null : `Crachá ${cracha.numero} disponível para vinculação.`);
+                    }}
+                    className={cn(
+                      'flex flex-col items-center gap-1 rounded-xl border py-1.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                      selecionado
+                        ? 'border-[#0877d1] bg-[#e3effc] text-[#0877d1] dark:bg-sky-950 dark:text-sky-300'
+                        : 'border-transparent text-[#102755] hover:bg-[#f0f6fd] dark:text-slate-200 dark:hover:bg-slate-800',
+                    )}
+                  >
+                    <span className={cn('h-4 w-4 rounded-full border-2', selecionado ? 'border-[#0877d1] bg-[#0877d1] ring-2 ring-white ring-inset' : 'border-slate-400')} />
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
             {formCrachaFeedback && (
               <p className={`text-xs font-medium ${formCrachaFeedback.includes('disponível') ? 'text-[#16a34a] dark:text-emerald-300' : 'text-[#dc2626] dark:text-rose-300'}`}>
                 {formCrachaFeedback}
