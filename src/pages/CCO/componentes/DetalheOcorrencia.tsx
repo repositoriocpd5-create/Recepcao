@@ -461,7 +461,7 @@ const FotoOcorrencia: React.FC<{ caminho: string }> = ({ caminho }) => {
             role="dialog"
             aria-modal="true"
             aria-label="Foto em tela cheia"
-            className="fixed inset-0 z-[1000] flex cursor-zoom-out items-center justify-center bg-black/90 p-4"
+            className="fixed inset-0 z-[1400] flex cursor-zoom-out items-center justify-center bg-black/90 p-4"
             onClick={() => setAmpliada(false)}
           >
             <button type="button" onClick={() => setAmpliada(false)} className="absolute right-4 top-4 rounded-full bg-white/15 p-2 text-white hover:bg-white/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" aria-label="Fechar tela cheia">
