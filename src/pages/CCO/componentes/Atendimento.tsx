@@ -363,13 +363,7 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
         </div>
       ) : (
         <form onSubmit={registrarAndamento} noValidate className="space-y-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/30 dark:bg-emerald-950/20">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className={cn(titulo, 'mb-0')}>Registrar andamento</h3>
-            <button type="submit" disabled={salvando} className={cn(botaoPrimario, 'min-h-11 px-4 text-sm')}>
-              {salvando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />}
-              {salvando ? 'Registrando…' : 'Adicionar andamento'}
-            </button>
-          </div>
+          <h3 className={cn(titulo, 'mb-0')}>Registrar andamento</h3>
 
           <Campo id="cco-andamento" rotulo="O que foi feito" erro={erroTexto || null} ajuda="Fica no histórico com seu nome, data e hora, e é visível para a unidade escolar.">
             <textarea
@@ -394,7 +388,7 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
                   <div className="min-w-0">
                     <p className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Visita presencial agendada</p>
                     <p className={cn('text-sm font-bold text-[#10233f] dark:text-slate-100', cancelarVisita && 'line-through opacity-60')}>{formatarVisita(oc.visita_data, oc.visita_hora)}</p>
-                    {cancelarVisita && <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">O cancelamento será registrado ao adicionar o andamento.</p>}
+                    {cancelarVisita && <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">O cancelamento será registrado ao salvar o andamento.</p>}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 pl-[52px]">
@@ -558,15 +552,21 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
             )}
           </Campo>
 
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <Aviso mensagem={mensagem} />
+            <div className="flex flex-col gap-2 sm:ml-auto sm:flex-row">
+            <button type="submit" disabled={salvando} className={cn(botaoPrimario, 'min-h-11 px-4 text-sm')}>
+              {salvando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />}
+              {salvando ? 'Salvando…' : 'Salvar Andamento'}
+            </button>
             <button
               type="button"
               onClick={() => abrirModal('finalizar')}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-600 px-4 text-sm font-bold text-white shadow-[0_10px_20px_-12px_rgba(22,163,74,.9)] transition-colors hover:bg-green-700 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:ml-auto"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-600 px-4 text-sm font-bold text-white shadow-[0_10px_20px_-12px_rgba(22,163,74,.9)] transition-colors hover:bg-green-700 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-green-600"
             >
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Finalizar ocorrência
             </button>
+            </div>
           </div>
         </form>
       )}

@@ -458,8 +458,8 @@ const TOPICOS_EQUIPE: TopicoEquipe[] = [
     id: 'eq-andamento',
     titulo: 'Registrar andamento e responsável',
     icone: ClipboardList,
-    busca: 'Abra a ocorrência. Em Registrar andamento, escreva O que foi feito, escolha a Situação após o andamento e o Responsável pelo atendimento (ou Assumir como responsável) e toque em Adicionar andamento. O texto fica no histórico e é visível para a unidade.',
-    texto: <>Abra a ocorrência. Em <Ui>Registrar andamento</Ui>, escreva <Ui>O que foi feito</Ui>, escolha a <Ui>Situação após o andamento</Ui> e o <Ui>Responsável pelo atendimento</Ui> (ou <Ui>Assumir como responsável</Ui>) e toque em <Ui>Adicionar andamento</Ui>. O texto fica no histórico e a unidade vê.</>,
+    busca: 'Abra a ocorrência. Em Registrar andamento, escreva O que foi feito, escolha a Situação após o andamento e o Responsável pelo atendimento (ou Assumir como responsável) e toque em Salvar Andamento. O texto fica no histórico e é visível para a unidade.',
+    texto: <>Abra a ocorrência. Em <Ui>Registrar andamento</Ui>, escreva <Ui>O que foi feito</Ui>, escolha a <Ui>Situação após o andamento</Ui> e o <Ui>Responsável pelo atendimento</Ui> (ou <Ui>Assumir como responsável</Ui>) e toque em <Ui>Salvar Andamento</Ui>. O texto fica no histórico e a unidade vê.</>,
   },
   {
     id: 'eq-finalizar',
