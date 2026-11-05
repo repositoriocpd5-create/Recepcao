@@ -41,6 +41,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Ca
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { Combobox } from '@/components/ui/Combobox';
 import {
   dataService,
   formatCpf,
@@ -2153,37 +2154,36 @@ export const RecepcaoPage: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <Select
+                      <Combobox
                         label="Departamento de destino"
-                        className="min-h-11 rounded-xl"
+                        className="rounded-xl"
                         value={destino.setor_destino_id}
-                        onChange={(event) => atualizarDestinoVisita(index, { setor_destino_id: event.target.value })}
-                        options={[
-                          { value: '', label: 'Selecione o departamento' },
-                          ...setoresDestinoOpcoes.map((s) => ({
-                            value: s.id,
-                            label: `${s.sigla} - ${s.nome}`,
-                          })),
-                        ]}
+                        onChange={(valor) => atualizarDestinoVisita(index, { setor_destino_id: valor })}
+                        placeholder="Selecione o departamento"
+                        searchPlaceholder="Busque por sigla ou nome"
+                        emptyMessage="Nenhum departamento encontrado"
+                        requiredMessage="Selecione o departamento de destino."
+                        options={setoresDestinoOpcoes.map((s) => ({
+                          value: s.id,
+                          label: `${s.sigla} - ${s.nome}`,
+                        }))}
                         required
                       />
 
-                      <Select
+                      <Combobox
                         label="Diretor / Servidor"
-                        className={`min-h-11 rounded-xl${exigeAut ? ' select-perigo' : ''}`}
+                        className={`rounded-xl${exigeAut ? ' !text-rose-600 dark:!text-rose-400' : ''}`}
                         value={destino.servidor_destino_id || ''}
-                        onChange={(event) => atualizarDestinoVisita(index, { servidor_destino_id: event.target.value })}
-                        options={[
-                          {
-                            value: '',
-                            label: destino.setor_destino_id ? 'Selecione uma pessoa (opcional)' : 'Selecione primeiro o departamento',
-                          },
-                          ...servidoresDoDestino.map((servidor) => ({
-                            value: servidor.id,
-                            label: `${servidor.nome} — ${servidor.cargo}`,
-                            destaque: servidorExigeAutorizacaoNoSetor(destino.setor_destino_id, servidor.id) ? ('perigo' as const) : undefined,
-                          })),
-                        ]}
+                        onChange={(valor) => atualizarDestinoVisita(index, { servidor_destino_id: valor })}
+                        placeholder={destino.setor_destino_id ? 'Selecione uma pessoa (opcional)' : 'Selecione primeiro o departamento'}
+                        searchPlaceholder="Busque por nome ou cargo"
+                        emptyMessage="Nenhum servidor encontrado neste departamento"
+                        options={servidoresDoDestino.map((servidor) => ({
+                          value: servidor.id,
+                          label: servidor.nome,
+                          detail: servidor.cargo,
+                          destaque: servidorExigeAutorizacaoNoSetor(destino.setor_destino_id, servidor.id) ? ('perigo' as const) : undefined,
+                        }))}
                         disabled={!destino.setor_destino_id}
                       />
                     </div>
