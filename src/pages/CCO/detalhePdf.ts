@@ -181,6 +181,10 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
 
   // ── Alerta de caso grave ────────────────────────────────────────────────
   if (gravidade.grave) {
+    // A fonte precisa estar definida ANTES de quebrar o texto, senão a medição usa outra fonte.
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.8);
+    doc.setCharSpace(0);
     const linhas = doc.splitTextToSize(
       `${SUGESTAO_IMAGENS}${gravidade.motivo ? ` ${gravidade.motivo}` : ''}`.trim(),
       LARGURA - 14,
