@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CalendarDays, Cctv, Check, ChevronDown, ClipboardList, Clock, Loader2, MapPin, MoonStar, Pencil, Plus, RotateCcw, Save, Send, ShieldCheck, Wrench, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -135,6 +136,9 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
   const [tipoRegistro, setTipoRegistro] = useState<CcoTipoRegistro>(() => edicao?.tipo_registro ?? 'ocorrencia');
   const [cameras, setCameras] = useState<string[]>(() => edicao?.cameras ?? []);
   const [locais, setLocais] = useState<string[]>(() => edicao?.locais ?? []);
+  const queryClient = useQueryClient();
+  // Locais que outras unidades (ou esta) já incluíram: aparecem para todas na lista.
+  const locaisIncluidos = useQuery({ queryKey: ['cco', 'locais'], queryFn: () => ccoService.listarLocaisPersonalizados(), staleTime: 5 * 60_000 });
   const [tipoProblema, setTipoProblema] = useState(() => edicao?.tipo_problema || TIPOS_PROBLEMA_CAMERA[0]);
   const [tiposExtras, setTiposExtras] = useState<string[]>(lerTiposExtras);
   const [novoTipo, setNovoTipo] = useState('');
@@ -554,7 +558,15 @@ export const FormularioOcorrencia: React.FC<Props> = ({ user, unidadeId, unidade
                     <MapPin className="h-4 w-4 text-[#0b63ce] dark:text-sky-300" aria-hidden="true" /> Local da ocorrência
                     <span className="text-xs font-semibold text-[#5f7391] dark:text-slate-400">(opcional)</span>
                   </label>
-                  <SeletorLocais id="cco-locais" valor={locais} disabled={ocupado} onChange={setLocais} />
+                  <SeletorLocais
+                    id="cco-locais"
+                    valor={locais}
+                    disabled={ocupado}
+                    onChange={setLocais}
+                    locaisIncluidos={locaisIncluidos.data}
+                    onNovoItem={(nome) => { void ccoService.incluirLocal(user, nome).then(() => queryClient.invalidateQueries({ queryKey: ['cco', 'locais'] })); }}
+                    focarAposIncluir={ID_CAMPO.descricao}
+                  />
                 </div>
               )}
             </div>

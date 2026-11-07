@@ -17,6 +17,10 @@ interface Props {
   placeholderOutro?: string;
   rotuloOutro?: string;
   placeholderBusca?: string;
+  /** Chamado quando o texto digitado em "Incluir" é um item que ainda não existe na lista (para guardá-lo no sistema). */
+  onNovoItem?: (nome: string) => void;
+  /** Id do campo que recebe o foco depois de "Incluir" (a lista também fecha). */
+  focarAposIncluir?: string;
 }
 
 const NOME_MAX = 60;
@@ -34,6 +38,8 @@ export const SeletorCameras: React.FC<Props> = ({
   placeholderOutro = 'Outra câmera (ex.: Biblioteca)',
   rotuloOutro = 'Nome de outra câmera',
   placeholderBusca,
+  onNovoItem,
+  focarAposIncluir,
 }) => {
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState('');
@@ -66,18 +72,30 @@ export const SeletorCameras: React.FC<Props> = ({
     };
   }, [aberto]);
 
+  const normalizar = (texto: string) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('pt-BR').trim();
+
   const alternar = (camera: string) =>
     onChange(valor.includes(camera) ? valor.filter((c) => c !== camera) : [...valor, camera]);
 
   const adicionarOutra = () => {
     const nome = outra.trim().replace(/\s+/g, ' ').slice(0, NOME_MAX);
     if (!nome) return;
-    if (!valor.some((c) => c.toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR'))) onChange([...valor, nome]);
+    const existente = [...sugestoes, ...valor].some((c) => normalizar(c) === normalizar(nome));
+    if (!valor.some((c) => normalizar(c) === normalizar(nome))) onChange([...valor, nome]);
+    if (!existente) onNovoItem?.(nome);
     setOutra('');
+    if (focarAposIncluir) {
+      setAberto(false);
+      // Espera a lista fechar para levar o foco ao próximo campo do formulário.
+      window.setTimeout(() => {
+        const proximo = document.getElementById(focarAposIncluir);
+        proximo?.focus();
+        proximo?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }, 0);
+    }
   };
 
   const extras = valor.filter((c) => !sugestoes.includes(c));
-  const normalizar = (texto: string) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('pt-BR').trim();
   const opcoes = [...sugestoes, ...extras];
   const filtradas = opcoes.filter((opcao) => normalizar(opcao).includes(normalizar(busca)));
 
@@ -228,10 +246,10 @@ export const SeletorCameras: React.FC<Props> = ({
 };
 
 /** Local da ocorrência: mesmo componente, com as sugestões de local. */
-export const SeletorLocais: React.FC<Omit<Props, 'sugestoes' | 'rotuloSelecionados' | 'rotuloLista' | 'placeholderOutro' | 'rotuloOutro'>> = (props) => (
+export const SeletorLocais: React.FC<Omit<Props, 'sugestoes' | 'rotuloSelecionados' | 'rotuloLista' | 'placeholderOutro' | 'rotuloOutro'> & { locaisIncluidos?: string[] }> = ({ locaisIncluidos = [], ...props }) => (
   <SeletorCameras
     {...props}
-    sugestoes={LOCAIS_SUGERIDOS}
+    sugestoes={[...LOCAIS_SUGERIDOS, ...locaisIncluidos.filter((l) => !LOCAIS_SUGERIDOS.includes(l))]}
     rotuloSelecionados="Locais selecionados"
     rotuloLista="Locais da unidade"
     placeholderOutro="Outro local (ex.: Biblioteca)"

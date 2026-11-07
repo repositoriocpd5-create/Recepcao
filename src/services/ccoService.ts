@@ -29,6 +29,7 @@ const CHAVES = {
   OCORRENCIAS: 'sme_cco_ocorrencias',
   HISTORICO: 'sme_cco_historico',
   FOTOS: 'sme_cco_fotos',
+  LOCAIS: 'sme_cco_locais',
 };
 
 // ─── Problema em câmera ───
@@ -359,7 +360,39 @@ export function motivoSemEdicao(user: UserProfile, oc: CcoOcorrencia): string | 
 
 export const podeEditar = (user: UserProfile, oc: CcoOcorrencia) => motivoSemEdicao(user, oc) === null;
 
+const chaveLocal = (nome: string) => nome.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('pt-BR').trim();
+
 export const ccoService = {
+  /** Locais incluídos pelas unidades (além dos padrões de LOCAIS_SUGERIDOS). Falha sem barulho: a lista padrão basta. */
+  async listarLocaisPersonalizados(): Promise<string[]> {
+    try {
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase.from('cco_locais').select('nome').order('nome', { ascending: true });
+        if (error) return [];
+        return (data || []).map((l: { nome: string }) => l.nome);
+      }
+      return ler<string[]>(CHAVES.LOCAIS, []);
+    } catch {
+      return [];
+    }
+  },
+
+  /** Guarda um local novo para todas as unidades. Local já existente (mesmo com acento ou maiúscula diferente) é ignorado. */
+  async incluirLocal(user: UserProfile, nome: string): Promise<void> {
+    const limpo = nome.trim().replace(/\s+/g, ' ').slice(0, 60);
+    if (limpo.length < 2) return;
+    const nomeFinal = limpo.charAt(0).toLocaleUpperCase('pt-BR') + limpo.slice(1);
+    if (LOCAIS_SUGERIDOS.some((l) => chaveLocal(l) === chaveLocal(nomeFinal))) return;
+    if (isSupabaseConfigured) {
+      // 23505 = já existe: tudo certo. Outros erros (migração ainda não aplicada) não travam o registro.
+      await supabase.from('cco_locais').insert({ nome: nomeFinal, criado_por: user.id });
+      return;
+    }
+    const atuais = ler<string[]>(CHAVES.LOCAIS, []);
+    if (atuais.some((l) => chaveLocal(l) === chaveLocal(nomeFinal))) return;
+    gravar(CHAVES.LOCAIS, [...atuais, nomeFinal].sort((a, b) => a.localeCompare(b, 'pt-BR')));
+  },
+
   async getUnidade(id?: string | null): Promise<RamalUnidade | null> {
     if (!id) return null;
     if (isSupabaseConfigured) {
