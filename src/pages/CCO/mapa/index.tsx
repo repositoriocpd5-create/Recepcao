@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock,
   ExternalLink,
+  History,
   Info,
   Maximize2,
   Minimize2,
@@ -33,6 +34,7 @@ import { DetalheOcorrencia } from '../componentes/DetalheOcorrencia';
 import { IMPORTANCIAS, importanciaDe } from '@/services/ccoService';
 import { Carregando } from '../componentes/ui';
 import { MapaRede } from './MapaRede';
+import { HistoricoEscola } from './HistoricoEscola';
 import { useTempoRealCco } from '../tempoReal';
 import { CcoOcorrencia } from '@/types';
 import {
@@ -278,6 +280,7 @@ export const MapaRedePage: React.FC = () => {
   const [filtroCriticidade, setFiltroCriticidade] = useState<FiltroCriticidade>('');
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>('');
   const [selecionada, setSelecionada] = useState<string | null>(null);
+  const [historicoEscola, setHistoricoEscola] = useState<string | null>(null);
   const [paradas, setParadas] = useState<string[]>([]);
   const [escolhendo, setEscolhendo] = useState(false);
   const [buscaEscolha, setBuscaEscolha] = useState('');
@@ -427,11 +430,15 @@ export const MapaRedePage: React.FC = () => {
       IMPORTANCIAS[importanciaDe(a).nivel].ordem - IMPORTANCIAS[importanciaDe(b).nivel].ordem
       || a.created_at.localeCompare(b.created_at))[0];
 
-  /** Clique na escola do mapa: com ocorrência em aberto, já abre a mais urgente para tomar providências. */
+  /**
+   * Clique na escola do mapa: com uma única ocorrência em aberto, já abre ela para tomar providências;
+   * com várias, abre a lista da escola para escolher qual atender (antes só a mais urgente aparecia).
+   */
   const clicarNaUnidade = useCallback((id: string) => {
     setSelecionada(id);
     const unidade = comLocal.find((u) => u.id === id);
-    if (unidade?.abertas.length) detalhe.abrir(maisUrgente(unidade).id);
+    if (unidade && unidade.abertas.length > 1) setHistoricoEscola(id);
+    else if (unidade?.abertas.length) detalhe.abrir(maisUrgente(unidade).id);
     else if (!window.matchMedia('(min-width: 1280px)').matches) setGavetaAberta(true);
   }, [comLocal, detalhe]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -771,6 +778,11 @@ export const MapaRedePage: React.FC = () => {
                     ))}
                   </ul>
                 )}
+                {(ocorrencias.data || []).some((oc) => oc.unidade_id === unidadeSelecionada.id) && (
+                  <button type="button" onClick={() => setHistoricoEscola(unidadeSelecionada.id)} className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[#0b63ce] hover:underline dark:text-sky-300">
+                    <History className="h-3.5 w-3.5" aria-hidden="true" /> Ver todas as ocorrências desta escola
+                  </button>
+                )}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button type="button" onClick={() => alternarParada(unidadeSelecionada.id)} className={cn(botaoBarra, 'h-9 border border-[#b9cfe9] text-[#0b4fa3] hover:bg-[#eef5fe] dark:border-slate-700 dark:text-sky-200')}>
                     {paradas.includes(unidadeSelecionada.id) ? <><X className="h-4 w-4" /> Tirar da rota</> : <><Plus className="h-4 w-4" /> Rota</>}
@@ -869,6 +881,12 @@ export const MapaRedePage: React.FC = () => {
           </aside>
         )}
       </div>
+      <HistoricoEscola
+        escola={historicoEscola ? comLocal.find((u) => u.id === historicoEscola) ?? null : null}
+        ocorrencias={ocorrencias.data || []}
+        onAbrir={(oc) => detalhe.abrir(oc.id)}
+        onFechar={() => setHistoricoEscola(null)}
+      />
       <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user!} onFechar={detalhe.fechar} />
     </section>
   );
