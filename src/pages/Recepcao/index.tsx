@@ -753,6 +753,12 @@ export const RecepcaoPage: React.FC = () => {
     }
   };
 
+  // O inventário alimenta os botões numerados da devolução rápida (só crachá em uso pode ser devolvido).
+  useEffect(() => {
+    if (!isBarcodeReturnModalOpen) return;
+    void dataService.getCrachas().then(setCrachasInventario).catch(() => setCrachasInventario([]));
+  }, [isBarcodeReturnModalOpen, returnBarcodeFeedback]);
+
   const handleQuickBarcodeReturn = async (event: React.FormEvent) => {
     event.preventDefault();
     const barcode = returnBarcodeInput.trim().toUpperCase();
@@ -1675,36 +1681,106 @@ export const RecepcaoPage: React.FC = () => {
         onClose={() => { if (!cameraTarget && !isReturningBadge) setIsBarcodeReturnModalOpen(false); }}
         title="Devolução rápida de crachá"
         description="Leia ou digite o código e confirme a devolução antes de registrar a saída."
-        maxWidth="md"
+        icon={<Barcode className="w-6 h-6" />}
+        maxWidth="3xl"
+        variant="destaque"
       >
-        <form onSubmit={handleQuickBarcodeReturn} className="space-y-4">
-          <div className="rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] p-3 flex items-start gap-3 dark:border-emerald-500/30 dark:bg-emerald-950/30">
-            <span className="p-2 rounded-lg bg-white text-[#16a34a] dark:bg-emerald-900/50"><Barcode className="w-5 h-5" /></span>
-            <div className="text-xs text-[#166534] dark:text-emerald-200"><strong>Confirmação obrigatória.</strong> A leitura apenas preenche o código. A saída e a liberação do crachá acontecem somente após selecionar Registrar devolução.</div>
+        <form onSubmit={handleQuickBarcodeReturn} className="space-y-4 px-4 pb-5 pt-6 sm:px-6">
+          {/* Confirmação obrigatória */}
+          <div className="flex items-center gap-4 rounded-2xl border border-[#c9e1f6] bg-[#e8f2fd] px-4 py-3 dark:border-slate-800 dark:bg-slate-900/80">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white text-[#0c2250] shadow-sm dark:bg-slate-800 dark:text-slate-100"><Barcode className="h-6 w-6" /></span>
+            <div className="min-w-0 text-sm text-[#3b4d68] dark:text-slate-300">
+              <strong className="block text-lg font-extrabold text-[#0c2250] dark:text-slate-100">Confirmação obrigatória.</strong>
+              A saída e a liberação do crachá acontecem somente após selecionar Registrar devolução.
+            </div>
           </div>
+
           {!returnBarcodeFeedback?.valid && (
-            <Input
-              ref={returnBarcodeInputRef}
-              label="Código de barras do crachá devolvido"
-              value={returnBarcodeInput}
-              onChange={(event) => setReturnBarcodeInput(event.target.value)}
-              placeholder="Aproxime o leitor ou digite o código"
-              icon={<Barcode className="w-4 h-4" />}
-              autoFocus
-            />
+            <>
+              <div className="space-y-2">
+                <label htmlFor="devolucao-codigo" className="block text-lg font-extrabold text-[#0c2250] dark:text-slate-100">Código de barras do crachá devolvido</label>
+                <div className="flex gap-3">
+                  <Input
+                    id="devolucao-codigo"
+                    ref={returnBarcodeInputRef}
+                    className="min-h-12 rounded-xl border-[#0b63ce]"
+                    value={returnBarcodeInput}
+                    onChange={(event) => setReturnBarcodeInput(event.target.value)}
+                    placeholder="Aproxime o leitor ou digite o código"
+                    icon={<Barcode className="w-5 h-5" />}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCameraTarget('devolucao')}
+                    disabled={isReturningBadge}
+                    className="inline-flex min-h-12 shrink-0 items-center gap-2 rounded-xl border border-[#b8d3f0] bg-white px-4 text-sm font-bold text-[#0c2250] transition-colors hover:bg-[#f1f6fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  >
+                    <Camera className="h-5 w-5" /><span className="hidden sm:inline">Ler com a câmera</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div>
+                  <h3 className="text-lg font-extrabold text-[#0c2250] dark:text-slate-100">Número do crachá</h3>
+                  <p className="text-sm text-[#52657f] dark:text-slate-400">Selecione o número do crachá devolvido.</p>
+                </div>
+                <div role="radiogroup" aria-label="Número do crachá devolvido" className="grid grid-cols-5 gap-2.5 sm:grid-cols-10">
+                  {Array.from({ length: QTD_CRACHAS_RAPIDOS }, (_, i) => i + 1).map((n) => {
+                    const cracha = crachasInventario.find((c) => c.ativo && numeroCurtoDoCracha(c) === n);
+                    // Só crachá em uso pode ser devolvido; selecionar apenas identifica (a saída é confirmada no botão).
+                    const devolvivel = Boolean(cracha && cracha.situacao === 'em_uso');
+                    const selecionado = Boolean(cracha) && resolverCracha(returnBarcodeInput, crachasInventario)?.id === cracha?.id;
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        role="radio"
+                        aria-checked={selecionado}
+                        disabled={!devolvivel || isReturningBadge}
+                        title={!cracha ? 'Crachá não cadastrado' : devolvivel ? `Crachá ${n} em uso — selecione para identificar a devolução` : `Crachá ${n} já está disponível (${cracha.situacao.replace('_', ' ')})`}
+                        onClick={() => {
+                          if (!cracha) return;
+                          setReturnBarcodeInput(selecionado ? '' : cracha.numero);
+                          setReturnBarcodeFeedback(null);
+                        }}
+                        className={cn(
+                          'grid h-11 place-items-center rounded-xl border text-base font-extrabold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600',
+                          selecionado
+                            ? 'border-emerald-700 bg-gradient-to-b from-emerald-500 to-emerald-700 text-white shadow-[0_3px_0_#065f46] ring-2 ring-emerald-300'
+                            : devolvivel
+                              ? 'border-emerald-300 bg-gradient-to-b from-[#f0fff6] to-[#cdf5dc] text-emerald-900 shadow-[0_2px_0_rgba(5,150,105,.22)] hover:to-[#b6efcc] dark:border-emerald-500/50 dark:from-emerald-950 dark:to-emerald-900 dark:text-emerald-100'
+                              : 'cursor-not-allowed border-[#d5dfec] bg-[#f1f4f8] text-[#9aa8bb] opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500',
+                        )}
+                      >
+                        {n}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
-          {!returnBarcodeFeedback?.valid && <Button type="button" variant="outline" className="min-h-11" onClick={() => setCameraTarget('devolucao')} disabled={isReturningBadge}><Camera className="w-4 h-4" /> Ler com câmera do celular</Button>}
+
           {returnBarcodeFeedback && (
             <div className={`rounded-xl border-2 p-4 text-sm font-semibold ${returnBarcodeFeedback.valid ? 'border-[#86efac] bg-[#f0fdf4] text-[#166534] dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-200' : 'animate-pulse border-[#f87171] bg-[#fef2f2] text-[#b91c1c] shadow-[0_0_0_3px_rgba(248,113,113,.12)] dark:border-rose-500/50 dark:bg-rose-950/30 dark:text-rose-200'}`}>
               {returnBarcodeFeedback.message}
             </div>
           )}
-          <div className="flex justify-end gap-3 pt-1">
-            <Button type="button" variant="outline" onClick={() => setIsBarcodeReturnModalOpen(false)}>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" className="min-h-12 rounded-xl border-[#9cc0ea] px-7 font-bold text-[#0c2250]" onClick={() => setIsBarcodeReturnModalOpen(false)}>
               {returnBarcodeFeedback?.valid ? 'Concluir' : 'Fechar'}
             </Button>
             {!returnBarcodeFeedback?.valid && (
-              <Button type="submit" variant="danger" isLoading={isReturningBadge}><Barcode className="w-4 h-4" /> Registrar devolução</Button>
+              <Button
+                type="submit"
+                variant="danger"
+                className="min-h-12 rounded-xl !bg-[#e5365f] px-7 text-base font-extrabold !text-white shadow-[0_10px_22px_-10px_rgba(229,54,95,.9)] hover:!bg-[#cf2a52]"
+                isLoading={isReturningBadge}
+              >
+                Registrar devolução
+              </Button>
             )}
           </div>
         </form>
