@@ -15,9 +15,10 @@ import { Carregando, Cartao, ESTILO_SITUACAO } from './componentes/ui';
 import { useDetalheNaUrl, useOcorrencias } from './hooks';
 import { DetalheOcorrencia } from './componentes/DetalheOcorrencia';
 import { TabelaAdmin } from './componentes/TabelaAdmin';
+import { DensidadeControle, useDensidade } from './componentes/DensidadeTabela';
 import { BoasVindasAdmin } from './componentes/BoasVindasAdmin';
 
-const INDICADOR: Record<string, string> = { registrada: 'Registradas', em_analise: 'Em análise', em_atendimento: 'Em atendimento', concluida: 'Solucionadas' };
+const INDICADOR: Record<string, string> = { registrada: 'Aguardando análise', em_analise: 'Em verificação', em_atendimento: 'Em providência', concluida: 'Solucionadas' };
 
 /** Painel da equipe CCO (e do administrador): ocorrências das unidades autorizadas. */
 export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
@@ -61,6 +62,7 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
   const pessoas = useQuery({ queryKey: ['cco', 'pessoas-unidades'], queryFn: () => ccoService.listarPessoasDasUnidades(), enabled: admin, staleTime: 10 * 60_000 });
   const [importancia, setImportancia] = useState<Importancia | ''>('');
   const [ordem, setOrdem] = useState<'recentes' | 'importancia'>('recentes');
+  const [densidade, setDensidade] = useDensidade();
   const exibidas = useMemo(() => {
     if (!admin) return filtradas;
     const lista = importancia ? filtradas.filter((oc) => importanciaDe(oc).nivel === importancia) : filtradas;
@@ -187,7 +189,8 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
                     { valor: 'baixa', rotulo: IMPORTANCIAS.baixa.rotulo, contagem: contagemImportancia.baixa, ponto: 'bg-slate-400' },
                   ]}
                 />
-                <label className="ml-auto block">
+                <div className="ml-auto hidden lg:block"><DensidadeControle valor={densidade} onChange={setDensidade} /></div>
+                <label className="block">
                   <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#6b7f9b] dark:text-slate-500">Ordenar por</span>
                   <select
                     value={ordem}
@@ -218,6 +221,7 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
                   onAbrir={(oc) => detalhe.abrir(oc.id)}
                   onAndamento={(oc) => detalhe.abrir(oc.id, 'andamento')}
                   onExcluir={setExcluir}
+                  densidade={densidade}
                 />
               </div>
             )}

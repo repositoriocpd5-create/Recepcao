@@ -150,9 +150,9 @@ export const novoIdentificador = () =>
 
 // ─── Situações ───
 export const SITUACOES: Record<CcoSituacao, { rotulo: string; descricao: string }> = {
-  registrada: { rotulo: 'Registrada', descricao: 'Recebida pelo CCO, aguardando análise.' },
-  em_analise: { rotulo: 'Em análise', descricao: 'A equipe do CCO está verificando as imagens.' },
-  em_atendimento: { rotulo: 'Em atendimento', descricao: 'Providências em andamento.' },
+  registrada: { rotulo: 'Aguardando análise', descricao: 'Recebida pelo CCO, aguardando a primeira análise.' },
+  em_analise: { rotulo: 'Em verificação', descricao: 'A equipe do CCO está vendo imagens e levantando informações.' },
+  em_atendimento: { rotulo: 'Em providência', descricao: 'Equipe, ronda, polícia ou manutenção acionada ou a caminho.' },
   concluida: { rotulo: 'Solucionada', descricao: 'Ocorrência solucionada pelo CCO.' },
 };
 export const ORDEM_SITUACOES: CcoSituacao[] = ['registrada', 'em_analise', 'em_atendimento', 'concluida'];
@@ -262,9 +262,9 @@ function exemplosDemo(): { ocorrencias: CcoOcorrencia[]; historico: CcoHistorico
     evento(1, ocorrencias[0], { situacao_nova: 'registrada', descricao: 'Ocorrência registrada pela unidade.' }),
     evento(2, ocorrencias[0], { tipo: 'responsavel', descricao: 'Responsável definido: Marcos Vinícius Rocha.', autor_id: 'u-demo-cco', autor_nome: 'Marcos Vinícius Rocha', created_at: `${dia(2)}T08:01:00-03:00` }),
     evento(3, ocorrencias[0], { tipo: 'observacao', descricao: 'Imagens conferidas. Guarda Municipal acionada; ronda reforçada no período noturno.', autor_id: 'u-demo-cco', autor_nome: 'Marcos Vinícius Rocha', created_at: `${dia(2)}T09:15:00-03:00` }),
-    evento(4, ocorrencias[0], { tipo: 'situacao', situacao_anterior: 'registrada', situacao_nova: 'concluida', descricao: 'Situação alterada de Registrada para Concluída.', autor_id: 'u-demo-cco', autor_nome: 'Marcos Vinícius Rocha', created_at: `${dia(2)}T10:30:00-03:00` }),
+    evento(4, ocorrencias[0], { tipo: 'situacao', situacao_anterior: 'registrada', situacao_nova: 'concluida', descricao: 'Situação alterada de Aguardando análise para Solucionada.', autor_id: 'u-demo-cco', autor_nome: 'Marcos Vinícius Rocha', created_at: `${dia(2)}T10:30:00-03:00` }),
     evento(5, ocorrencias[1], { situacao_nova: 'registrada', descricao: 'Ocorrência registrada pela unidade.' }),
-    evento(6, ocorrencias[1], { tipo: 'situacao', situacao_anterior: 'registrada', situacao_nova: 'em_atendimento', descricao: 'Situação alterada de Registrada para Em atendimento.', autor_id: 'u-demo-cco', autor_nome: 'Marcos Vinícius Rocha', created_at: `${dia(1)}T15:10:00-03:00` }),
+    evento(6, ocorrencias[1], { tipo: 'situacao', situacao_anterior: 'registrada', situacao_nova: 'em_atendimento', descricao: 'Situação alterada de Aguardando análise para Em providência.', autor_id: 'u-demo-cco', autor_nome: 'Marcos Vinícius Rocha', created_at: `${dia(1)}T15:10:00-03:00` }),
     evento(7, ocorrencias[2], { situacao_nova: 'registrada', descricao: 'Ocorrência registrada pela unidade.' }),
   ];
   return { ocorrencias, historico };

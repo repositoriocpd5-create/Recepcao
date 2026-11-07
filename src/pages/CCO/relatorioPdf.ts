@@ -17,7 +17,7 @@ interface Opcoes {
   ocorrencias: CcoOcorrencia[];
   user: UserProfile;
   pessoas?: PessoasDasUnidades;
-  /** Texto curto dos filtros usados na tela (ex.: "Situação: Registrada · Importância: Alta"). */
+  /** Texto curto dos filtros usados na tela (ex.: "Situação: Aguardando análise · Importância: Alta"). */
   filtros: string;
   /** Administrador: inclui direção da unidade e importância. */
   completo: boolean;

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, CheckCircle2, ExternalLink, Loader2, Lock, MessageSquarePlus, RotateCcw, Sparkles, Undo2, X } from 'lucide-react';
+import { CalendarClock, CheckCircle2, ExternalLink, Loader2, Lock, MessageSquarePlus, NotebookPen, RotateCcw, Search, Sparkles, Truck, Undo2, X, type LucideIcon } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 import { perfilCco } from '@/lib/modulos';
@@ -41,6 +41,21 @@ export const formatarVisita = (data: string, hora?: string | null) => {
 
 /** Situações que um andamento pode definir (registrada é a inicial; solucionada é pela finalização). */
 const SITUACOES_ANDAMENTO: CcoSituacao[] = ['em_analise', 'em_atendimento'];
+
+/** Linguagem do dia a dia para o que o registro significa (os valores gravados no banco não mudam). */
+const OPCOES_ANDAMENTO: Record<CcoSituacao | '', { titulo: string; descricao: string; icone: LucideIcon }> = {
+  em_analise: { titulo: 'Ainda estou verificando', descricao: 'Vendo imagens, levantando informações ou aguardando retorno.', icone: Search },
+  em_atendimento: { titulo: 'Providência em andamento', descricao: 'Equipe, ronda, polícia ou manutenção acionada ou a caminho.', icone: Truck },
+  '': { titulo: 'Só registrar, sem mudar a etapa', descricao: '', icone: NotebookPen },
+  registrada: { titulo: 'Registrada', descricao: '', icone: NotebookPen },
+  concluida: { titulo: 'Solucionada', descricao: '', icone: CheckCircle2 },
+};
+const DESCRICAO_SEM_MUDANCA: Record<CcoSituacao, string> = {
+  registrada: 'Continua aguardando análise.',
+  em_analise: 'Continua em verificação pelo CCO.',
+  em_atendimento: 'Continua com providências em andamento.',
+  concluida: 'Continua solucionada.',
+};
 
 interface Props {
   oc: CcoOcorrencia;
@@ -487,7 +502,8 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
           </div>
 
           <fieldset aria-describedby="cco-sugestao-situacao">
-            <legend className="mb-1.5 block text-sm font-bold text-[#10233f] dark:text-slate-200">Situação após o andamento</legend>
+            <legend className="block text-sm font-bold text-[#10233f] dark:text-slate-200">Como fica a ocorrência após este registro?</legend>
+            <p className="mb-2 mt-0.5 text-xs text-[#5b6f8a] dark:text-slate-400">Escolha o que melhor descreve o momento. Para encerrar o caso, use <strong>Finalizar ocorrência</strong>.</p>
             <div id="cco-sugestao-situacao" aria-live="polite" className="mb-2 min-h-0">
               {analisando ? (
                 <p className="flex items-center gap-1.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
@@ -498,7 +514,7 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
                   <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-300" aria-hidden="true" />
                   <p className="min-w-0 flex-1 text-violet-900 dark:text-violet-100">
                     <span className="font-extrabold">{ROTULO_ORIGEM_SUGESTAO[sugestao.origem]}:</span>{' '}
-                    <span className="font-bold">{sugestao.situacao ? SITUACOES[sugestao.situacao].rotulo : `manter (${SITUACOES[oc.situacao].rotulo})`}</span>
+                    <span className="font-bold">{sugestao.situacao ? OPCOES_ANDAMENTO[sugestao.situacao].titulo : OPCOES_ANDAMENTO[''].titulo}</span>
                     <span className="text-violet-800/90 dark:text-violet-200/80"> — {sugestao.motivo}</span>
                     {escolhaManual && situacao !== (sugestao.situacao ?? '') && (
                       <button type="button" onClick={() => { setSituacao(sugestao.situacao ?? ''); setEscolhaManual(false); }} className="ml-1.5 font-bold text-violet-700 underline underline-offset-2 hover:text-violet-900 dark:text-violet-300">
@@ -509,26 +525,36 @@ export const Atendimento: React.FC<Props> = ({ oc, user, focarAndamento, onSalvo
                 </div>
               ) : null}
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {(['', ...SITUACOES_ANDAMENTO] as (CcoSituacao | '')[]).map((valor) => {
+            <div className="grid grid-cols-1 gap-2">
+              {(['em_analise', 'em_atendimento', ''] as (CcoSituacao | '')[]).map((valor) => {
                 const ativo = situacao === valor;
-                const rotulo = valor === '' ? `Manter (${SITUACOES[oc.situacao].rotulo})` : SITUACOES[valor].rotulo;
+                const opcao = OPCOES_ANDAMENTO[valor];
+                const Icone = opcao.icone;
+                const descricao = valor === '' ? DESCRICAO_SEM_MUDANCA[oc.situacao] : opcao.descricao;
                 return (
                   <label
                     key={valor || 'manter'}
                     className={cn(
-                      'flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border px-2 text-center text-[13px] font-bold transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#0b63ce]',
+                      'flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#0b63ce]',
                       ativo
-                        ? valor ? cn('border-transparent ring-1', ESTILO_SITUACAO[valor].classe) : 'border-[#0b63ce] bg-[#eaf3ff] text-[#0b4fa3] dark:bg-sky-500/10 dark:text-sky-200'
+                        ? valor ? cn('border-transparent ring-2', ESTILO_SITUACAO[valor].classe) : 'border-[#0b63ce] bg-[#eaf3ff] text-[#0b4fa3] ring-1 ring-[#0b63ce] dark:bg-sky-500/10 dark:text-sky-200'
                         : 'border-[#cfdbea] bg-white text-[#3b4d68] hover:border-[#a9c1de] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
                     )}
                   >
                     <input type="radio" name="cco-situacao-andamento" checked={ativo} onChange={() => { setSituacao(valor); setEscolhaManual(true); }} className="sr-only" />
-                    {valor && <span className={cn('h-2.5 w-2.5 rounded-full', ESTILO_SITUACAO[valor].ponto)} aria-hidden="true" />}
-                    {rotulo}
+                    <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', ativo ? 'bg-white/70 dark:bg-black/20' : 'bg-[#eef3f9] dark:bg-slate-800')} aria-hidden="true">
+                      <Icone className="h-[18px] w-[18px]" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-extrabold leading-tight">{opcao.titulo}</span>
+                      <span className="mt-0.5 block text-xs font-medium leading-snug opacity-80">{descricao}</span>
+                    </span>
                     {sugestao && !analisando && (sugestao.situacao ?? '') === valor && (
-                      <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-300" aria-label="sugerida" />
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-700 dark:bg-violet-500/20 dark:text-violet-200">
+                        <Sparkles className="h-3 w-3" aria-hidden="true" /> Sugerida
+                      </span>
                     )}
+                    {ativo && <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" />}
                   </label>
                 );
               })}
