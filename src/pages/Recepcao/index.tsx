@@ -18,6 +18,7 @@ import {
   Fingerprint,
   BadgeX,
   Check,
+  IdCard,
   QrCode,
   Barcode,
   Camera,
@@ -2019,21 +2020,23 @@ export const RecepcaoPage: React.FC = () => {
         title="Entrada em andamento"
         description="Confirme o destino e vincule o crachá entregue."
         icon={<LogIn className="w-6 h-6" />}
-        maxWidth="3xl"
+        maxWidth="2xl"
+        variant="destaque"
       >
-        <form onSubmit={handleConfirmarEntrada} className="space-y-3 sm:space-y-3.5">
-          <div className="flex items-center gap-3.5 rounded-2xl border border-[#c9e1f6] bg-[#edf5fc] px-4 py-3 dark:border-slate-800 dark:bg-slate-900/80">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#dcebf9] text-[#0b6bbf] dark:bg-slate-800 dark:text-sky-300">
+        <form onSubmit={handleConfirmarEntrada} className="space-y-2.5 px-4 pb-3 pt-4 sm:px-6">
+          {/* Pessoa identificada */}
+          <div className="flex items-center gap-3.5 rounded-2xl border border-[#cfe3f6] bg-[#eaf3fc] px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#d9eafa] text-[#0b6bbf] dark:bg-slate-800 dark:text-sky-300">
               <User className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <span className="text-xs text-[#627289] dark:text-slate-400">Pessoa identificada</span>
-              <div className="truncate text-base font-extrabold leading-tight text-[#102755] dark:text-slate-100">
+              <span className="text-xs text-[#52657f] dark:text-slate-400">Pessoa identificada</span>
+              <div className="truncate text-[17px] font-extrabold uppercase leading-tight text-[#0c2250] dark:text-slate-100">
                 {activeTab === 'servidor'
                   ? servidorResultado?.servidor?.nome
                   : visitanteResultado?.visitante?.nome}
               </div>
-              <div className="text-sm text-[#627289] dark:text-slate-400">
+              <div className="text-sm text-[#52657f] dark:text-slate-400">
                 {activeTab === 'servidor'
                   ? <>Matrícula: <span className="ml-1">{servidorResultado?.servidor?.matricula}</span></>
                   : <>CPF: <span className="ml-1">{visitanteResultado?.visitante?.cpf}</span></>}
@@ -2041,10 +2044,14 @@ export const RecepcaoPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Crachá temporário */}
           <div className="space-y-2">
-            <div className="flex items-baseline justify-between">
-              <h3 className="text-base font-extrabold text-[#102755] dark:text-slate-100">Crachá temporário</h3>
-              <span className="text-xs text-[#627289] dark:text-slate-400">Opcional</span>
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-base font-extrabold text-[#0c2250] dark:text-slate-100">
+                <IdCard className="h-5 w-5 text-[#0b63ce] dark:text-sky-300" aria-hidden="true" />
+                Crachá temporário
+              </h3>
+              <span className="rounded-full border border-[#cfdbea] bg-[#f1f6fc] px-2.5 py-0.5 text-xs font-semibold text-[#52657f] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">Opcional</span>
             </div>
             <div className="flex gap-2">
               <Input
@@ -2067,16 +2074,25 @@ export const RecepcaoPage: React.FC = () => {
                 disabled={entrouSemCracha}
                 autoFocus
               />
-              <Button type="button" size="sm" variant="outline" className="min-h-11 shrink-0 rounded-xl" disabled={entrouSemCracha} onClick={() => setCameraTarget('entrada')} aria-label="Ler com a câmera"><Camera className="w-4 h-4" /><span className="hidden sm:inline">Ler com a câmera</span></Button>
-              <Button
+              <button
                 type="button"
-                size="sm"
-                variant="outline"
+                disabled={entrouSemCracha}
+                onClick={() => setCameraTarget('entrada')}
+                aria-label="Ler com a câmera"
+                className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-[#b8d3f0] bg-[#e4effb] px-3 text-sm font-bold text-[#0c2250] shadow-[0_2px_0_rgba(11,79,163,.12)] transition-colors hover:bg-[#d8e8f9] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              >
+                <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#0b4fa3] text-white"><Camera className="h-4 w-4" /></span>
+                <span className="hidden sm:inline">Ler com a câmera</span>
+              </button>
+              <button
+                type="button"
                 aria-pressed={entrouSemCracha}
                 title={entrouSemCracha ? 'Desfazer: voltar a vincular um crachá' : 'A pessoa entrou sem receber crachá'}
                 className={cn(
-                  'min-h-11 shrink-0 rounded-xl',
-                  entrouSemCracha && 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-400/60 dark:bg-amber-500/15 dark:text-amber-200',
+                  'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce]',
+                  entrouSemCracha
+                    ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-400/60 dark:bg-amber-500/15 dark:text-amber-200'
+                    : 'border-[#9db6d4] bg-white text-[#0c2250] hover:bg-[#f1f6fc] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100',
                 )}
                 onClick={() => {
                   const ativar = !entrouSemCracha;
@@ -2085,14 +2101,18 @@ export const RecepcaoPage: React.FC = () => {
                   setFormCrachaFeedback(ativar ? 'Entrada será registrada sem crachá.' : null);
                 }}
               >
-                {entrouSemCracha ? <Check className="w-4 h-4" /> : <BadgeX className="w-4 h-4" />}
-                <span className="whitespace-nowrap">Entrou sem Crachá</span>
-              </Button>
+                {entrouSemCracha ? <Check className="h-5 w-5" /> : <BadgeX className="h-5 w-5" />}
+                <span className="whitespace-nowrap">Entrou sem crachá</span>
+              </button>
             </div>
-            <p className="text-xs text-[#627289] dark:text-slate-400">
-              O leitor USB preenche este campo automaticamente. Você também pode digitar só o número do crachá ou tocar nele abaixo. Deixe em branco se não houver entrega de crachá.
-            </p>
-            <div role="radiogroup" aria-label="Número do crachá" className="grid grid-cols-5 gap-2 border-t border-[#dce4f0] pt-3 sm:grid-cols-10 dark:border-slate-800">
+            {formCrachaFeedback ? (
+              <p role="status" className={`text-xs font-medium ${formCrachaFeedback.includes('disponível') || formCrachaFeedback.includes('sem crachá') ? 'text-[#16a34a] dark:text-emerald-300' : 'text-[#dc2626] dark:text-rose-300'}`}>
+                {formCrachaFeedback}
+              </p>
+            ) : (
+              <p className="text-xs text-[#52657f] dark:text-slate-400">Use o leitor USB, digite o código ou selecione um número abaixo.</p>
+            )}
+            <div role="radiogroup" aria-label="Número do crachá" className="grid grid-cols-5 gap-x-2 gap-y-2 sm:grid-cols-10">
               {Array.from({ length: QTD_CRACHAS_RAPIDOS }, (_, i) => i + 1).map((n) => {
                 const cracha = crachasInventario.find((c) => c.ativo && numeroCurtoDoCracha(c) === n);
                 const disponivel = Boolean(cracha && cracha.situacao === 'disponivel');
@@ -2111,43 +2131,40 @@ export const RecepcaoPage: React.FC = () => {
                       setFormCrachaFeedback(selecionado ? null : `Crachá ${cracha.numero} disponível para vinculação.`);
                     }}
                     className={cn(
-                      'flex flex-col items-center gap-1 rounded-xl border py-1.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                      'grid h-10 place-items-center rounded-xl border text-[15px] font-extrabold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] disabled:cursor-not-allowed disabled:opacity-40',
                       selecionado
-                        ? 'border-[#0877d1] bg-[#e3effc] text-[#0877d1] dark:bg-sky-950 dark:text-sky-300'
-                        : 'border-transparent text-[#102755] hover:bg-[#f0f6fd] dark:text-slate-200 dark:hover:bg-slate-800',
+                        ? 'border-[#0b4fa3] bg-gradient-to-b from-[#1d6fd0] to-[#0b4fa3] text-white shadow-[0_3px_0_#083b7c]'
+                        : 'border-[#b8d3f0] bg-gradient-to-b from-[#f4f9ff] to-[#d9e9fa] text-[#0c2250] shadow-[0_2px_0_rgba(11,79,163,.18)] hover:from-[#ffffff] hover:to-[#cfe3f8] dark:border-slate-700 dark:from-slate-800 dark:to-slate-800 dark:text-slate-100',
                     )}
                   >
-                    <span className={cn('h-4 w-4 rounded-full border-2', selecionado ? 'border-[#0877d1] bg-[#0877d1] ring-2 ring-white ring-inset' : 'border-slate-400')} />
                     {n}
                   </button>
                 );
               })}
             </div>
-            {formCrachaFeedback && (
-              <p className={`text-xs font-medium ${formCrachaFeedback.includes('disponível') ? 'text-[#16a34a] dark:text-emerald-300' : 'text-[#dc2626] dark:text-rose-300'}`}>
-                {formCrachaFeedback}
-              </p>
-            )}
           </div>
 
           {/* Seção de Destinos da Visita (até 10 departamentos) */}
-          <section className="space-y-3 border-t border-[#dce4f0] pt-4 dark:border-slate-800">
+          <section className="space-y-2.5 border-t border-[#dce4f0] pt-3 dark:border-slate-800">
             <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-extrabold text-[#102755] dark:text-slate-100 flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-[#0d6efd]" />
-                  Destino e atendimento
-                </h3>
-                <p className="text-xs text-[#627289] dark:text-slate-400">
-                  A visita pode percorrer até 10 departamentos no prédio.
-                </p>
-              </div>
-              <Badge variant={destinosVisita.length >= 10 ? 'warning' : 'neutral'}>
+              <h3 className="flex items-center gap-2 text-base font-extrabold text-[#0c2250] dark:text-slate-100">
+                <Building2 className="h-5 w-5 text-[#0b63ce] dark:text-sky-300" aria-hidden="true" />
+                Destino e atendimento
+              </h3>
+              <span
+                title="A visita pode percorrer até 10 departamentos no prédio."
+                className={cn(
+                  'rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+                  destinosVisita.length >= 10
+                    ? 'border-amber-400 bg-amber-50 text-amber-800'
+                    : 'border-[#b8d3f0] bg-[#e4effb] text-[#0b4fa3] dark:border-slate-700 dark:bg-slate-800 dark:text-sky-200',
+                )}
+              >
                 {destinosVisita.length}/10 departamentos
-              </Badge>
+              </span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {destinosVisita.map((destino, index) => {
                 const servidoresDoDestino = obterServidoresPorSetor(destino.setor_destino_id);
                 const exigeAut = servidorExigeAutorizacaoNoSetor(destino.setor_destino_id, destino.servidor_destino_id);
@@ -2155,15 +2172,15 @@ export const RecepcaoPage: React.FC = () => {
                 return (
                   <div
                     key={index}
-                    className="relative rounded-2xl border border-[#d6e6f7] bg-[#f8fbff] p-3.5 space-y-3 dark:border-slate-800 dark:bg-slate-900/60 transition-all shadow-sm"
+                    className="relative space-y-2.5 rounded-2xl border border-[#c3dcf4] bg-[#eaf3fc] p-3 transition-all dark:border-slate-800 dark:bg-slate-900/60"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#e3effc] text-xs font-bold text-[#0877d1] dark:bg-slate-800 dark:text-sky-300">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#d4e6f9] text-xs font-extrabold text-[#0b4fa3] dark:bg-slate-800 dark:text-sky-300">
                           {index + 1}
                         </span>
-                        <span className="text-xs font-bold uppercase tracking-wider text-[#102755] dark:text-slate-200">
-                          Destino {index + 1} {index === 0 && <span className="text-[10px] font-normal text-[#627289] dark:text-slate-400">(Principal)</span>}
+                        <span className="text-sm font-extrabold text-[#0c2250] dark:text-slate-200">
+                          Destino {index + 1} {index === 0 && <span className="text-xs font-medium text-[#52657f] dark:text-slate-400">· Principal</span>}
                         </span>
                       </div>
                       {destinosVisita.length > 1 && (
@@ -2179,7 +2196,7 @@ export const RecepcaoPage: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <Combobox
                         label="Departamento de destino"
                         className="rounded-xl"
@@ -2229,13 +2246,14 @@ export const RecepcaoPage: React.FC = () => {
               <button
                 type="button"
                 onClick={adicionarDestinoVisita}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#52a6fb] bg-[#f0f7ff] py-2.5 text-sm font-semibold text-[#0877d1] hover:bg-[#e4f1ff] transition-colors dark:border-slate-700 dark:bg-slate-900/50 dark:text-sky-400"
+                aria-label={`Adicionar outro departamento (${destinosVisita.length}/10)`}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#b8d3f0] bg-[#eaf3fc] py-2 text-sm font-bold text-[#0b4fa3] transition-colors hover:bg-[#dcebfa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] dark:border-slate-700 dark:bg-slate-900/50 dark:text-sky-400"
               >
-                <Plus className="w-4 h-4" />
-                Adicionar outro departamento ({destinosVisita.length}/10)
+                <span className="grid h-5 w-5 place-items-center rounded-md bg-[#0b63ce] text-white"><Plus className="h-3.5 w-3.5" strokeWidth={3} /></span>
+                Adicionar outro departamento
               </button>
             ) : (
-              <p className="text-center text-xs text-[#627289] dark:text-slate-400">
+              <p className="text-center text-xs text-[#52657f] dark:text-slate-400">
                 Limite máximo de 10 departamentos atingido para esta visita.
               </p>
             )}
@@ -2252,9 +2270,9 @@ export const RecepcaoPage: React.FC = () => {
             />
 
             <div className="space-y-1.5">
-              <label htmlFor="observacoes-entrada" className="flex items-baseline gap-2 text-xs font-medium text-slate-300">
+              <label htmlFor="observacoes-entrada" className="flex items-center gap-2 text-xs font-medium text-[#3b4d68] dark:text-slate-300">
                 Observações / Pertences declarados
-                <span className="font-normal text-[#627289] dark:text-slate-400">Opcional</span>
+                <span className="rounded-full border border-[#cfdbea] bg-[#f1f6fc] px-2 py-px text-[10px] font-semibold text-[#52657f] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">Opcional</span>
               </label>
               <textarea
                 id="observacoes-entrada"
@@ -2262,33 +2280,38 @@ export const RecepcaoPage: React.FC = () => {
                 value={formObservacoes}
                 onChange={(e) => setFormObservacoes(e.target.value)}
                 placeholder="Ex.: pasta e notebook Dell"
-                className="block min-h-11 w-full resize-y rounded-xl border border-slate-700/80 bg-[#121826] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="block min-h-11 w-full resize-y rounded-xl border border-[#cfdbea] bg-white px-3 py-2.5 text-sm text-[#0c2250] placeholder-[#8a9bb3] transition-colors focus:border-[#0b63ce] focus:outline-none focus:ring-2 focus:ring-[#0b63ce]/25 dark:border-slate-700/80 dark:bg-[#121826] dark:text-slate-100 dark:placeholder-slate-500"
               />
             </div>
           </div>
 
           {destinoRequerAutorizacao && (
-            <div className="px-3 py-2 rounded-lg bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
               <span>
                 <strong>Atenção:</strong> Há responsável(is) nos destinos selecionados que exige(m) autorização formal prévia. Na próxima etapa, confirme que a visita foi autorizada; sem confirmação, a entrada ficará "Pendente de Autorização".
               </span>
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#dce4f0] dark:border-slate-800">
+          <div className="flex items-center justify-end gap-3 border-t border-[#dce4f0] pt-3 dark:border-slate-800">
             <Button
               type="button"
               variant="outline"
-              className="min-h-11 rounded-xl px-6"
+              className="min-h-12 rounded-xl px-6 font-bold"
               onClick={() => setIsEntradaModalOpen(false)}
             >
               Cancelar
             </Button>
-            <Button type="submit" variant="primary" className="min-h-11 rounded-xl px-6" isLoading={isSubmittingEntrada}>
+            <Button
+              type="submit"
+              variant="primary"
+              isLoading={isSubmittingEntrada}
+              className="min-h-12 rounded-xl !bg-[#0b2a5c] px-7 text-base font-extrabold !text-white shadow-[0_10px_22px_-10px_rgba(11,42,92,.85)] hover:!bg-[#0a2350] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce]"
+            >
               {destinoRequerAutorizacao
-                ? <><ShieldCheck className="w-5 h-5" /><span>Confirmar autorização</span></>
-                : <><LogIn className="w-5 h-5" /><span>Registrar entrada</span></>}
+                ? <><span className="grid h-7 w-7 place-items-center rounded-lg bg-white/15"><ShieldCheck className="h-5 w-5" /></span><span>Confirmar autorização</span></>
+                : <><span className="grid h-7 w-7 place-items-center rounded-lg bg-white/15"><LogIn className="h-5 w-5" /></span><span>Registrar entrada</span></>}
             </Button>
           </div>
         </form>
