@@ -268,7 +268,7 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
         )}
       </Cartao>
 
-      <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user} onFechar={detalhe.fechar} focarAndamento={detalhe.acao === 'andamento'} onExcluir={admin ? setExcluir : undefined} />
+      <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user} onFechar={detalhe.fechar} focarAndamento={detalhe.acao === 'andamento'} navegacao={{ ids: exibidas.map((o) => o.id), onIr: (id) => detalhe.abrir(id) }} onExcluir={admin ? setExcluir : undefined} />
       {admin && <ExcluirOcorrencia oc={excluir} user={user} onFechar={() => setExcluir(null)} onExcluida={aoExcluir} />}
       {/* Administrador: boas-vindas com o resumo do dia (uma vez por dia; espera o detalhe aberto por link fechar). */}
       {admin && <BoasVindasAdmin user={user} ocorrencias={lista} carregando={ocorrencias.isLoading || Boolean(detalhe.id)} onAbrir={(id) => detalhe.abrir(id)} />}

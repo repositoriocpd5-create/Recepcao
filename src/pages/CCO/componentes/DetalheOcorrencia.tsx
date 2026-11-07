@@ -9,6 +9,8 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Copy,
   FileText,
@@ -240,6 +242,8 @@ interface Props {
   focarAndamento?: boolean;
   /** Só administrador: pede ao painel para abrir a confirmação de exclusão. */
   onExcluir?: (oc: CcoOcorrencia) => void;
+  /** Lista de ocorrências por onde navegar (na ordem da tela de origem): habilita Anterior/Próxima e as setas ← →. */
+  navegacao?: { ids: string[]; onIr: (id: string) => void };
 }
 
 const Dado: React.FC<{ icone: typeof Clock; rotulo: string; children: React.ReactNode }> = ({ icone: Icone, rotulo, children }) => (
@@ -478,8 +482,28 @@ const FotoOcorrencia: React.FC<{ caminho: string }> = ({ caminho }) => {
   );
 };
 
-export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFechar, focarAndamento, onExcluir }) => {
+export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFechar, focarAndamento, onExcluir, navegacao }) => {
   const queryClient = useQueryClient();
+
+  // Navegação entre os chamados da lista: só aparece quando a ocorrência aberta faz parte dela.
+  const posicao = navegacao && ocorrenciaId ? navegacao.ids.indexOf(ocorrenciaId) : -1;
+  const total = navegacao?.ids.length ?? 0;
+  const anteriorId = navegacao && posicao > 0 ? navegacao.ids[posicao - 1] : null;
+  const proximoId = navegacao && posicao >= 0 && posicao < total - 1 ? navegacao.ids[posicao + 1] : null;
+  const irPara = navegacao?.onIr;
+  useEffect(() => {
+    if (!irPara || posicao < 0) return;
+    const aoTeclar = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const alvo = e.target as HTMLElement | null;
+      // Não rouba as setas de quem está digitando ou escolhendo uma opção.
+      if (alvo && (alvo.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName))) return;
+      const destino = e.key === 'ArrowLeft' ? anteriorId : e.key === 'ArrowRight' ? proximoId : null;
+      if (destino) { e.preventDefault(); irPara(destino); }
+    };
+    window.addEventListener('keydown', aoTeclar);
+    return () => window.removeEventListener('keydown', aoTeclar);
+  }, [irPara, posicao, anteriorId, proximoId]);
   const [copiado, setCopiado] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [erroPdf, setErroPdf] = useState<string | null>(null);
@@ -582,9 +606,36 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
                   <p className="mt-0.5 truncate text-xs font-bold uppercase tracking-wide text-sky-100">{oc.unidade_nome}</p>
                 </div>
               </div>
-              <button type="button" onClick={onFechar} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white/90 transition-colors hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" aria-label="Fechar janela">
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {navegacao && posicao >= 0 && total > 1 && (
+                  <nav aria-label="Navegar entre as ocorrências" className="flex items-center gap-1 rounded-xl bg-white/10 p-1">
+                    <button
+                      type="button"
+                      onClick={() => anteriorId && navegacao.onIr(anteriorId)}
+                      disabled={!anteriorId}
+                      title="Ocorrência anterior (←)"
+                      aria-label="Ocorrência anterior"
+                      className="grid h-8 w-8 place-items-center rounded-lg text-white transition-colors hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
+                    >
+                      <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                    <span className="min-w-[3.5rem] px-1 text-center text-xs font-bold tabular-nums" aria-live="polite">{posicao + 1} de {total}</span>
+                    <button
+                      type="button"
+                      onClick={() => proximoId && navegacao.onIr(proximoId)}
+                      disabled={!proximoId}
+                      title="Próxima ocorrência (→)"
+                      aria-label="Próxima ocorrência"
+                      className="grid h-8 w-8 place-items-center rounded-lg text-white transition-colors hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
+                    >
+                      <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                  </nav>
+                )}
+                <button type="button" onClick={onFechar} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white/90 transition-colors hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" aria-label="Fechar janela">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
           </header>
 
@@ -722,7 +773,7 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
 
           {/* Equipe: o formulário de atendimento ocupa a coluna da direita; unidade: o histórico. */}
           <div className="min-w-0 space-y-4">
-            {equipe ? <Atendimento oc={oc} user={user} focarAndamento={focarAndamento} onSalvo={() => void atualizar()} /> : secaoHistorico}
+            {equipe ? <Atendimento key={oc.id} oc={oc} user={user} focarAndamento={focarAndamento} onSalvo={() => void atualizar()} /> : secaoHistorico}
             {perfil === 'admin' && onExcluir && (
             <div className="flex flex-col gap-2 border-t border-[#e6edf6] pt-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
               <p className="text-xs text-[#6b7f9b] dark:text-slate-500">Administração: excluir apaga a ocorrência para todos e guarda uma cópia na auditoria.</p>

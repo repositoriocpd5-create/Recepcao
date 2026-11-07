@@ -430,6 +430,12 @@ export const MapaRedePage: React.FC = () => {
       IMPORTANCIAS[importanciaDe(a).nivel].ordem - IMPORTANCIAS[importanciaDe(b).nivel].ordem
       || a.created_at.localeCompare(b.created_at))[0];
 
+  /** Ordem para navegar pelos chamados no detalhe: escolas pela prioridade de atendimento e, em cada uma, a mais urgente primeiro. */
+  const idsNavegacao = prioridades.flatMap((u) =>
+    [...u.abertas]
+      .sort((a, b) => IMPORTANCIAS[importanciaDe(a).nivel].ordem - IMPORTANCIAS[importanciaDe(b).nivel].ordem || a.created_at.localeCompare(b.created_at))
+      .map((oc) => oc.id));
+
   /**
    * Clique na escola do mapa: com uma única ocorrência em aberto, já abre ela para tomar providências;
    * com várias, abre a lista da escola para escolher qual atender (antes só a mais urgente aparecia).
@@ -887,7 +893,12 @@ export const MapaRedePage: React.FC = () => {
         onAbrir={(oc) => detalhe.abrir(oc.id)}
         onFechar={() => setHistoricoEscola(null)}
       />
-      <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user!} onFechar={detalhe.fechar} />
+      <DetalheOcorrencia
+        ocorrenciaId={detalhe.id}
+        user={user!}
+        onFechar={detalhe.fechar}
+        navegacao={{ ids: idsNavegacao, onIr: (id) => detalhe.abrir(id) }}
+      />
     </section>
   );
 };
