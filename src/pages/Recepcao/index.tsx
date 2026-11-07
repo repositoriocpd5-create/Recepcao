@@ -2124,17 +2124,23 @@ export const RecepcaoPage: React.FC = () => {
                     role="radio"
                     aria-checked={selecionado}
                     disabled={!disponivel || entrouSemCracha}
-                    title={!cracha ? 'Crachá não cadastrado' : disponivel ? `Crachá ${n}` : `Crachá ${n} indisponível (${cracha.situacao.replace('_', ' ')})`}
+                    title={!cracha ? 'Crachá não cadastrado' : disponivel ? `Crachá ${n} livre` : cracha.situacao === 'em_uso' ? `Crachá ${n} em uso — volta a ficar livre quando for devolvido` : `Crachá ${n} indisponível (${cracha.situacao.replace('_', ' ')})`}
                     onClick={() => {
                       if (!cracha) return;
                       setFormCracha(selecionado ? '' : cracha.numero);
                       setFormCrachaFeedback(selecionado ? null : `Crachá ${cracha.numero} disponível para vinculação.`);
                     }}
                     className={cn(
-                      'grid h-10 place-items-center rounded-xl border text-[15px] font-extrabold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] disabled:cursor-not-allowed disabled:opacity-40',
+                      'grid h-10 place-items-center rounded-xl border text-[15px] font-extrabold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce]',
+                      // Verde: livre para entregar. Vermelho: em uso até ser devolvido. Cinza: indisponível por outro motivo.
                       selecionado
-                        ? 'border-[#0b4fa3] bg-gradient-to-b from-[#1d6fd0] to-[#0b4fa3] text-white shadow-[0_3px_0_#083b7c]'
-                        : 'border-[#b8d3f0] bg-gradient-to-b from-[#f4f9ff] to-[#d9e9fa] text-[#0c2250] shadow-[0_2px_0_rgba(11,79,163,.18)] hover:from-[#ffffff] hover:to-[#cfe3f8] dark:border-slate-700 dark:from-slate-800 dark:to-slate-800 dark:text-slate-100',
+                        ? 'border-emerald-700 bg-gradient-to-b from-emerald-500 to-emerald-700 text-white shadow-[0_3px_0_#065f46] ring-2 ring-emerald-300'
+                        : disponivel
+                          ? 'border-emerald-300 bg-gradient-to-b from-emerald-50 to-emerald-100 text-emerald-900 shadow-[0_2px_0_rgba(5,150,105,.25)] hover:from-white hover:to-emerald-200 dark:border-emerald-500/50 dark:from-emerald-950 dark:to-emerald-900 dark:text-emerald-100'
+                          : cracha?.situacao === 'em_uso'
+                            ? 'cursor-not-allowed border-rose-300 bg-gradient-to-b from-rose-50 to-rose-100 text-rose-700 shadow-[0_2px_0_rgba(225,29,72,.2)] dark:border-rose-500/50 dark:from-rose-950 dark:to-rose-900 dark:text-rose-200'
+                            : 'cursor-not-allowed border-[#d5dfec] bg-[#f1f4f8] text-[#9aa8bb] opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500',
+                      entrouSemCracha && (disponivel || cracha?.situacao === 'em_uso') && 'opacity-50',
                     )}
                   >
                     {n}
