@@ -78,12 +78,14 @@ export const SeletorCameras: React.FC<Props> = ({
     onChange(valor.includes(camera) ? valor.filter((c) => c !== camera) : [...valor, camera]);
 
   const adicionarOutra = () => {
-    const nome = outra.trim().replace(/\s+/g, ' ').slice(0, NOME_MAX);
+    // Sem resultado na busca, o que foi pesquisado vira o novo item (o campo de baixo continua valendo).
+    const nome = (outra.trim() || (buscaSemResultado ? busca : '')).trim().replace(/\s+/g, ' ').slice(0, NOME_MAX);
     if (!nome) return;
     const existente = [...sugestoes, ...valor].some((c) => normalizar(c) === normalizar(nome));
     if (!valor.some((c) => normalizar(c) === normalizar(nome))) onChange([...valor, nome]);
     if (!existente) onNovoItem?.(nome);
     setOutra('');
+    setBusca('');
     if (focarAposIncluir) {
       setAberto(false);
       // Espera a lista fechar para levar o foco ao próximo campo do formulário.
@@ -98,6 +100,7 @@ export const SeletorCameras: React.FC<Props> = ({
   const extras = valor.filter((c) => !sugestoes.includes(c));
   const opcoes = [...sugestoes, ...extras];
   const filtradas = opcoes.filter((opcao) => normalizar(opcao).includes(normalizar(busca)));
+  const buscaSemResultado = Boolean(placeholderBusca) && busca.trim().length > 0 && filtradas.length === 0;
 
   return (
     <div ref={raiz} className="relative">
@@ -168,7 +171,7 @@ export const SeletorCameras: React.FC<Props> = ({
                   value={busca}
                   disabled={disabled}
                   onChange={(e) => setBusca(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (buscaSemResultado) adicionarOutra(); } }}
                   placeholder={placeholderBusca}
                   aria-label="Buscar local da ocorrência"
                   aria-controls={`${id}-opcoes`}
@@ -208,8 +211,20 @@ export const SeletorCameras: React.FC<Props> = ({
               );
             })}
             {filtradas.length === 0 && (
-              <li className="px-4 py-5 text-sm text-[#5f7391] dark:text-slate-400">
-                Nenhum local encontrado. Você pode incluir um novo no campo abaixo.
+              <li className="px-4 py-4 text-sm text-[#5f7391] dark:text-slate-400">
+                {buscaSemResultado ? (
+                  <>
+                    <span className="block">Nenhum local encontrado.</span>
+                    <button
+                      type="button"
+                      onClick={adicionarOutra}
+                      disabled={disabled}
+                      className="mt-2 inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-lg bg-[#0b63ce] px-3 text-sm font-bold text-white hover:bg-[#0a56b4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce]"
+                    >
+                      <Plus className="h-4 w-4 shrink-0" aria-hidden="true" /> <span className="truncate">Incluir “{busca.trim().slice(0, NOME_MAX)}”</span>
+                    </button>
+                  </>
+                ) : 'Nenhum local encontrado. Você pode incluir um novo no campo abaixo.'}
               </li>
             )}
           </ul>
@@ -233,7 +248,7 @@ export const SeletorCameras: React.FC<Props> = ({
             <button
               type="button"
               onClick={adicionarOutra}
-              disabled={disabled || !outra.trim()}
+              disabled={disabled || (!outra.trim() && !buscaSemResultado)}
               className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-[#0b63ce] px-3 text-sm font-bold text-white hover:bg-[#0a56b4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] disabled:opacity-50"
             >
               <Plus className="h-4 w-4" aria-hidden="true" /> Incluir
