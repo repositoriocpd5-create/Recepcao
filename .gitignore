@@ -27,3 +27,13 @@ dist-ssr
 .env
 .env.*.local
 !.env.example
+
+# Claude config
+.claude/
+
+# Planilhas e dados locais
+*.xls
+*.xlsx
+
+# Supabase CLI (arquivos temporários locais)
+supabase/.temp/

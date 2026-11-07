@@ -138,7 +138,7 @@ export const AgendamentosPage: React.FC = () => {
                     {formatDateTime(ag.data_hora_prevista)}
                   </td>
                   <td className="py-3 px-4 text-slate-300">
-                    {ag.departamento?.sigla} - {ag.setor?.sigla}
+                    {ag.departamento?.sigla} - {ag.setor?.nome}
                   </td>
                   <td className="py-3 px-4 text-slate-300">
                     {ag.servidor_destino?.nome || 'Balcão do Setor'}
@@ -192,7 +192,7 @@ export const AgendamentosPage: React.FC = () => {
               onChange={(e) => setSetorId(e.target.value)}
               options={setores
                 .filter((s) => s.departamento_id === depId)
-                .map((s) => ({ value: s.id, label: `${s.sigla} - ${s.nome}` }))}
+                .map((s) => ({ value: s.id, label: s.nome }))}
             />
           </div>
 

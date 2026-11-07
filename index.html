@@ -2,25 +2,84 @@
 <html lang="pt-BR" class="dark" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SMEDU Recepção — Sistema de Gestão de Acesso e Atendimento</title>
+    <!-- Ícone da aba: o mesmo do portal da Prefeitura (novoportal.itaguai.rj.gov.br). -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-aba-32.png?v=5" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="SMEDU Soluções" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="application-name" content="SMEDU Soluções" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#0f1422" />
+    <title>SMEDU | Soluções</title>
     <meta name="description" content="Sistema oficial de controle de recepção, identificação de servidores, visitantes, autorizações e fluxo de acesso da Secretaria Municipal de Educação." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script>
       (() => {
-        const theme = localStorage.getItem('sme-theme');
-        if (theme === 'light') {
-          document.documentElement.classList.remove('dark');
-          document.documentElement.dataset.theme = 'light';
-        }
+        // O sistema sempre abre no tema claro; o botão de tema vale apenas durante a sessão.
+        try { localStorage.removeItem('sme-theme'); } catch {}
+        document.documentElement.classList.remove('dark');
+        document.documentElement.dataset.theme = 'light';
+        document.querySelector('meta[name="theme-color"]').content = '#ffffff';
       })();
     </script>
+    <style>
+      /* Tela de carregamento: aparece já no HTML (antes do JavaScript) e é reutilizada pelo React. */
+      .sl{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:24px;
+        background:radial-gradient(circle at 50% 38%,#e3efff 0,#f4f8fd 42%,#eef4fb 100%);
+        font-family:Alexandria,system-ui,-apple-system,'Segoe UI',sans-serif;color:#0b2a55}
+      html.dark .sl{background:radial-gradient(circle at 50% 38%,#14264a 0,#0d1526 45%,#0b0f19 100%);color:#e2e8f0}
+      .sl-box{display:flex;flex-direction:column;align-items:center;gap:26px}
+      .sl-ring{position:relative;width:124px;height:124px;display:grid;place-items:center}
+      .sl-ring::before,.sl-ring::after{content:"";position:absolute;inset:0;border-radius:50%}
+      .sl-ring::before{border:4px solid rgba(19,102,232,.12)}
+      html.dark .sl-ring::before{border-color:rgba(96,165,250,.14)}
+      .sl-ring::after{background:conic-gradient(from 0deg,transparent 0 25%,rgba(91,180,255,.15) 40%,#5bb4ff 70%,#1366e8 92%,transparent 93%);
+        -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 4px));
+        mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 4px));
+        animation:sl-spin 1.1s linear infinite}
+      .sl-halo{position:absolute;inset:14px;border-radius:50%;background:#1366e8;filter:blur(22px);opacity:.28;animation:sl-glow 2.2s ease-in-out infinite}
+      .sl-logo{position:relative;width:92px;height:92px;border-radius:50%;background:#fff;display:grid;place-items:center;
+        box-shadow:0 14px 34px -12px rgba(19,102,232,.6),inset 0 0 0 1px rgba(19,102,232,.08);animation:sl-breathe 2.2s ease-in-out infinite}
+      .sl-logo img{width:66px;height:66px;object-fit:contain}
+      .sl-brand{display:flex;align-items:center;gap:10px;font-size:22px;line-height:1;letter-spacing:.01em}
+      .sl-brand b{font-weight:800;letter-spacing:-.01em}
+      .sl-brand i{width:1px;height:22px;background:currentColor;opacity:.35}
+      .sl-brand span{font-weight:300;letter-spacing:.06em}
+      .sl-sub{margin-top:-16px;font-size:12px;opacity:.6;text-align:center}
+      .sl-bar{position:relative;width:180px;height:4px;border-radius:99px;overflow:hidden;background:rgba(19,102,232,.14)}
+      html.dark .sl-bar{background:rgba(96,165,250,.16)}
+      .sl-bar::after{content:"";position:absolute;inset:0;width:42%;border-radius:inherit;
+        background:linear-gradient(90deg,transparent,#5bb4ff,#1366e8);animation:sl-slide 1.25s cubic-bezier(.65,0,.35,1) infinite}
+      .sl-msg{margin-top:-12px;font-size:12px;font-weight:500;letter-spacing:.02em;opacity:.75}
+      .sl-msg::after{content:"";display:inline-block;width:1.2em;text-align:left;animation:sl-dots 1.2s steps(4) infinite}
+      @keyframes sl-spin{to{transform:rotate(360deg)}}
+      @keyframes sl-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+      @keyframes sl-glow{0%,100%{opacity:.18;transform:scale(.92)}50%{opacity:.38;transform:scale(1.08)}}
+      @keyframes sl-slide{from{transform:translateX(-110%)}to{transform:translateX(250%)}}
+      @keyframes sl-dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+      @media (prefers-reduced-motion:reduce){
+        .sl-ring::after{animation-duration:3s}.sl-logo,.sl-halo{animation:none}.sl-bar::after{animation-duration:2.5s}
+      }
+    </style>
   </head>
   <body class="bg-[#0b0f19] text-slate-100 min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
-    <div id="root"></div>
+    <div id="root">
+      <div class="sl" role="status" aria-live="polite">
+        <div class="sl-box">
+          <div class="sl-ring"><span class="sl-halo"></span><span class="sl-logo"><img src="/assets/brasao_itaguai.png" alt="" /></span></div>
+          <div class="sl-brand"><b>SMEDU</b><i></i><span>RECEPÇÃO</span></div>
+          <div class="sl-sub">Secretaria Municipal de Educação · Itaguaí</div>
+          <div class="sl-bar"></div>
+          <div class="sl-msg">Carregando o sistema</div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
