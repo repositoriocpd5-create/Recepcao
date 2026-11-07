@@ -124,8 +124,8 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(186, 214, 245);
-  doc.text('Secretaria Municipal de Educação', xTexto, 18.5);
-  doc.text('Central de Controle Operacional — CCO', xTexto, 22.8);
+  doc.text('SECRETARIA MUNICIPAL DE EDUCAÇÃO', xTexto, 18.5);
+  doc.text('CCO | Gabinete da Educação', xTexto, 22.8);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6.6);
@@ -230,7 +230,7 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(186, 214, 245);
-    doc.text('SMEDU · Central de Controle Operacional', 196, 7.6, { align: 'right' });
+    doc.text('CCO | Gabinete da Educação', 196, 7.6, { align: 'right' });
   };
 
   // ── Dados do registro ───────────────────────────────────────────────────

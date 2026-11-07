@@ -31,7 +31,7 @@ import { Carregando, Cartao, IconeTitulo, SituacaoBadge, botaoPrimario, botaoSec
 import { Modal } from '@/components/ui/Modal';
 import { useDetalheNaUrl, useOcorrencias, useUnidade } from './hooks';
 import { PainelEquipe } from './PainelEquipe';
-import { gerarPdfOcorrencia } from './relatorioUnidadePdf';
+import { gerarPdfDetalhe } from './detalhePdf';
 import { gerarRelatorioCcoPdf } from './relatorioPdf';
 import { tocarSomAlerta, useTempoRealCco } from './tempoReal';
 
@@ -63,7 +63,9 @@ const Registrada: React.FC<{ ocorrencia: CcoOcorrencia | null; onVer: () => void
     const janela = window.open('about:blank', '_blank');
     if (janela) janela.opener = null;
     try {
-      const pdf = await gerarPdfOcorrencia(ocorrencia);
+      // Mesma ficha da tela de detalhe (cabeçalho institucional, alerta, dados e histórico).
+      const historico = await ccoService.listarHistorico(ocorrencia.id).catch(() => []);
+      const pdf = await gerarPdfDetalhe({ ocorrencia, historico, emitidoPor: ocorrencia.criado_por_nome || 'Unidade escolar' });
       const url = URL.createObjectURL(pdf);
       if (janela && !janela.closed) {
         janela.location.replace(url);

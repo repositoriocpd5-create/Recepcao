@@ -419,6 +419,14 @@ export const ccoService = {
   async registrarOcorrencia(user: UserProfile, dados: CcoNovaOcorrencia): Promise<CcoOcorrencia> {
     const { foto, ...campos } = dados;
     if (isSupabaseConfigured) {
+      // Sessão vencida faz o banco tratar o envio como anônimo e recusar com "sem permissão": avisa a causa real.
+      const { data: sessao } = await supabase.auth.getSession();
+      if (!sessao.session) throw new Error('Sua sessão expirou. Entre novamente no sistema; os dados do formulário não serão perdidos se você não fechar esta página.');
+      // A escola da conta pode ter mudado no banco com esta aba aberta: o banco só aceita a escola atual.
+      const { data: vinculo } = await supabase.from('profiles').select('unidade_id').eq('id', sessao.session.user.id).maybeSingle();
+      if (vinculo && (vinculo.unidade_id ?? null) !== dados.unidade_id) {
+        throw new Error('A escola vinculada à sua conta foi alterada. Recarregue a página (F5) para atualizar e registre novamente.');
+      }
       const existente = await supabase.from('cco_ocorrencias').select('*').eq('client_request_id', dados.client_request_id).maybeSingle();
       if (existente.data) return existente.data as CcoOcorrencia;
 
