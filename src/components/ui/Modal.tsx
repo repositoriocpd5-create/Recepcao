@@ -13,6 +13,8 @@ export interface ModalProps {
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '5xl' | '6xl';
   /** 'destaque': cabeçalho azul-escuro de largura total, usado na identificação de pessoas. */
   variant?: 'padrao' | 'destaque';
+  /** Só no 'destaque': mostra o ícone solto, sem o quadrado ao redor. */
+  iconBare?: boolean;
   /** Oculta o cabeçalho padrão para conteúdo que possui cabeçalho próprio. */
   hideHeader?: boolean;
   /** Classes adicionais para a área com rolagem do conteúdo. */
@@ -55,6 +57,7 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 'lg',
   variant = 'padrao',
+  iconBare = false,
   hideHeader = false,
   contentClassName,
   container,
@@ -123,13 +126,13 @@ export const Modal: React.FC<ModalProps> = ({
             maxWidths[maxWidth]
           )}
         >
-          <div className="relative overflow-hidden bg-gradient-to-r from-[#081a40] via-[#0c2558] to-[#123a86] px-4 pb-7 pt-4 sm:px-7 sm:pb-11 sm:pt-8">
+          <div className={cn('relative overflow-hidden bg-gradient-to-r from-[#081a40] via-[#0c2558] to-[#123a86]', iconBare ? 'px-5 pb-8 pt-4 sm:px-7 sm:pb-9 sm:pt-5' : 'px-4 pb-7 pt-4 sm:px-7 sm:pb-11 sm:pt-8')}>
             <div aria-hidden className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full border border-sky-300/15" />
             <div aria-hidden className="pointer-events-none absolute -right-8 -top-48 h-96 w-96 rounded-full border border-sky-300/10" />
             <div className="relative flex items-start justify-between gap-4">
               <div className="flex items-center gap-3 sm:gap-4">
                 {icon && (
-                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white sm:h-14 sm:w-14">
+                  <div className={cn('grid shrink-0 place-items-center text-white', iconBare ? 'h-11 w-11' : 'h-11 w-11 rounded-2xl border border-white/15 bg-white/10 sm:h-14 sm:w-14')}>
                     {icon}
                   </div>
                 )}
@@ -141,10 +144,10 @@ export const Modal: React.FC<ModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20"
+                className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-full text-white transition-colors hover:bg-white/20', !iconBare && 'border border-white/20 bg-white/10')}
                 aria-label="Fechar janela"
               >
-                <X className="w-5 h-5" />
+                <X className={iconBare ? 'h-7 w-7' : 'w-5 h-5'} />
               </button>
             </div>
           </div>

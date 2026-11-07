@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Fingerprint,
   BadgeX,
+  MapPin,
   Check,
   IdCard,
   QrCode,
@@ -1713,22 +1714,38 @@ export const RecepcaoPage: React.FC = () => {
         isOpen={isIdentificationModalOpen}
         onClose={() => setIsIdentificationModalOpen(false)}
         title={activeTab === 'servidor' ? 'Identificar servidor' : 'Identificar visitante'}
-        description={activeTab === 'servidor'
-          ? 'Informe a matrícula institucional ou busque pelo nome para iniciar o atendimento.'
-          : 'Informe o CPF do visitante para consultar o cadastro.'}
-        maxWidth="md"
+        icon={<ShieldCheck className="h-9 w-9" strokeWidth={1.75} />}
+        iconBare
+        maxWidth="xl"
+        variant="destaque"
       >
+        <div className="space-y-4 px-5 pb-5 pt-6 sm:px-6">
+        {/* Destino principal da identificação */}
+        <div className="flex items-center gap-4 rounded-2xl bg-[#e2effc] px-5 py-3.5 dark:bg-slate-900/80">
+          <MapPin className="h-8 w-8 shrink-0 fill-[#0b63ce] text-[#0b63ce]" aria-hidden="true" />
+          <div className="min-w-0">
+            <span className="block text-xs font-extrabold uppercase tracking-wide text-[#0b63ce] dark:text-sky-300">Destino principal</span>
+            <span className="block text-xl font-extrabold leading-tight text-[#0c2250] dark:text-slate-100">
+              {activeTab === 'servidor' ? 'Atendimento ao servidor' : 'Atendimento ao visitante'}
+            </span>
+          </div>
+        </div>
+
         {activeTab === 'servidor' ? (
           <form onSubmit={handleConsultarMatricula} className="space-y-4">
+            <label htmlFor="identificacao-busca" className="block text-base text-[#0c2250] dark:text-slate-200">
+              Solicite ao visitantes o número da <strong>Matrícula ou nome</strong> completo.
+            </label>
             <Input
-              label="Matrícula ou nome"
+              id="identificacao-busca"
+              className="min-h-12 rounded-xl border-[#0b63ce] text-base"
               placeholder="Ex.: 38000 ou Maria da Silva"
               value={matriculaInput}
               onChange={(event) => {
                 setMatriculaInput(event.target.value);
                 setSearchFeedback({ type: null, message: '' });
               }}
-              icon={<Search className="w-4 h-4" />}
+              icon={<Search className="w-5 h-5" />}
               enterKeyHint="search"
               autoComplete="off"
               autoCapitalize="characters"
@@ -1754,18 +1771,22 @@ export const RecepcaoPage: React.FC = () => {
               </div>
             )}
             <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => setIsIdentificationModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" variant="primary" isLoading={isLoadingSearch}><Search className="w-4 h-4" /> Consultar</Button>
+              <Button type="button" variant="outline" className="min-h-12 rounded-xl border-[#9cc0ea] px-6 font-bold text-[#0c2250]" onClick={() => setIsIdentificationModalOpen(false)}>Cancelar</Button>
+              <Button type="submit" variant="primary" className="min-h-12 rounded-xl !bg-[#0a5fc9] px-6 font-bold hover:!bg-[#0852ad]" isLoading={isLoadingSearch}><Search className="w-5 h-5" /> Consultar</Button>
             </div>
           </form>
         ) : (
           <form onSubmit={handleConsultarCpf} className="space-y-4">
+            <label htmlFor="identificacao-busca" className="block text-base text-[#0c2250] dark:text-slate-200">
+              Informe o <strong>CPF</strong> do visitante para consultar o cadastro.
+            </label>
             <Input
-              label="CPF"
+              id="identificacao-busca"
+              className="min-h-12 rounded-xl border-[#0b63ce] text-base"
               placeholder="000.000.000-00"
               value={cpfInput}
               onChange={(event) => setCpfInput(formatCpf(event.target.value))}
-              icon={<Search className="w-4 h-4" />}
+              icon={<Search className="w-5 h-5" />}
               maxLength={14}
               inputMode="numeric"
               enterKeyHint="search"
@@ -1773,8 +1794,8 @@ export const RecepcaoPage: React.FC = () => {
               autoFocus
             />
             <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => setIsIdentificationModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" variant="primary" isLoading={isLoadingSearch}><Search className="w-4 h-4" /> Consultar CPF</Button>
+              <Button type="button" variant="outline" className="min-h-12 rounded-xl border-[#9cc0ea] px-6 font-bold text-[#0c2250]" onClick={() => setIsIdentificationModalOpen(false)}>Cancelar</Button>
+              <Button type="submit" variant="primary" className="min-h-12 rounded-xl !bg-[#0a5fc9] px-6 font-bold hover:!bg-[#0852ad]" isLoading={isLoadingSearch}><Search className="w-5 h-5" /> Consultar CPF</Button>
             </div>
           </form>
         )}
@@ -1815,6 +1836,7 @@ export const RecepcaoPage: React.FC = () => {
             )}
           </div>
         )}
+        </div>
       </Modal>
 
       <Modal
