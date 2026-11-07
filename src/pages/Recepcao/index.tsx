@@ -16,6 +16,8 @@ import {
   RefreshCw,
   ChevronRight,
   Fingerprint,
+  BadgeX,
+  Check,
   QrCode,
   Barcode,
   Camera,
@@ -245,6 +247,8 @@ export const RecepcaoPage: React.FC = () => {
   const [formCracha, setFormCracha] = useState('');
   const [crachasInventario, setCrachasInventario] = useState<Cracha[]>([]);
   const [formCrachaFeedback, setFormCrachaFeedback] = useState<string | null>(null);
+  // Visitante entrou sem receber crachá: o campo e os números rápidos ficam travados até desfazer.
+  const [entrouSemCracha, setEntrouSemCracha] = useState(false);
   const [formMotivo, setFormMotivo] = useState('Atendimento institucional');
   const [formObservacoes, setFormObservacoes] = useState('');
   const [isSubmittingEntrada, setIsSubmittingEntrada] = useState(false);
@@ -671,6 +675,7 @@ export const RecepcaoPage: React.FC = () => {
     void dataService.getCrachas().then(setCrachasInventario).catch(() => setCrachasInventario([]));
     setFormCracha(crachaNumero);
     setFormCrachaFeedback(null);
+    setEntrouSemCracha(false);
     setFormDestinoDepId('');
     setFormDestinoSetorId('');
     setFormServidorDestinoId('');
@@ -2057,11 +2062,32 @@ export const RecepcaoPage: React.FC = () => {
                     void validarCrachaParaEntrada();
                   }
                 }}
-                placeholder="Leia ou digite o código do crachá"
+                placeholder={entrouSemCracha ? 'Entrada sem crachá' : 'Leia ou digite o código do crachá'}
                 icon={<Barcode className="w-5 h-5" />}
+                disabled={entrouSemCracha}
                 autoFocus
               />
-              <Button type="button" size="sm" variant="outline" className="min-h-11 shrink-0 rounded-xl" onClick={() => setCameraTarget('entrada')} aria-label="Ler com a câmera"><Camera className="w-4 h-4" /><span className="hidden sm:inline">Ler com a câmera</span></Button>
+              <Button type="button" size="sm" variant="outline" className="min-h-11 shrink-0 rounded-xl" disabled={entrouSemCracha} onClick={() => setCameraTarget('entrada')} aria-label="Ler com a câmera"><Camera className="w-4 h-4" /><span className="hidden sm:inline">Ler com a câmera</span></Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                aria-pressed={entrouSemCracha}
+                title={entrouSemCracha ? 'Desfazer: voltar a vincular um crachá' : 'A pessoa entrou sem receber crachá'}
+                className={cn(
+                  'min-h-11 shrink-0 rounded-xl',
+                  entrouSemCracha && 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-400/60 dark:bg-amber-500/15 dark:text-amber-200',
+                )}
+                onClick={() => {
+                  const ativar = !entrouSemCracha;
+                  setEntrouSemCracha(ativar);
+                  if (ativar) setFormCracha('');
+                  setFormCrachaFeedback(ativar ? 'Entrada será registrada sem crachá.' : null);
+                }}
+              >
+                {entrouSemCracha ? <Check className="w-4 h-4" /> : <BadgeX className="w-4 h-4" />}
+                <span className="whitespace-nowrap">Entrou sem Crachá</span>
+              </Button>
             </div>
             <p className="text-xs text-[#627289] dark:text-slate-400">
               O leitor USB preenche este campo automaticamente. Você também pode digitar só o número do crachá ou tocar nele abaixo. Deixe em branco se não houver entrega de crachá.
@@ -2077,7 +2103,7 @@ export const RecepcaoPage: React.FC = () => {
                     type="button"
                     role="radio"
                     aria-checked={selecionado}
-                    disabled={!disponivel}
+                    disabled={!disponivel || entrouSemCracha}
                     title={!cracha ? 'Crachá não cadastrado' : disponivel ? `Crachá ${n}` : `Crachá ${n} indisponível (${cracha.situacao.replace('_', ' ')})`}
                     onClick={() => {
                       if (!cracha) return;
