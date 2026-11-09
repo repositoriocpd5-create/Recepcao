@@ -2,6 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTecladoVirtual } from '@/hooks/useTecladoVirtual';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -63,6 +64,7 @@ export const Modal: React.FC<ModalProps> = ({
   container,
 }) => {
   const modalId = useId();
+  const tecladoAberto = useTecladoVirtual();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -122,11 +124,13 @@ export const Modal: React.FC<ModalProps> = ({
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={onClose} />
         <div
           className={cn(
-            'relative z-10 flex max-h-[calc(92dvh-var(--keyboard-inset,0px))] w-full flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_32px_64px_-20px_rgba(10,30,70,.45)] sm:max-h-[96vh] sm:rounded-3xl dark:bg-[#121826]',
+            'relative z-10 flex w-full flex-col overflow-hidden rounded-t-[24px] bg-white shadow-[0_32px_64px_-20px_rgba(10,30,70,.45)] sm:max-h-[96vh] sm:rounded-3xl dark:bg-[#121826]',
+            // Com o teclado aberto o modal ocupa toda a área visível; senão, 92% dela.
+            tecladoAberto ? 'max-h-[calc(100dvh-var(--keyboard-inset,0px))]' : 'max-h-[calc(92dvh-var(--keyboard-inset,0px))]',
             maxWidths[maxWidth]
           )}
         >
-          <div className={cn('relative overflow-hidden bg-gradient-to-r from-[#081a40] via-[#0c2558] to-[#123a86]', iconBare ? 'px-5 pb-8 pt-4 sm:px-7 sm:pb-9 sm:pt-5' : 'px-4 pb-7 pt-4 sm:px-7 sm:pb-11 sm:pt-8')}>
+          <div className={cn('relative overflow-hidden bg-gradient-to-r from-[#081a40] via-[#0c2558] to-[#123a86]', tecladoAberto ? 'px-4 pb-6 pt-2 sm:px-7 sm:pb-11 sm:pt-8' : iconBare ? 'px-5 pb-8 pt-4 sm:px-7 sm:pb-9 sm:pt-5' : 'px-4 pb-7 pt-4 sm:px-7 sm:pb-11 sm:pt-8')}>
             <div aria-hidden className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full border border-sky-300/15" />
             <div aria-hidden className="pointer-events-none absolute -right-8 -top-48 h-96 w-96 rounded-full border border-sky-300/10" />
             <div className="relative flex items-start justify-between gap-4">
@@ -138,7 +142,7 @@ export const Modal: React.FC<ModalProps> = ({
                 )}
                 <div>
                   <h2 className="text-lg font-extrabold tracking-tight text-white sm:text-2xl">{title}</h2>
-                  {description && <p className="mt-0.5 text-xs text-sky-200/90 sm:text-base">{description}</p>}
+                  {description && <p className={cn('mt-0.5 text-xs text-sky-200/90 sm:text-base', tecladoAberto && 'hidden sm:block')}>{description}</p>}
                 </div>
               </div>
               <button

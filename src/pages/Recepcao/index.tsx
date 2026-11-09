@@ -86,6 +86,7 @@ const resolverCracha = (texto: string, lista: Cracha[]): Cracha | undefined => {
   return undefined;
 };
 import { cn, formatDateTime, formatTime } from '@/lib/utils';
+import { useTecladoVirtual } from '@/hooks/useTecladoVirtual';
 import { biometricProvider, isBiometricAgentConfigured, DeviceStatus, IdentificationMethod } from '@/services/identification';
 import { generateInstitutionalPdf } from '@/services/pdfService';
 import { ReceptionClock } from '@/components/recepcao/ReceptionClock';
@@ -233,6 +234,9 @@ export const RecepcaoPage: React.FC = () => {
   const [contatoEmail, setContatoEmail] = useState('');
   const [contatoErro, setContatoErro] = useState('');
   const [isSalvandoContato, setIsSalvandoContato] = useState(false);
+  const tecladoAberto = useTecladoVirtual();
+  // No celular o teclado abre sozinho e cobriria os números de crachá: só foca o campo com mouse/teclado.
+  const focoAutomaticoCracha = typeof window === 'undefined' || !window.matchMedia('(pointer: coarse)').matches;
   const [isEntradaModalOpen, setIsEntradaModalOpen] = useState(false);
   const [isNovoVisitanteModalOpen, setIsNovoVisitanteModalOpen] = useState(false);
   const [isNovoServidorModalOpen, setIsNovoServidorModalOpen] = useState(false);
@@ -1795,9 +1799,9 @@ export const RecepcaoPage: React.FC = () => {
         maxWidth="xl"
         variant="destaque"
       >
-        <div className="space-y-4 px-5 pb-5 pt-6 sm:px-6">
-        {/* Destino principal da identificação */}
-        <div className="flex items-center gap-4 rounded-2xl bg-[#e2effc] px-5 py-3.5 dark:bg-slate-900/80">
+        <div className={cn('space-y-4 px-5 pb-5 pt-6 sm:px-6', tecladoAberto && 'space-y-3 pb-3 pt-5')}>
+        {/* Destino principal da identificação (some com o teclado aberto para liberar espaço) */}
+        <div className={cn('items-center gap-4 rounded-2xl bg-[#e2effc] px-5 py-3.5 dark:bg-slate-900/80', tecladoAberto ? 'hidden' : 'flex')}>
           <MapPin className="h-8 w-8 shrink-0 fill-[#0b63ce] text-[#0b63ce]" aria-hidden="true" />
           <div className="min-w-0">
             <span className="block text-xs font-extrabold uppercase tracking-wide text-[#0b63ce] dark:text-sky-300">Destino principal</span>
@@ -1846,7 +1850,7 @@ export const RecepcaoPage: React.FC = () => {
                 )}
               </div>
             )}
-            <div className="flex justify-end gap-3">
+            <div className="sticky bottom-0 -mx-5 flex justify-end gap-3 border-t border-[#e1e9f4] bg-white px-5 py-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 dark:border-slate-800 dark:bg-[#121826] [&>button]:flex-1 sm:[&>button]:flex-none">
               <Button type="button" variant="outline" className="min-h-12 rounded-xl border-[#9cc0ea] px-6 font-bold text-[#0c2250]" onClick={() => setIsIdentificationModalOpen(false)}>Cancelar</Button>
               <Button type="submit" variant="primary" className="min-h-12 rounded-xl !bg-[#0a5fc9] px-6 font-bold hover:!bg-[#0852ad]" isLoading={isLoadingSearch}><Search className="w-5 h-5" /> Consultar</Button>
             </div>
@@ -1869,7 +1873,7 @@ export const RecepcaoPage: React.FC = () => {
               autoComplete="off"
               autoFocus
             />
-            <div className="flex justify-end gap-3">
+            <div className="sticky bottom-0 -mx-5 flex justify-end gap-3 border-t border-[#e1e9f4] bg-white px-5 py-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 dark:border-slate-800 dark:bg-[#121826] [&>button]:flex-1 sm:[&>button]:flex-none">
               <Button type="button" variant="outline" className="min-h-12 rounded-xl border-[#9cc0ea] px-6 font-bold text-[#0c2250]" onClick={() => setIsIdentificationModalOpen(false)}>Cancelar</Button>
               <Button type="submit" variant="primary" className="min-h-12 rounded-xl !bg-[#0a5fc9] px-6 font-bold hover:!bg-[#0852ad]" isLoading={isLoadingSearch}><Search className="w-5 h-5" /> Consultar CPF</Button>
             </div>
@@ -2122,8 +2126,8 @@ export const RecepcaoPage: React.FC = () => {
         variant="destaque"
       >
         <form onSubmit={handleConfirmarEntrada} className="space-y-2.5 px-4 pb-3 pt-4 sm:px-6">
-          {/* Pessoa identificada */}
-          <div className="flex items-center gap-3.5 rounded-2xl border border-[#cfe3f6] bg-[#eaf3fc] px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
+          {/* Pessoa identificada (some com o teclado aberto, para os números de crachá ficarem visíveis) */}
+          <div className={cn('items-center gap-3.5 rounded-2xl border border-[#cfe3f6] bg-[#eaf3fc] px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900/80', tecladoAberto ? 'hidden' : 'flex')}>
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#d9eafa] text-[#0b6bbf] dark:bg-slate-800 dark:text-sky-300">
               <User className="w-5 h-5" />
             </div>
@@ -2170,7 +2174,7 @@ export const RecepcaoPage: React.FC = () => {
                 placeholder={entrouSemCracha ? 'Entrada sem crachá' : 'Leia ou digite o código do crachá'}
                 icon={<Barcode className="w-5 h-5" />}
                 disabled={entrouSemCracha}
-                autoFocus
+                autoFocus={focoAutomaticoCracha}
               />
               <button
                 type="button"
@@ -2208,7 +2212,7 @@ export const RecepcaoPage: React.FC = () => {
                 {formCrachaFeedback}
               </p>
             ) : (
-              <p className="text-xs text-[#52657f] dark:text-slate-400">Use o leitor USB, digite o código ou selecione um número abaixo.</p>
+              <p className={cn('text-xs text-[#52657f] dark:text-slate-400', tecladoAberto && 'hidden')}>Use o leitor USB, digite o código ou selecione um número abaixo.</p>
             )}
             <div role="radiogroup" aria-label="Número do crachá" className="grid grid-cols-5 gap-x-2 gap-y-2 sm:grid-cols-10">
               {Array.from({ length: QTD_CRACHAS_RAPIDOS }, (_, i) => i + 1).map((n) => {
