@@ -2402,7 +2402,10 @@ export const RecepcaoPage: React.FC = () => {
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 border-t border-[#dce4f0] pt-3 dark:border-slate-800">
+          {/* Espaço extra com o teclado aberto: deixa o campo em edição subir até o topo da área rolável */}
+          {tecladoAberto && <div aria-hidden className="h-32 sm:hidden" />}
+
+          <div className="sticky bottom-0 z-20 -mx-4 flex items-center justify-end gap-3 border-t border-[#dce4f0] bg-white px-4 py-3 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:pt-3 dark:border-slate-800 dark:bg-[#121826] sm:dark:bg-transparent">
             <Button
               type="button"
               variant="outline"

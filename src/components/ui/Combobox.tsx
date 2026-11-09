@@ -123,6 +123,10 @@ export function Combobox({
     const indice = filtradas.findIndex((o) => o.value === value);
     setAtivo(indice >= 0 ? indice : 0);
     setAberto(true);
+    // No celular o teclado cobriria a lista: leva o campo ao topo da área rolável assim que o teclado abre.
+    if (window.matchMedia('(pointer: coarse)').matches) {
+      window.setTimeout(() => raiz.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 300);
+    }
   }
 
   function escolher(opcao: ComboboxOption) {
@@ -162,7 +166,7 @@ export function Combobox({
   }
 
   return (
-    <div className="w-full space-y-1.5" ref={raiz}>
+    <div className="w-full scroll-mt-2 space-y-1.5" ref={raiz}>
       {label && (
         <label htmlFor={inputId} className="block text-xs font-medium text-slate-300">
           {label}
@@ -227,7 +231,7 @@ export function Combobox({
 
         {aberto && (
           <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-[#c9dcf0] bg-white shadow-xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900">
-            <ul id={listId} ref={lista} role="listbox" aria-label={label} className="max-h-60 overflow-y-auto p-1.5">
+            <ul id={listId} ref={lista} role="listbox" aria-label={label} className="max-h-[clamp(7rem,calc(100dvh-var(--keyboard-inset,0px)-19rem),15rem)] overflow-y-auto p-1.5 sm:max-h-60">
               {filtradas.map((opcao, indice) => {
                 const marcada = opcao.value === value;
                 const sobre = indice === ativo;
