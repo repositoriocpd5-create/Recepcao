@@ -19,6 +19,7 @@ import { DensidadeControle, useDensidade } from './componentes/DensidadeTabela';
 import { BoasVindasAdmin } from './componentes/BoasVindasAdmin';
 import { FormularioOcorrencia } from './componentes/FormularioOcorrencia';
 import { Modal } from '@/components/ui/Modal';
+import { SeletorUnidade } from './componentes/SeletorUnidade';
 
 const INDICADOR: Record<string, string> = { registrada: 'Aguardando análise', em_analise: 'Em verificação', em_atendimento: 'Em providência', concluida: 'Solucionadas' };
 
@@ -290,17 +291,10 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
           maxWidth="5xl"
         >
           <div className="space-y-4">
-            <label className="block">
+            <div>
               <span className="mb-1.5 block text-[15px] font-bold text-[#10233f] dark:text-slate-200">Unidade escolar<span className="ml-0.5 text-rose-500" aria-hidden="true">*</span></span>
-              <select
-                value={unidadeNova}
-                onChange={(e) => setUnidadeNova(e.target.value)}
-                className="min-h-12 w-full rounded-xl border border-[#cfdbea] bg-white px-3 text-[15px] font-semibold text-[#10233f] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b63ce]/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              >
-                <option value="">Selecione a unidade…</option>
-                {unidades.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
-              </select>
-            </label>
+              <SeletorUnidade unidades={unidades} valor={unidadeNova} onChange={setUnidadeNova} />
+            </div>
             {unidadeNova ? (
               <FormularioOcorrencia
                 key={unidadeNova}
@@ -315,7 +309,7 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
                 }}
               />
             ) : (
-              <p className="rounded-xl bg-[#f3f8fe] p-4 text-sm text-[#4c6283] dark:bg-slate-900/40 dark:text-slate-300">Escolha a unidade para abrir o formulário.</p>
+              <p className="min-h-[16rem] rounded-xl bg-[#f3f8fe] p-4 text-sm text-[#4c6283] dark:bg-slate-900/40 dark:text-slate-300">Escolha a unidade para abrir o formulário.</p>
             )}
           </div>
         </Modal>
