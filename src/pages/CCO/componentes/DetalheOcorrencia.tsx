@@ -35,6 +35,8 @@ import {
   Navigation,
   FileDown,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
@@ -58,6 +60,54 @@ import { Atendimento, formatarVisita } from './Atendimento';
 import { useUnidade } from '../hooks';
 import { LOCALIZACOES_UNIDADES } from '@/services/localizacoesUnidades';
 import { abrirPdfEmNovaAba, gerarPdfDetalhe } from '../detalhePdf';
+
+/** Parágrafos justificados, com nomes e horários em negrito. */
+const ParagrafosDescricao: React.FC<{ texto: string }> = ({ texto }) => (
+  <>
+    {texto.split(/\n+/).filter((par) => par.trim()).map((par, i) => (
+      <p key={i} className="indent-8">
+        {destacarNomesEHorarios(par).map((p, k) => (
+          <React.Fragment key={k}>{k > 0 ? ' ' : ''}{p.negrito ? <strong className="font-extrabold">{p.texto}</strong> : p.texto}</React.Fragment>
+        ))}
+      </p>
+    ))}
+  </>
+);
+
+/** Descrição da ocorrência com leitura ampliada: tela grande e zoom do texto. */
+const DescricaoOcorrencia: React.FC<{ texto: string; protocolo: string }> = ({ texto, protocolo }) => {
+  const [ampliada, setAmpliada] = useState(false);
+  const [zoom, setZoom] = useState(1.25);
+  const mudarZoom = (delta: number) => setZoom((z) => Math.min(2.5, Math.max(0.9, Math.round((z + delta) * 100) / 100)));
+  const botao = 'inline-flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-lg border border-[#cfdbea] bg-white px-2.5 text-sm font-bold text-[#0b4fa3] hover:bg-[#f0f6fe] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0b63ce] disabled:opacity-40 dark:border-slate-700 dark:bg-transparent dark:text-sky-200';
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-[13px] font-extrabold text-[#17365d] dark:text-slate-200">Descrição</h3>
+        <button type="button" onClick={() => setAmpliada(true)} className={botao} title="Ler em tela cheia, com zoom">
+          <Maximize2 className="h-4 w-4" aria-hidden="true" /> Ampliar
+        </button>
+      </div>
+      <div className="max-h-60 space-y-2 overflow-y-auto break-words rounded-lg border-l-[3px] border-l-[#0b63ce] bg-[linear-gradient(100deg,#f6fbff_0%,#dcefff_100%)] px-3 py-3 text-justify text-[13px] font-semibold leading-relaxed text-[#193b65] [hyphens:auto] dark:border-l-sky-400 dark:bg-sky-500/10 dark:text-sky-50" lang="pt-BR">
+        <ParagrafosDescricao texto={texto} />
+      </div>
+      <Modal isOpen={ampliada} onClose={() => setAmpliada(false)} title={`Descrição · ${protocolo}`} maxWidth="6xl">
+        <div className="flex items-center justify-end gap-2 pb-3">
+          <button type="button" onClick={() => mudarZoom(-0.15)} disabled={zoom <= 0.9} className={botao} aria-label="Diminuir o texto"><ZoomOut className="h-4 w-4" aria-hidden="true" /></button>
+          <span className="min-w-12 text-center text-sm font-bold tabular-nums text-[#3b4d68] dark:text-slate-300" aria-live="polite">{Math.round(zoom * 100)}%</span>
+          <button type="button" onClick={() => mudarZoom(0.15)} disabled={zoom >= 2.5} className={botao} aria-label="Aumentar o texto"><ZoomIn className="h-4 w-4" aria-hidden="true" /></button>
+        </div>
+        <div
+          style={{ fontSize: `${Math.round(16 * zoom)}px` }}
+          className="max-h-[70vh] space-y-4 overflow-y-auto break-words rounded-xl border-l-4 border-l-[#0b63ce] bg-[#f6fbff] px-5 py-5 text-justify font-medium leading-relaxed text-[#193b65] [hyphens:auto] dark:border-l-sky-400 dark:bg-sky-500/10 dark:text-sky-50"
+          lang="pt-BR"
+        >
+          <ParagrafosDescricao texto={texto} />
+        </div>
+      </Modal>
+    </section>
+  );
+};
 
 /**
  * Nome da unidade e, ao lado, a localização do Mapa da Rede: bairro e link para o ponto exato
@@ -758,12 +808,7 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
             </section>
           )}
 
-          <section>
-            <h3 className="mb-2 text-[13px] font-extrabold text-[#17365d] dark:text-slate-200">Descrição</h3>
-            <div className="max-h-60 space-y-2 overflow-y-auto break-words rounded-lg border-l-[3px] border-l-[#0b63ce] bg-[linear-gradient(100deg,#f6fbff_0%,#dcefff_100%)] px-3 py-3 text-justify text-[13px] font-semibold leading-relaxed text-[#193b65] [hyphens:auto] dark:border-l-sky-400 dark:bg-sky-500/10 dark:text-sky-50" lang="pt-BR">
-              {oc.descricao.split(/\n+/).filter((par) => par.trim()).map((par, i) => <p key={i} className="indent-8">{destacarNomesEHorarios(par).map((p, k) => <React.Fragment key={k}>{k > 0 ? ' ' : ''}{p.negrito ? <strong className="font-extrabold">{p.texto}</strong> : p.texto}</React.Fragment>)}</p>)}
-            </div>
-          </section>
+          <DescricaoOcorrencia texto={oc.descricao} protocolo={oc.protocolo} />
 
           <FotoFachadaUnidade oc={oc} />
 
