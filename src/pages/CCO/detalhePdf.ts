@@ -6,7 +6,6 @@ import { SUGESTAO_IMAGENS } from '@/lib/gravidadeCco';
 type RGB = [number, number, number];
 
 const AZUL_ESCURO: RGB = [7, 29, 65];
-const AZUL_ESCURO_FIM: RGB = [17, 56, 130];
 const AZUL: RGB = [11, 99, 206];
 const CINZA: RGB = [98, 114, 137];
 const LINHA: RGB = [223, 230, 240];
@@ -41,21 +40,6 @@ const carregarBrasao = async (): Promise<string | null> => {
     });
   } catch {
     return null;
-  }
-};
-
-/** jsPDF não tem degradê: faixas finas lado a lado simulam o véu azul do cabeçalho. */
-const faixaDegrade = (doc: jsPDF, x: number, y: number, largura: number, altura: number, de: RGB, ate: RGB) => {
-  const passos = 90;
-  const passo = largura / passos;
-  for (let i = 0; i < passos; i += 1) {
-    const t = i / (passos - 1);
-    doc.setFillColor(
-      Math.round(de[0] + (ate[0] - de[0]) * t),
-      Math.round(de[1] + (ate[1] - de[1]) * t),
-      Math.round(de[2] + (ate[2] - de[2]) * t),
-    );
-    doc.rect(x + i * passo, y, passo + 0.3, altura, 'F');
   }
 };
 
@@ -109,13 +93,11 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
     creator: 'SMEDU · CCO',
   });
 
-  // ── Cabeçalho institucional ─────────────────────────────────────────────
-  faixaDegrade(doc, 0, 0, 210, 38, AZUL_ESCURO, AZUL_ESCURO_FIM);
-
+  // ── Cabeçalho institucional (fundo branco) ──────────────────────────────
   if (brasao) doc.addImage(brasao, 'PNG', MARGEM, 8.5, 13, 16);
 
   const xTexto = brasao ? MARGEM + 18 : MARGEM;
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...AZUL_ESCURO);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setCharSpace(0.5);
@@ -123,32 +105,32 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
   doc.setCharSpace(0);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.setTextColor(186, 214, 245);
+  doc.setTextColor(...CINZA);
   doc.text('SECRETARIA MUNICIPAL DE EDUCAÇÃO', xTexto, 18.5);
   doc.text('CCO | Gabinete da Educação', xTexto, 22.8);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6.6);
-  doc.setTextColor(150, 190, 235);
+  doc.setTextColor(...CINZA);
   doc.text('PROTOCOLO', 196, 11.5, { align: 'right' });
   doc.setFontSize(13);
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...AZUL_ESCURO);
   doc.text(ocorrencia.protocolo, 196, 18.5, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.setTextColor(186, 214, 245);
+  doc.setTextColor(...CINZA);
   doc.text(titulo, 196, 24, { align: 'right' });
 
-  doc.setDrawColor(255, 255, 255);
-  doc.setLineWidth(0.4);
+  doc.setDrawColor(...AZUL);
+  doc.setLineWidth(0.5);
   doc.line(MARGEM, 27.5, 196, 27.5);
 
   doc.setFontSize(7.2);
-  doc.setTextColor(186, 214, 245);
-  doc.text(ocorrencia.unidade_nome, MARGEM, 33.5);
+  doc.setTextColor(...CINZA);
+  doc.text(ocorrencia.unidade_nome, MARGEM, 32);
 
-  // ── Cartão de situação (sobreposto à faixa) ─────────────────────────────
-  const cartaoY = 32;
+  // ── Cartão de situação ─────────────────────────────
+  const cartaoY = 36;
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...LINHA);
   doc.setLineWidth(0.35);
@@ -222,15 +204,17 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
   /** Cabeçalho compacto nas páginas seguintes, para a folha solta continuar identificada. */
   const cabecalhoDeContinuacao = (pagina: number) => {
     if (pagina <= 1) return;
-    faixaDegrade(doc, 0, 0, 210, 12, AZUL_ESCURO, AZUL_ESCURO_FIM);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.4);
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(...AZUL_ESCURO);
     doc.text(`Ocorrência ${ocorrencia.protocolo}`, MARGEM, 7.6);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
-    doc.setTextColor(186, 214, 245);
+    doc.setTextColor(...CINZA);
     doc.text('CCO | Gabinete da Educação', 196, 7.6, { align: 'right' });
+    doc.setDrawColor(...AZUL);
+    doc.setLineWidth(0.4);
+    doc.line(MARGEM, 10.5, 196, 10.5);
   };
 
   // ── Dados do registro ───────────────────────────────────────────────────

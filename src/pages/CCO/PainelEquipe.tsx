@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, FileDown, LayoutDashboard, Loader2, MessageSquarePlus, RefreshCw, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileDown, LayoutDashboard, Loader2, MessageSquarePlus, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { dataService } from '@/services/dataService';
 import { IMPORTANCIAS, Importancia, ORDEM_SITUACOES, SITUACOES, ccoService, formatarData, formatarDataHora, importanciaDe } from '@/services/ccoService';
@@ -17,6 +17,8 @@ import { DetalheOcorrencia } from './componentes/DetalheOcorrencia';
 import { TabelaAdmin } from './componentes/TabelaAdmin';
 import { DensidadeControle, useDensidade } from './componentes/DensidadeTabela';
 import { BoasVindasAdmin } from './componentes/BoasVindasAdmin';
+import { FormularioOcorrencia } from './componentes/FormularioOcorrencia';
+import { Modal } from '@/components/ui/Modal';
 
 const INDICADOR: Record<string, string> = { registrada: 'Aguardando análise', em_analise: 'Em verificação', em_atendimento: 'Em providência', concluida: 'Solucionadas' };
 
@@ -30,6 +32,8 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
   const admin = perfilCco(user) === 'admin';
   const [excluir, setExcluir] = useState<CcoOcorrencia | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [novaAberta, setNovaAberta] = useState(false);
+  const [unidadeNova, setUnidadeNova] = useState('');
 
   useEffect(() => {
     if (!toast) return;
@@ -145,6 +149,15 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {admin && (
+            <button
+              type="button"
+              onClick={() => setNovaAberta(true)}
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0b63ce] px-3.5 text-sm font-bold text-white shadow-[0_8px_18px_-12px_rgba(11,99,206,.9)] hover:bg-[#0a56b4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce]"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" /> Nova ocorrência
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void gerarPdf()}
@@ -268,6 +281,45 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
         )}
       </Cartao>
 
+      {admin && (
+        <Modal
+          isOpen={novaAberta}
+          onClose={() => { setNovaAberta(false); setUnidadeNova(''); }}
+          title="Nova ocorrência"
+          description="Registre uma ocorrência em nome de qualquer unidade escolar."
+          maxWidth="5xl"
+        >
+          <div className="space-y-4">
+            <label className="block">
+              <span className="mb-1.5 block text-[15px] font-bold text-[#10233f] dark:text-slate-200">Unidade escolar<span className="ml-0.5 text-rose-500" aria-hidden="true">*</span></span>
+              <select
+                value={unidadeNova}
+                onChange={(e) => setUnidadeNova(e.target.value)}
+                className="min-h-12 w-full rounded-xl border border-[#cfdbea] bg-white px-3 text-[15px] font-semibold text-[#10233f] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b63ce]/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              >
+                <option value="">Selecione a unidade…</option>
+                {unidades.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+              </select>
+            </label>
+            {unidadeNova ? (
+              <FormularioOcorrencia
+                key={unidadeNova}
+                user={user}
+                unidadeId={unidadeNova}
+                unidadeNome={unidades.find((u) => u.id === unidadeNova)?.nome}
+                onRegistrada={(oc) => {
+                  setNovaAberta(false);
+                  setUnidadeNova('');
+                  void queryClient.invalidateQueries({ queryKey: ['cco'] });
+                  setToast(`Ocorrência ${oc.protocolo} registrada para ${oc.unidade_nome}.`);
+                }}
+              />
+            ) : (
+              <p className="rounded-xl bg-[#f3f8fe] p-4 text-sm text-[#4c6283] dark:bg-slate-900/40 dark:text-slate-300">Escolha a unidade para abrir o formulário.</p>
+            )}
+          </div>
+        </Modal>
+      )}
       <DetalheOcorrencia ocorrenciaId={detalhe.id} user={user} onFechar={detalhe.fechar} focarAndamento={detalhe.acao === 'andamento'} navegacao={{ ids: exibidas.map((o) => o.id), onIr: (id) => detalhe.abrir(id) }} onExcluir={admin ? setExcluir : undefined} />
       {admin && <ExcluirOcorrencia oc={excluir} user={user} onFechar={() => setExcluir(null)} onExcluida={aoExcluir} />}
       {/* Administrador: boas-vindas com o resumo do dia (uma vez por dia; espera o detalhe aberto por link fechar). */}

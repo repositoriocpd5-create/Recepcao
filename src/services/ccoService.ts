@@ -456,7 +456,10 @@ export const ccoService = {
       const { data: sessao } = await supabase.auth.getSession();
       if (!sessao.session) throw new Error('Sua sessão expirou. Entre novamente no sistema; os dados do formulário não serão perdidos se você não fechar esta página.');
       // A escola da conta pode ter mudado no banco com esta aba aberta: o banco só aceita a escola atual.
-      const { data: vinculo } = await supabase.from('profiles').select('unidade_id').eq('id', sessao.session.user.id).maybeSingle();
+      // O administrador registra por qualquer unidade: só a conta de unidade tem escola fixa.
+      const { data: vinculo } = perfilCco(user) === 'unidade'
+        ? await supabase.from('profiles').select('unidade_id').eq('id', sessao.session.user.id).maybeSingle()
+        : { data: null };
       if (vinculo && (vinculo.unidade_id ?? null) !== dados.unidade_id) {
         throw new Error('A escola vinculada à sua conta foi alterada. Recarregue a página (F5) para atualizar e registre novamente.');
       }
@@ -490,7 +493,7 @@ export const ccoService = {
     }
 
     // Modo demonstração
-    if (perfilCco(user) !== 'unidade' || user.unidade_id !== dados.unidade_id) {
+    if (!(perfilCco(user) === 'admin' || (perfilCco(user) === 'unidade' && user.unidade_id === dados.unidade_id))) {
       throw new Error('Seu usuário não tem permissão para esta ação no CCO.');
     }
     await esperar(700);
