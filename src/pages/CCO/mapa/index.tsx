@@ -640,7 +640,7 @@ export const MapaRedePage: React.FC = () => {
       {/* Indicadores */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Indicador icone={School} valor={indicadores.total} rotulo="Unidades escolares" ativo={!filtrosAtivos} onClick={() => { setFiltroCriticidade(''); setFiltroStatus(''); }} />
-        <Indicador icone={AlertTriangle} valor={indicadores.criticas} rotulo="Situação crítica" destaque="text-rose-600" ativo={filtroCriticidade === 'critica'} onClick={() => setFiltroCriticidade((v) => (v === 'critica' ? '' : 'critica'))} />
+        <Indicador icone={AlertTriangle} valor={indicadores.criticas} rotulo="Crítica" destaque="text-rose-600" ativo={filtroCriticidade === 'critica'} onClick={() => setFiltroCriticidade((v) => (v === 'critica' ? '' : 'critica'))} />
         <Indicador icone={Info} valor={indicadores.atencao} rotulo="Atenção" destaque="text-amber-600" ativo={filtroCriticidade === 'atencao'} onClick={() => setFiltroCriticidade((v) => (v === 'atencao' ? '' : 'atencao'))} />
         <Indicador icone={CheckCircle2} valor={indicadores.estaveis} rotulo="Estável" destaque="text-green-600" ativo={filtroCriticidade === 'estavel'} onClick={() => setFiltroCriticidade((v) => (v === 'estavel' ? '' : 'estavel'))} />
         <Indicador icone={UserRound} valor={indicadores.atendimento} rotulo="Em atendimento" destaque="text-blue-600" ativo={filtroStatus === 'atendimento'} onClick={() => setFiltroStatus((v) => (v === 'atendimento' ? '' : 'atendimento'))} />
