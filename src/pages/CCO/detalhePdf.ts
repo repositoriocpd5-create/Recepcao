@@ -331,7 +331,22 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
         const x = dado.cell.x + PAD_ESQ + (linha.recuo ? RECUO : 0);
         const yLinha = dado.cell.y + PAD_TOPO + i * alturaLinha;
         if (linha.fim) doc.text(linha.texto, x, yLinha, { baseline: 'top' });
-        else doc.text(linha.texto, x, yLinha, { baseline: 'top', align: 'justify', maxWidth: larguraTexto - (linha.recuo ? RECUO : 0) });
+        else {
+          // Justificação manual: o espaço que sobra na linha é dividido igualmente entre as palavras.
+          const palavras = linha.texto.split(' ');
+          const alvo = larguraTexto - (linha.recuo ? RECUO : 0);
+          if (palavras.length < 2) {
+            doc.text(linha.texto, x, yLinha, { baseline: 'top' });
+          } else {
+            const soPalavras = palavras.reduce((total, palavra) => total + doc.getTextWidth(palavra), 0);
+            const espaco = (alvo - soPalavras) / (palavras.length - 1);
+            let xAtual = x;
+            palavras.forEach((palavra) => {
+              doc.text(palavra, xAtual, yLinha, { baseline: 'top' });
+              xAtual += doc.getTextWidth(palavra) + espaco;
+            });
+          }
+        }
       }
       lidas += quantas;
     },
