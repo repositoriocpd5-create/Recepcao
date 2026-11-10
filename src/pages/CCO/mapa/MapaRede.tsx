@@ -68,7 +68,15 @@ export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto
   // Cria o mapa uma vez.
   useEffect(() => {
     if (!caixa.current || mapa.current) return;
-    const m = L.map(caixa.current, { zoomControl: false, attributionControl: true }).setView([SEDE.lat, SEDE.lng], 12);
+    const m = L.map(caixa.current, {
+      zoomControl: false,
+      attributionControl: true,
+      // Zoom gradual: cada "clique" da roda avança uma fração do nível (o padrão pula um nível inteiro).
+      zoomSnap: 0.25,
+      zoomDelta: 0.5,
+      wheelPxPerZoomLevel: 140,
+      wheelDebounceTime: 30,
+    }).setView([SEDE.lat, SEDE.lng], 12);
     L.control.zoom({ position: 'topright', zoomInTitle: 'Aproximar', zoomOutTitle: 'Afastar' }).addTo(m);
 
     // Abaixo do zoom: enquadrar todas as unidades e tela cheia só do mapa.
