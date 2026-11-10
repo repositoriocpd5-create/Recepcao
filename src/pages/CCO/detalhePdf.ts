@@ -78,7 +78,7 @@ interface Opcoes {
  * dados do registro em grade, descrição destacada e a linha do tempo do atendimento.
  */
 export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opcoes): Promise<Blob> {
-  const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+  const [{ jsPDF, AcroFormTextField }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const brasao = await carregarBrasao();
   const emitidoEm = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
@@ -221,39 +221,66 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
   // ── Dados do registro ───────────────────────────────────────────────────
   secao('Dados do registro');
 
-  const par = (rotuloA: string, valorA: string) => [rotuloA, valorA];
-  const dados: string[][] = [
-    [...par('Data da ocorrência', formatarData(ocorrencia.data_ocorrencia)), ...par('Horário', descreverHorario(ocorrencia))],
-    [...par('Unidade escolar', ocorrencia.unidade_nome), ...par('Local da ocorrência', ocorrencia.locais?.length ? ocorrencia.locais.join(', ') : '—')],
-    [...par('Responsável no CCO', ocorrencia.responsavel_nome || 'Ainda não definido'), ...par('Registrada em', formatarDataHora(ocorrencia.created_at))],
+  const maiuscula = (texto: string) => texto.charAt(0).toLocaleUpperCase('pt-BR') + texto.slice(1);
+  const NOME_DIRETOR = 'Nome do Diretor(a):';
+  // Cada linha tem dois campos [rótulo, valor]: rótulo em cima e valor embaixo, como na ficha de referência.
+  const dados: [string, string][][] = [
+    [['Data da ocorrência', formatarData(ocorrencia.data_ocorrencia)], ['Horário', maiuscula(descreverHorario(ocorrencia))]],
+    [['Unidade escolar', ocorrencia.unidade_nome], [NOME_DIRETOR, '']],
+    [['Local da ocorrência', ocorrencia.locais?.length ? ocorrencia.locais.join(', ') : '—'], ['Responsável no CCO', ocorrencia.responsavel_nome || 'Ainda não definido']],
+    [['Registrada em', formatarDataHora(ocorrencia.created_at)], ['Registrada por', ocorrencia.criado_por_nome || 'Não informado']],
   ];
   if (ocorrencia.tipo_registro === 'camera') {
-    dados.push([...par('Câmeras', ocorrencia.cameras?.join(', ') || '—'), ...par('Tipo de problema', ocorrencia.tipo_problema || '—')]);
+    dados.push([['Câmeras', ocorrencia.cameras?.join(', ') || '—'], ['Tipo de problema', ocorrencia.tipo_problema || '—']]);
   }
   if (ocorrencia.visita_data) {
-    dados.push([...par('Visita presencial', formatarVisita(ocorrencia.visita_data, ocorrencia.visita_hora)), ...par('Registrada por', ocorrencia.criado_por_nome || 'Não informado')]);
-  } else {
-    dados.push([...par('Registrada por', ocorrencia.criado_por_nome || 'Não informado'), '', '']);
+    dados.push([['Visita presencial', formatarVisita(ocorrencia.visita_data, ocorrencia.visita_hora)], ['', '']]);
   }
 
+  const TOPO_DADO = 4.9;
   autoTable(doc, {
     startY: y,
-    body: dados,
+    body: dados.map((linha) => linha.map(([, valor]) => valor)),
     theme: 'plain',
     margin: margemPagina,
     styles: {
       font: 'helvetica',
-      fontSize: 8.6,
-      cellPadding: { top: 2.1, right: 3, bottom: 2.1, left: 0 },
+      fontSize: 9.4,
+      cellPadding: { top: TOPO_DADO, right: 3, bottom: 1.9, left: 0 },
       overflow: 'linebreak',
       valign: 'top',
       textColor: AZUL_ESCURO,
+      minCellHeight: 10.6,
     },
-    columnStyles: {
-      0: { cellWidth: 25, fontStyle: 'bold', fontSize: 7.4, textColor: CINZA },
-      1: { cellWidth: 62 },
-      2: { cellWidth: 25, fontStyle: 'bold', fontSize: 7.4, textColor: CINZA },
-      3: { cellWidth: 70 },
+    columnStyles: { 0: { cellWidth: LARGURA / 2 }, 1: { cellWidth: LARGURA / 2 } },
+    didDrawCell: (dado) => {
+      if (dado.section !== 'body') return;
+      const [rotulo] = dados[dado.row.index]?.[dado.column.index] ?? ['', ''];
+      doc.setDrawColor(...LINHA);
+      doc.setLineWidth(0.25);
+      if (dado.row.index === 0) doc.line(dado.cell.x, dado.cell.y, dado.cell.x + dado.cell.width, dado.cell.y);
+      doc.line(dado.cell.x, dado.cell.y + dado.cell.height, dado.cell.x + dado.cell.width, dado.cell.y + dado.cell.height);
+      if (!rotulo) return;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.8);
+      doc.setTextColor(...CINZA);
+      doc.text(rotulo, dado.cell.x, dado.cell.y + 1.7, { baseline: 'top' });
+      if (rotulo === NOME_DIRETOR) {
+        // Campo para digitar o nome no próprio PDF (e imprimir ou assinar depois).
+        const x = dado.cell.x;
+        const yCampo = dado.cell.y + 4.9;
+        const larguraCampo = dado.cell.width - 1;
+        doc.setDrawColor(...AZUL);
+        doc.setLineWidth(0.3);
+        doc.rect(x, yCampo, larguraCampo, 5.2);
+        const campo = new AcroFormTextField() as any;
+        campo.fieldName = 'nome_diretor';
+        campo.Rect = [x + 0.4, yCampo + 0.4, larguraCampo - 0.8, 4.4];
+        campo.fontSize = 9;
+        campo.maxFontSize = 9;
+        campo.value = '';
+        doc.addField(campo);
+      }
     },
     didDrawPage: (dado) => cabecalhoDeContinuacao(dado.pageNumber),
   });
