@@ -755,7 +755,9 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
 
           <section>
             <h3 className="mb-2 text-[13px] font-extrabold text-[#17365d] dark:text-slate-200">Descrição</h3>
-            <p className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border-l-[3px] border-l-[#0b63ce] bg-[linear-gradient(100deg,#f6fbff_0%,#dcefff_100%)] px-3 py-3 text-[13px] font-semibold leading-relaxed text-[#193b65] dark:border-l-sky-400 dark:bg-sky-500/10 dark:text-sky-50">{oc.descricao}</p>
+            <div className="max-h-60 space-y-2 overflow-y-auto break-words rounded-lg border-l-[3px] border-l-[#0b63ce] bg-[linear-gradient(100deg,#f6fbff_0%,#dcefff_100%)] px-3 py-3 text-justify text-[13px] font-semibold leading-relaxed text-[#193b65] [hyphens:auto] dark:border-l-sky-400 dark:bg-sky-500/10 dark:text-sky-50" lang="pt-BR">
+              {oc.descricao.split(/\n+/).filter((par) => par.trim()).map((par, i) => <p key={i} className="indent-8">{par.trim()}</p>)}
+            </div>
           </section>
 
           <FotoFachadaUnidade oc={oc} />

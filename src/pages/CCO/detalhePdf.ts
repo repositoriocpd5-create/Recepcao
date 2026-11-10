@@ -261,27 +261,79 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
   // ── Descrição ───────────────────────────────────────────────────────────
   secao('Descrição');
 
+  // Texto justificado, com recuo na primeira linha de cada parágrafo. As linhas são quebradas aqui
+  // (a tabela só reserva o espaço, com texto invisível) e desenhadas em didDrawCell.
+  const PAD_ESQ = 6;
+  const PAD_DIR = 4;
+  const PAD_TOPO = 3.6;
+  const RECUO = 8;
+  const FONTE = 9;
+  const larguraTexto = LARGURA - PAD_ESQ - PAD_DIR;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(FONTE);
+  const linhasDescricao: { texto: string; recuo: boolean; fim: boolean }[] = [];
+  ocorrencia.descricao
+    .split(/\n+/)
+    .map((par) => par.trim())
+    .filter(Boolean)
+    .forEach((par, indice) => {
+      if (indice > 0) linhasDescricao.push({ texto: '', recuo: false, fim: true });
+      let atual = '';
+      let primeira = true;
+      const largura = () => larguraTexto - (primeira ? RECUO : 0);
+      const fechar = (fim: boolean) => {
+        linhasDescricao.push({ texto: atual, recuo: primeira, fim });
+        primeira = false;
+        atual = '';
+      };
+      par.split(/\s+/).forEach((palavra) => {
+        const teste = atual ? `${atual} ${palavra}` : palavra;
+        if (atual && doc.getTextWidth(teste) > largura()) {
+          fechar(false);
+          atual = palavra;
+        } else {
+          atual = teste;
+        }
+      });
+      fechar(true);
+    });
+  let lidas = 0;
+  const alturaLinha = FONTE * 1.15 * 0.3528;
+
   autoTable(doc, {
     startY: y,
-    body: [[ocorrencia.descricao]],
+    body: [[linhasDescricao.map((l) => l.texto || ' ').join('\n')]],
     theme: 'grid',
     margin: margemPagina,
     styles: {
       font: 'helvetica',
-      fontSize: 9,
-      cellPadding: { top: 3.6, right: 4, bottom: 3.6, left: 6 },
-      overflow: 'linebreak',
+      fontSize: FONTE,
+      cellPadding: { top: PAD_TOPO, right: PAD_DIR, bottom: PAD_TOPO, left: PAD_ESQ },
+      overflow: 'ellipsize',
       valign: 'top',
-      textColor: ROSA_TEXTO,
+      textColor: ROSA_FUNDO,
       fillColor: ROSA_FUNDO,
     },
     tableLineColor: LINHA,
     tableLineWidth: 0.3,
     didDrawCell: (dado) => {
-      // Barra vermelha de destaque, como a borda lateral da descrição na tela.
       if (dado.section !== 'body' || dado.column.index !== 0) return;
+      // Barra vermelha de destaque, como a borda lateral da descrição na tela.
       doc.setFillColor(...BARRA_ROSA);
       doc.rect(dado.cell.x, dado.cell.y, 1.4, dado.cell.height, 'F');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(FONTE);
+      doc.setTextColor(...ROSA_TEXTO);
+      const quantas = Array.isArray(dado.cell.text) ? dado.cell.text.length : 0;
+      for (let i = 0; i < quantas; i += 1) {
+        const linha = linhasDescricao[lidas + i];
+        if (!linha?.texto) continue;
+        const x = dado.cell.x + PAD_ESQ + (linha.recuo ? RECUO : 0);
+        const yLinha = dado.cell.y + PAD_TOPO + i * alturaLinha;
+        if (linha.fim) doc.text(linha.texto, x, yLinha, { baseline: 'top' });
+        else doc.text(linha.texto, x, yLinha, { baseline: 'top', align: 'justify', maxWidth: larguraTexto - (linha.recuo ? RECUO : 0) });
+      }
+      lidas += quantas;
     },
     didDrawPage: (dado) => cabecalhoDeContinuacao(dado.pageNumber),
   });
