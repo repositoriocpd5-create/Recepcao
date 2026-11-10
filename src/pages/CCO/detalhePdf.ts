@@ -71,13 +71,15 @@ interface Opcoes {
   ocorrencia: CcoOcorrencia;
   historico: CcoHistorico[];
   emitidoPor: string;
+  /** Nome da direção da unidade; preenche o campo "Nome do Diretor(a)" (que continua editável). */
+  diretor?: string | null;
 }
 
 /**
  * Ficha da ocorrência pronta para impressão (A4 retrato): identificação no cabeçalho,
  * dados do registro em grade, descrição destacada e a linha do tempo do atendimento.
  */
-export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opcoes): Promise<Blob> {
+export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor, diretor }: Opcoes): Promise<Blob> {
   const [{ jsPDF, AcroFormTextField }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const brasao = await carregarBrasao();
@@ -278,7 +280,7 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
         campo.Rect = [x + 0.4, yCampo + 0.4, larguraCampo - 0.8, 4.4];
         campo.fontSize = 9;
         campo.maxFontSize = 9;
-        campo.value = '';
+        campo.value = diretor?.trim() || '';
         doc.addField(campo);
       }
     },

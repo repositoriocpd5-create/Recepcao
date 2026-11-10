@@ -560,8 +560,12 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
     setGerandoPdf(true);
     setErroPdf(null);
     try {
+      // Só o administrador enxerga a direção cadastrada; sem ela o campo sai em branco para preencher.
+      const diretor = perfil === 'admin'
+        ? await ccoService.listarPessoasDasUnidades().then((p) => p.direcao[oc.unidade_id]?.nome ?? null).catch(() => null)
+        : null;
       await abrirPdfEmNovaAba(
-        () => gerarPdfDetalhe({ ocorrencia: oc, historico: historico.data || [], emitidoPor: user.nome_completo }),
+        () => gerarPdfDetalhe({ ocorrencia: oc, historico: historico.data || [], emitidoPor: user.nome_completo, diretor }),
         `${oc.protocolo}.pdf`,
       );
     } catch {
