@@ -2,6 +2,7 @@ import type { jsPDF } from 'jspdf';
 import { CcoHistorico, CcoOcorrencia } from '@/types';
 import { SITUACOES, descreverEvento, descreverHorario, formatarData, formatarDataHora, gravidadeDe } from '@/services/ccoService';
 import { SUGESTAO_IMAGENS } from '@/lib/gravidadeCco';
+import { destacarNomesEHorarios } from '@/lib/destaqueTexto';
 
 type RGB = [number, number, number];
 
@@ -271,29 +272,37 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
   const larguraTexto = LARGURA - PAD_ESQ - PAD_DIR;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(FONTE);
-  const linhasDescricao: { texto: string; recuo: boolean; fim: boolean }[] = [];
+  type PalavraPdf = { texto: string; negrito: boolean };
+  const linhasDescricao: { palavras: PalavraPdf[]; recuo: boolean; fim: boolean }[] = [];
+  const largura = (palavra: PalavraPdf) => {
+    doc.setFont('helvetica', palavra.negrito ? 'bold' : 'normal');
+    return doc.getTextWidth(palavra.texto);
+  };
+  const larguraEspaco = () => {
+    doc.setFont('helvetica', 'normal');
+    return doc.getTextWidth(' ');
+  };
   ocorrencia.descricao
     .split(/\n+/)
     .map((par) => par.trim())
     .filter(Boolean)
     .forEach((par, indice) => {
-      if (indice > 0) linhasDescricao.push({ texto: '', recuo: false, fim: true });
-      let atual = '';
+      if (indice > 0) linhasDescricao.push({ palavras: [], recuo: false, fim: true });
+      let atual: PalavraPdf[] = [];
+      let usado = 0;
       let primeira = true;
-      const largura = () => larguraTexto - (primeira ? RECUO : 0);
       const fechar = (fim: boolean) => {
-        linhasDescricao.push({ texto: atual, recuo: primeira, fim });
+        linhasDescricao.push({ palavras: atual, recuo: primeira, fim });
         primeira = false;
-        atual = '';
+        atual = [];
+        usado = 0;
       };
-      par.split(/\s+/).forEach((palavra) => {
-        const teste = atual ? `${atual} ${palavra}` : palavra;
-        if (atual && doc.getTextWidth(teste) > largura()) {
-          fechar(false);
-          atual = palavra;
-        } else {
-          atual = teste;
-        }
+      destacarNomesEHorarios(par).forEach((palavra) => {
+        const w = largura(palavra);
+        const necessario = usado + (atual.length ? larguraEspaco() : 0) + w;
+        if (atual.length && necessario > larguraTexto - (primeira ? RECUO : 0)) fechar(false);
+        usado += (atual.length ? larguraEspaco() : 0) + w;
+        atual.push(palavra);
       });
       fechar(true);
     });
@@ -302,7 +311,7 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
 
   autoTable(doc, {
     startY: y,
-    body: [[linhasDescricao.map((l) => l.texto || ' ').join('\n')]],
+    body: [[linhasDescricao.map((l) => l.palavras.map((p) => p.texto).join(' ') || ' ').join('\n')]],
     theme: 'grid',
     margin: margemPagina,
     styles: {
@@ -327,26 +336,19 @@ export async function gerarPdfDetalhe({ ocorrencia, historico, emitidoPor }: Opc
       const quantas = Array.isArray(dado.cell.text) ? dado.cell.text.length : 0;
       for (let i = 0; i < quantas; i += 1) {
         const linha = linhasDescricao[lidas + i];
-        if (!linha?.texto) continue;
+        if (!linha?.palavras.length) continue;
         const x = dado.cell.x + PAD_ESQ + (linha.recuo ? RECUO : 0);
         const yLinha = dado.cell.y + PAD_TOPO + i * alturaLinha;
-        if (linha.fim) doc.text(linha.texto, x, yLinha, { baseline: 'top' });
-        else {
-          // Justificação manual: o espaço que sobra na linha é dividido igualmente entre as palavras.
-          const palavras = linha.texto.split(' ');
-          const alvo = larguraTexto - (linha.recuo ? RECUO : 0);
-          if (palavras.length < 2) {
-            doc.text(linha.texto, x, yLinha, { baseline: 'top' });
-          } else {
-            const soPalavras = palavras.reduce((total, palavra) => total + doc.getTextWidth(palavra), 0);
-            const espaco = (alvo - soPalavras) / (palavras.length - 1);
-            let xAtual = x;
-            palavras.forEach((palavra) => {
-              doc.text(palavra, xAtual, yLinha, { baseline: 'top' });
-              xAtual += doc.getTextWidth(palavra) + espaco;
-            });
-          }
-        }
+        const alvo = larguraTexto - (linha.recuo ? RECUO : 0);
+        const soPalavras = linha.palavras.reduce((total, palavra) => total + largura(palavra), 0);
+        // Justificada: a sobra é dividida entre as palavras. Última linha do parágrafo: espaço normal.
+        const espaco = linha.fim || linha.palavras.length < 2 ? larguraEspaco() : (alvo - soPalavras) / (linha.palavras.length - 1);
+        let xAtual = x;
+        linha.palavras.forEach((palavra) => {
+          doc.setFont('helvetica', palavra.negrito ? 'bold' : 'normal');
+          doc.text(palavra.texto, xAtual, yLinha, { baseline: 'top' });
+          xAtual += largura(palavra) + espaco;
+        });
       }
       lidas += quantas;
     },
