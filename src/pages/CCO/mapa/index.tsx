@@ -394,6 +394,8 @@ export const MapaRedePage: React.FC = () => {
   const indicadores = useMemo(() => ({
     total: comLocal.length + semLocal.length,
     criticas: comLocal.filter((u) => u.criticidade === 'critica').length,
+    atencao: comLocal.filter((u) => GRUPO_CRITICIDADE.atencao.includes(u.criticidade)).length,
+    estaveis: comLocal.filter((u) => GRUPO_CRITICIDADE.estavel.includes(u.criticidade)).length,
     atendimento: comLocal.filter((u) => u.emAtendimento > 0).length,
     vencidas: comLocal.filter((u) => u.vencidas > 0).length,
   }), [comLocal, semLocal]);
@@ -636,9 +638,11 @@ export const MapaRedePage: React.FC = () => {
       {aviso && <p role="status" className="rounded-lg bg-[#0d2240] px-3 py-2 text-sm font-semibold text-white dark:bg-slate-800">{aviso}</p>}
 
       {/* Indicadores */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Indicador icone={School} valor={indicadores.total} rotulo="Unidades escolares" ativo={!filtrosAtivos} onClick={() => { setFiltroCriticidade(''); setFiltroStatus(''); }} />
         <Indicador icone={AlertTriangle} valor={indicadores.criticas} rotulo="Situação crítica" destaque="text-rose-600" ativo={filtroCriticidade === 'critica'} onClick={() => setFiltroCriticidade((v) => (v === 'critica' ? '' : 'critica'))} />
+        <Indicador icone={Info} valor={indicadores.atencao} rotulo="Atenção" destaque="text-amber-600" ativo={filtroCriticidade === 'atencao'} onClick={() => setFiltroCriticidade((v) => (v === 'atencao' ? '' : 'atencao'))} />
+        <Indicador icone={CheckCircle2} valor={indicadores.estaveis} rotulo="Estável" destaque="text-green-600" ativo={filtroCriticidade === 'estavel'} onClick={() => setFiltroCriticidade((v) => (v === 'estavel' ? '' : 'estavel'))} />
         <Indicador icone={UserRound} valor={indicadores.atendimento} rotulo="Em atendimento" destaque="text-blue-600" ativo={filtroStatus === 'atendimento'} onClick={() => setFiltroStatus((v) => (v === 'atendimento' ? '' : 'atendimento'))} />
         <Indicador icone={Clock} valor={indicadores.vencidas} rotulo="Prazos vencidos" destaque="text-orange-600" ativo={filtroStatus === 'vencidas'} onClick={() => setFiltroStatus((v) => (v === 'vencidas' ? '' : 'vencidas'))} />
       </div>
