@@ -13,6 +13,10 @@ import {
   UserProfile,
   Cracha,
   CrachaStatus,
+  CrachaModelo,
+  ServidorSetorVinculo,
+  RamalUnidade,
+  RamalContato,
 } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
@@ -24,8 +28,10 @@ import {
   INITIAL_AUTORIZACOES,
   INITIAL_AGENDAMENTOS,
   INITIAL_AUDITORIA_LOGS,
+  DEMO_USERS,
 } from './mockData';
 import { SERVIDORES_OFICIAIS } from './servidoresOficiais';
+import { RAMAIS_UNIDADES_INICIAIS } from './ramaisUnidades';
 
 // Local storage keys para persistência no ambiente de teste/demonstração
 const STORAGE_KEYS = {
@@ -38,12 +44,33 @@ const STORAGE_KEYS = {
   AGENDAMENTOS: 'sme_agendamentos',
   AUDITORIA: 'sme_auditoria',
   CRACHAS: 'smedu_crachas',
+  CRACHA_MODELO: 'smedu_cracha_modelo',
+  SERVIDOR_SETOR_VINCULOS: 'sme_servidor_setor_vinculos',
+  USUARIOS: 'sme_admin_users',
+  RAMAIS_UNIDADES: 'sme_ramais_unidades',
 };
+
+type MovimentacaoAdminUpdate = Pick<
+  Movimentacao,
+  | 'departamento_destino_id'
+  | 'setor_destino_id'
+  | 'servidor_destino_id'
+  | 'motivo'
+  | 'data_hora_entrada'
+  | 'data_hora_saida'
+  | 'status'
+  | 'observacoes'
+>;
 
 const MATRICULAS_FICTICIAS_LEGADAS = new Set([
   'SME-100201', 'SME-100452', 'SME-200781', 'SME-200994',
   'SME-300112', 'SME-400553', 'SME-500881',
 ]);
+
+/** Captura o hostname/IP do terminal para registro de auditoria. */
+function getTerminalInfo(): string {
+  return window.location.hostname || 'terminal-recepcao';
+}
 
 function getStorage<T>(key: string, initial: T): T {
   try {
@@ -64,6 +91,22 @@ function setStorage<T>(key: string, value: T): void {
   } catch (err) {
     console.error('Falha ao salvar no localStorage', err);
   }
+}
+
+/** Remove ramais vazios ou repetidos e apara os textos. */
+function limparRamais(ramais: RamalContato[]): RamalContato[] {
+  const vistos = new Set<string>();
+  return ramais
+    .map((r) => ({ numero: r.numero.trim(), descricao: r.descricao?.trim() || null }))
+    .filter((r) => r.numero && !vistos.has(r.numero) && vistos.add(r.numero));
+}
+
+/** Garante a lista de ramais, inclusive em registros que só têm a coluna ramal. */
+function normalizarRamalUnidade(unidade: Partial<RamalUnidade>): RamalUnidade {
+  const ramais = Array.isArray(unidade.ramais) && unidade.ramais.length
+    ? unidade.ramais
+    : unidade.ramal ? [{ numero: unidade.ramal }] : [];
+  return { ...unidade, ramais, ramal: ramais[0]?.numero ?? null, ativo: unidade.ativo ?? true } as RamalUnidade;
 }
 
 function requireLiveResult<T>(data: T | null, error: { message: string } | null, operation: string): T {
@@ -103,6 +146,50 @@ export const isValidCpf = (value: string): boolean => {
     return remainder === 10 ? 0 : remainder;
   };
   return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]);
+};
+
+// ─── Gestão de operadores (Supabase Auth via Edge Function) ───
+const ADMIN_USERS_FUNCTION = 'admin-manage-user';
+
+/** Chama a Edge Function de administração de usuários e devolve mensagens claras de erro. */
+const invokeAdminUsuarios = async <T = unknown>(action: string, payload: Record<string, unknown>): Promise<T> => {
+  const { data, error } = await supabase.functions.invoke(ADMIN_USERS_FUNCTION, { body: { action, payload } });
+  if (!error) return data as T;
+
+  // Função inexistente: o navegador bloqueia a chamada (CORS) e o supabase-js só informa "Failed to send a request".
+  if (error.name === 'FunctionsFetchError' || /failed to send a request/i.test(error.message)) {
+    throw new Error(
+      navigator.onLine
+        ? `Não foi possível acessar a função "${ADMIN_USERS_FUNCTION}" no Supabase. Ela ainda não foi publicada — publique-a no painel do Supabase (Edge Functions) e tente novamente.`
+        : 'Sem conexão com a internet. Verifique a rede e tente novamente.',
+    );
+  }
+
+  const response = (error as { context?: Response }).context;
+  if (response instanceof Response) {
+    if (response.status === 404) {
+      throw new Error(`A função "${ADMIN_USERS_FUNCTION}" ainda não foi publicada no Supabase. Publique-a para cadastrar usuários (veja o README).`);
+    }
+    try {
+      const body = await response.clone().json();
+      if (body?.error) throw new Error(body.error);
+    } catch (parsed) {
+      if (parsed instanceof Error && parsed.message) throw parsed;
+    }
+  }
+  throw new Error(error.message || 'Não foi possível concluir a operação no Supabase.');
+};
+
+const salvarUsuarioLocal = (u: UserProfile) => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.USUARIOS);
+    const users: UserProfile[] = raw ? JSON.parse(raw) : DEMO_USERS.map((x) => ({ ...x }));
+    const existe = users.some((item) => item.id === u.id);
+    const atualizados = existe ? users.map((item) => (item.id === u.id ? { ...item, ...u } : item)) : [...users, u];
+    localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(atualizados));
+  } catch (err) {
+    console.error('Erro ao salvar usuário no localStorage:', err);
+  }
 };
 
 export const dataService = {
@@ -147,6 +234,155 @@ export const dataService = {
       departamento: deps.find((d) => d.id === s.departamento_id),
     }));
     return departamentoId ? enriched.filter((s) => s.departamento_id === departamentoId) : enriched;
+  },
+
+  async getRamaisUnidades(): Promise<RamalUnidade[]> {
+    if (isSupabaseConfigured) {
+      // select('*') tolera bancos ainda sem a coluna ramais (migração 20261020140000).
+      const { data, error } = await supabase.from('ramais_unidades').select('*').eq('ativo', true).order('nome');
+      const lista = requireLiveResult(data, error, 'Não foi possível carregar os ramais') as Partial<RamalUnidade>[];
+      return lista.map(normalizarRamalUnidade);
+    }
+    return getStorage<Partial<RamalUnidade>[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS)
+      .map(normalizarRamalUnidade)
+      .filter((u) => u.ativo);
+  },
+
+  /** Todas as unidades e departamentos, inclusive as removidas da lista de ramais (tela de cadastro). */
+  async getUnidadesCadastro(): Promise<RamalUnidade[]> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('ramais_unidades').select('*').order('nome');
+      const lista = requireLiveResult(data, error, 'Não foi possível carregar as unidades') as Partial<RamalUnidade>[];
+      return lista.map(normalizarRamalUnidade);
+    }
+    return getStorage<Partial<RamalUnidade>[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS).map(normalizarRamalUnidade);
+  },
+
+  async salvarRamalUnidade(unidade: Partial<RamalUnidade>): Promise<RamalUnidade> {
+    const dados: Partial<RamalUnidade> = { ...unidade };
+    if (unidade.ramais) {
+      dados.ramais = limparRamais(unidade.ramais);
+      dados.ramal = dados.ramais[0]?.numero ?? null;
+    } else if ('ramal' in unidade) {
+      dados.ramal = unidade.ramal?.trim() || null;
+      dados.ramais = dados.ramal ? [{ numero: dados.ramal }] : [];
+    }
+
+    if (isSupabaseConfigured) {
+      const { id, ...campos } = dados;
+      const gravar = (valores: Partial<RamalUnidade>) => {
+        const query = id
+          ? supabase.from('ramais_unidades').update({ ...valores, updated_at: new Date().toISOString() }).eq('id', id)
+          : supabase.from('ramais_unidades').insert(valores);
+        return query.select('*').single();
+      };
+      let { data, error } = await gravar(campos);
+      if (error && /(diretor|vice_diretor|diretor_servidor_id|vice_servidor_id|email|telefone|cep|observacoes)/.test(error.message) && /column|coluna|schema cache/i.test(error.message)) {
+        throw new Error('O banco ainda não tem os novos campos do cadastro. Execute a migrações 20261024100000_unidades_cadastro_completo.sql e 20261024120000_unidade_diretor_vinculo.sql no Supabase.');
+      }
+      const semColuna = !!error && /ramais/.test(error.message) && /column|coluna|schema cache/i.test(error.message);
+      // Banco sem a migração 20261020140000: um único ramal ainda cabe na coluna ramal.
+      if (semColuna && (dados.ramais?.length ?? 0) <= 1) {
+        const { ramais: _ramais, ...semRamais } = campos;
+        ({ data, error } = await gravar(semRamais));
+      }
+      if (error) {
+        throw new Error(semColuna
+          ? 'O banco ainda não aceita vários ramais. Execute a migração 20261020140000_ramais_multiplos.sql no Supabase.'
+          : `Não foi possível salvar o ramal: ${error.message}`);
+      }
+      return normalizarRamalUnidade(data as Partial<RamalUnidade>);
+    }
+
+    const lista = getStorage<Partial<RamalUnidade>[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS).map(normalizarRamalUnidade);
+    if (dados.id) {
+      const indice = lista.findIndex((item) => item.id === dados.id);
+      if (indice < 0) throw new Error('Unidade não encontrada.');
+      lista[indice] = { ...lista[indice], ...dados } as RamalUnidade;
+      setStorage(STORAGE_KEYS.RAMAIS_UNIDADES, lista);
+      return lista[indice];
+    }
+    const nova = normalizarRamalUnidade({
+      ...dados,
+      id: `ru-${Date.now()}`,
+      tipo: dados.tipo || 'unidade_escolar',
+      categoria: dados.categoria || 'Escolas Municipais',
+      nome: dados.nome || '',
+      lotacao: dados.lotacao ?? null,
+      ativo: true,
+    });
+    setStorage(STORAGE_KEYS.RAMAIS_UNIDADES, [...lista, nova]);
+    return nova;
+  },
+
+  async excluirRamalUnidade(id: string, operador?: UserProfile | null): Promise<void> {
+    if (operador?.role !== 'admin') {
+      throw new Error('Apenas administradores podem excluir unidades.');
+    }
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('ramais_unidades').delete().eq('id', id).select('id');
+      if (error) {
+        throw new Error(/foreign key|violates/i.test(error.message)
+          ? 'Esta unidade possui registros vinculados (ocorrências). Desative-a em vez de excluir.'
+          : `Não foi possível excluir a unidade: ${error.message}`);
+      }
+      if (!data?.length) throw new Error('Não foi possível excluir: sem permissão ou unidade não encontrada.');
+      return;
+    }
+    const lista = getStorage<Partial<RamalUnidade>[]>(STORAGE_KEYS.RAMAIS_UNIDADES, RAMAIS_UNIDADES_INICIAIS);
+    setStorage(STORAGE_KEYS.RAMAIS_UNIDADES, lista.filter((item) => item.id !== id));
+  },
+
+  async getServidorSetorVinculos(): Promise<ServidorSetorVinculo[]> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('servidor_setor_vinculos').select('servidor_id, setor_id, requer_autorizacao');
+      if (!error) return (data || []) as ServidorSetorVinculo[];
+      // Bancos sem a migração 20261017120000 ainda não possuem a coluna requer_autorizacao.
+      const legado = await supabase.from('servidor_setor_vinculos').select('servidor_id, setor_id');
+      return requireLiveResult(legado.data, legado.error, 'Não foi possível carregar os vínculos de servidores') as ServidorSetorVinculo[];
+    }
+
+    const salvos = getStorage<ServidorSetorVinculo[]>(STORAGE_KEYS.SERVIDOR_SETOR_VINCULOS, []);
+    if (salvos.length) return salvos;
+    const servidores = await this.getServidores();
+    return servidores
+      .filter((servidor) => servidor.setor_id)
+      .map((servidor) => ({ servidor_id: servidor.id, setor_id: servidor.setor_id!, requer_autorizacao: false }));
+  },
+
+  async salvarServidorSetorVinculo(vinculo: ServidorSetorVinculo): Promise<ServidorSetorVinculo> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase
+        .from('servidor_setor_vinculos')
+        .upsert(vinculo, { onConflict: 'servidor_id,setor_id' })
+        .select('servidor_id, setor_id, requer_autorizacao')
+        .single();
+      return requireLiveResult(data, error, 'Não foi possível salvar o vínculo da pessoa ao setor') as ServidorSetorVinculo;
+    }
+
+    const vinculos = await this.getServidorSetorVinculos();
+    const indice = vinculos.findIndex((item) => item.servidor_id === vinculo.servidor_id && item.setor_id === vinculo.setor_id);
+    if (indice >= 0) vinculos[indice] = vinculo;
+    else vinculos.push(vinculo);
+    setStorage(STORAGE_KEYS.SERVIDOR_SETOR_VINCULOS, vinculos);
+    return vinculo;
+  },
+
+  async excluirServidorSetorVinculo(servidorId: string, setorId: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase
+        .from('servidor_setor_vinculos')
+        .delete()
+        .eq('servidor_id', servidorId)
+        .eq('setor_id', setorId)
+        .select('servidor_id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('A remoção foi bloqueada pelas permissões do Supabase.');
+      return;
+    }
+
+    const vinculos = await this.getServidorSetorVinculos();
+    setStorage(STORAGE_KEYS.SERVIDOR_SETOR_VINCULOS, vinculos.filter((item) => item.servidor_id !== servidorId || item.setor_id !== setorId));
   },
 
   async salvarDepartamento(departamento: Partial<Departamento>): Promise<Departamento> {
@@ -252,6 +488,28 @@ export const dataService = {
     return getStorage<Cracha[]>(STORAGE_KEYS.CRACHAS, []);
   },
 
+  /** Modelo visual dos crachás; null quando ainda não foi personalizado. */
+  async getCrachaModelo(): Promise<Partial<CrachaModelo> | null> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('cracha_modelo').select('config').eq('id', 1).maybeSingle();
+      if (!error) return (data?.config as Partial<CrachaModelo> | undefined) ?? null;
+    }
+    return getStorage<Partial<CrachaModelo> | null>(STORAGE_KEYS.CRACHA_MODELO, null);
+  },
+
+  async salvarCrachaModelo(modelo: CrachaModelo): Promise<void> {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('cracha_modelo').upsert({ id: 1, config: modelo, updated_at: new Date().toISOString() });
+      if (error) {
+        throw new Error(/relation|does not exist|schema cache/i.test(error.message)
+          ? 'O banco ainda não tem a tabela do modelo de crachá. Execute a migração 20261024110000_cracha_modelo.sql no Supabase.'
+          : `Não foi possível salvar o modelo: ${error.message}`);
+      }
+      return;
+    }
+    setStorage(STORAGE_KEYS.CRACHA_MODELO, modelo);
+  },
+
   async salvarCracha(cracha: Partial<Cracha>): Promise<Cracha> {
     const payload = {
       numero: (cracha.numero || '').trim().toUpperCase(),
@@ -296,11 +554,21 @@ export const dataService = {
   // 2. Servidores
   async getServidores(): Promise<Servidor[]> {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('servidores')
-        .select('*, departamento:departamentos(*), setor:setores(*)')
-        .order('nome');
-      return requireLiveResult(data, error, 'Não foi possível carregar servidores') as Servidor[];
+      // O PostgREST limita cada resposta a 1000 linhas; o quadro tem mais servidores que isso.
+      const tamanhoPagina = 1000;
+      const todos: Servidor[] = [];
+      for (let inicio = 0; ; inicio += tamanhoPagina) {
+        const { data, error } = await supabase
+          .from('servidores')
+          // servidor_setor_vinculos cria uma segunda relação servidores↔setores; a FK precisa ser explícita.
+          .select('*, departamento:departamentos(*), setor:setores!servidores_setor_id_fkey(*)')
+          .order('nome')
+          .order('id')
+          .range(inicio, inicio + tamanhoPagina - 1);
+        const pagina = requireLiveResult(data, error, 'Não foi possível carregar servidores') as Servidor[];
+        todos.push(...pagina);
+        if (pagina.length < tamanhoPagina) return todos;
+      }
     }
     const deps = await this.getDepartamentos();
     const sets = await this.getSetores();
@@ -319,6 +587,35 @@ export const dataService = {
       departamento: deps.find((d) => d.id === s.departamento_id),
       setor: sets.find((st) => st.id === s.setor_id),
     }));
+  },
+
+  /**
+   * Completa telefone/e-mail do servidor no balcão. Com Supabase passa pela Edge Function
+   * atualizar-contato-servidor (a RLS só deixa admin/gestor editar servidores).
+   */
+  async atualizarContatoServidor(servidorId: string, contato: { telefone?: string; email?: string }): Promise<Servidor> {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.functions.invoke('atualizar-contato-servidor', {
+        body: { servidor_id: servidorId, telefone: contato.telefone || '', email: contato.email || '' },
+      });
+      if (!error) return (data as { servidor: Servidor }).servidor;
+      const response = (error as { context?: Response }).context;
+      if (response instanceof Response) {
+        if (response.status === 404) {
+          let mensagem = '';
+          try { mensagem = (await response.clone().json())?.error || ''; } catch {}
+          throw new Error(mensagem || 'A função "atualizar-contato-servidor" ainda não foi publicada no Supabase.');
+        }
+        try {
+          const body = await response.clone().json();
+          if (body?.error) throw new Error(body.error);
+        } catch (parsed) {
+          if (parsed instanceof Error && parsed.message) throw parsed;
+        }
+      }
+      throw new Error('Não foi possível salvar o contato agora. Verifique se a função "atualizar-contato-servidor" está publicada.');
+    }
+    return this.salvarServidor({ id: servidorId, ...(contato.telefone ? { telefone: contato.telefone } : {}), ...(contato.email ? { email: contato.email } : {}) });
   },
 
   async salvarServidor(servidor: Partial<Servidor>): Promise<Servidor> {
@@ -358,8 +655,10 @@ export const dataService = {
       nome: servidor.nome || '',
       cpf: servidor.cpf || '',
       cargo: servidor.cargo || 'Servidor',
+      lotacao: servidor.lotacao,
       departamento_id: servidor.departamento_id || '',
       setor_id: servidor.setor_id,
+      ramal: servidor.ramal,
       email: servidor.email,
       telefone: servidor.telefone,
       status: servidor.status || 'ativo',
@@ -375,12 +674,49 @@ export const dataService = {
     operador?: UserProfile | null
   ): Promise<ConsultaServidorResultado> {
     const limpa = matricula.trim().toLowerCase();
+    const resultado = await this.consultarMatriculaExata(limpa, operador);
 
+    // Aceita matrícula digitada com ponto de milhar (38.000 → 38000) quando não há cadastro com o ponto.
+    const semPontos = limpa.replace(/\./g, '');
+    if (resultado.encontrado || !semPontos || semPontos === limpa) return resultado;
+    return this.consultarMatriculaExata(semPontos, operador);
+  },
+
+  async consultarMatriculaExata(
+    limpa: string,
+    operador?: UserProfile | null
+  ): Promise<ConsultaServidorResultado> {
     if (isSupabaseConfigured) {
       const { data, error } = await supabase.rpc('rpc_consultar_servidor', {
         p_matricula: limpa,
       });
-      return requireLiveResult(data, error, 'Não foi possível consultar a matrícula') as ConsultaServidorResultado;
+      const resultadoRpc = requireLiveResult(data, error, 'Não foi possível consultar a matrícula') as ConsultaServidorResultado;
+      if (resultadoRpc.encontrado) return resultadoRpc;
+
+      // A função do banco pode estar defasada em relação à tabela que alimenta a lista de nomes
+      // (ex.: servidores sem departamento); a leitura direta usa a mesma fonte da lista.
+      const { data: linhas, error: erroServidor } = await supabase
+        .from('servidores')
+        .select('*, departamento:departamentos(*), setor:setores!servidores_setor_id_fkey(*)')
+        .ilike('matricula', limpa)
+        .limit(1);
+      const servidorDireto = (requireLiveResult(linhas, erroServidor, 'Não foi possível consultar a matrícula') as Servidor[])[0];
+      if (!servidorDireto) return resultadoRpc;
+
+      const { data: movimentos } = await supabase
+        .from('movimentacoes')
+        .select('*')
+        .eq('servidor_id', servidorDireto.id)
+        .eq('status', 'no_predio')
+        .order('data_hora_entrada', { ascending: false })
+        .limit(1);
+      const movimentoAberto = movimentos?.[0] as Movimentacao | undefined;
+      return {
+        encontrado: true,
+        servidor: servidorDireto,
+        no_predio: Boolean(movimentoAberto),
+        movimentacao_atual: movimentoAberto,
+      };
     }
 
     // Fallback de homologação / testes
@@ -403,7 +739,9 @@ export const dataService = {
       tabela: 'servidores',
       registro_id: servidor.id,
       detalhes: { matricula: servidor.matricula, nome: servidor.nome },
+      ip_origem: getTerminalInfo(),
     });
+
 
     return {
       encontrado: true,
@@ -493,12 +831,87 @@ export const dataService = {
       tabela: 'visitantes',
       registro_id: novoVisitante.id,
       detalhes: { cpf: novoVisitante.cpf, nome: novoVisitante.nome },
+      ip_origem: getTerminalInfo(),
     });
+
 
     return novoVisitante;
   },
 
   // 5. Consulta Atômica de Visitante por CPF
+  /** Grava a foto do rosto (já em JPEG) no bucket privado e registra o consentimento biométrico. */
+  async salvarFotoVisitante(visitanteId: string, foto: Blob, operador?: UserProfile | null): Promise<Visitante> {
+    const agora = new Date().toISOString();
+    if (isSupabaseConfigured) {
+      const caminho = `${visitanteId}.jpg`;
+      const { error: erroUpload } = await supabase.storage
+        .from('visitantes-fotos')
+        .upload(caminho, foto, { contentType: 'image/jpeg', upsert: true, cacheControl: '0' });
+      if (erroUpload) {
+        throw new Error(/bucket/i.test(erroUpload.message)
+          ? 'O armazenamento de fotos ainda não existe. Execute a migração 20261020150000_biometria_visitantes.sql no Supabase.'
+          : `Não foi possível enviar a foto: ${erroUpload.message}`);
+      }
+      const { data, error } = await supabase
+        .from('visitantes')
+        .update({ foto_path: caminho, biometria_consentida_em: agora })
+        .eq('id', visitanteId)
+        .select()
+        .single();
+      if (error) throw new Error(`Foto enviada, mas não foi possível vincular ao cadastro: ${error.message}`);
+      await this.registrarLogAuditoria({
+        usuario_id: operador?.id, usuario_email: operador?.email, acao: 'CADASTRO_FOTO_VISITANTE',
+        tabela: 'visitantes', registro_id: visitanteId, detalhes: { consentimento: agora }, ip_origem: getTerminalInfo(),
+      });
+      return data as Visitante;
+    }
+
+    const fotoUrl = await new Promise<string>((resolve, reject) => {
+      const leitor = new FileReader();
+      leitor.onload = () => resolve(String(leitor.result));
+      leitor.onerror = () => reject(new Error('Não foi possível ler a foto.'));
+      leitor.readAsDataURL(foto);
+    });
+    const visitantes = getStorage<Visitante[]>(STORAGE_KEYS.VISITANTES, INITIAL_VISITANTES);
+    const indice = visitantes.findIndex((v) => v.id === visitanteId);
+    if (indice < 0) throw new Error('Visitante não encontrado.');
+    visitantes[indice] = { ...visitantes[indice], foto_url: fotoUrl, biometria_consentida_em: agora };
+    setStorage(STORAGE_KEYS.VISITANTES, visitantes);
+    return visitantes[indice];
+  },
+
+  /** URL temporária (assinada) da foto do visitante; null quando não há foto. */
+  async getFotoVisitanteUrl(visitante: Pick<Visitante, 'foto_path' | 'foto_url'>): Promise<string | null> {
+    if (isSupabaseConfigured && visitante.foto_path) {
+      const { data, error } = await supabase.storage.from('visitantes-fotos').createSignedUrl(visitante.foto_path, 60 * 60);
+      return error ? null : data.signedUrl;
+    }
+    return visitante.foto_url || null;
+  },
+
+  /** Marca que a digital foi cadastrada no agente biométrico (o template não sai do agente). */
+  async registrarDigitalVisitante(visitanteId: string, operador?: UserProfile | null): Promise<void> {
+    const agora = new Date().toISOString();
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('visitantes')
+        .update({ digital_cadastrada_em: agora, biometria_consentida_em: agora })
+        .eq('id', visitanteId);
+      if (error) throw new Error(`Digital cadastrada no leitor, mas não foi possível registrar no cadastro: ${error.message}`);
+      await this.registrarLogAuditoria({
+        usuario_id: operador?.id, usuario_email: operador?.email, acao: 'CADASTRO_DIGITAL_VISITANTE',
+        tabela: 'visitantes', registro_id: visitanteId, detalhes: { consentimento: agora }, ip_origem: getTerminalInfo(),
+      });
+      return;
+    }
+    const visitantes = getStorage<Visitante[]>(STORAGE_KEYS.VISITANTES, INITIAL_VISITANTES);
+    const indice = visitantes.findIndex((v) => v.id === visitanteId);
+    if (indice >= 0) {
+      visitantes[indice] = { ...visitantes[indice], digital_cadastrada_em: agora, biometria_consentida_em: agora };
+      setStorage(STORAGE_KEYS.VISITANTES, visitantes);
+    }
+  },
+
   async consultarVisitantePorCpf(
     cpf: string,
     operador?: UserProfile | null
@@ -545,7 +958,9 @@ export const dataService = {
       tabela: 'visitantes',
       registro_id: visitante.id,
       detalhes: { cpf: rawCpf, nome: visitante.nome },
+      ip_origem: getTerminalInfo(),
     });
+
 
     return {
       encontrado: true,
@@ -563,11 +978,11 @@ export const dataService = {
         .from('movimentacoes')
         .select(`
           *,
-          servidor:servidores(*),
+          servidor:servidores!movimentacoes_servidor_id_fkey(*),
           visitante:visitantes(*),
           departamento_destino:departamentos(*),
           setor_destino:setores(*),
-          servidor_destino:servidores(*),
+          servidor_destino:servidores!movimentacoes_servidor_destino_id_fkey(*),
           destinos:movimentacao_destinos(*)
         `)
         .order('data_hora_entrada', { ascending: false });
@@ -589,7 +1004,87 @@ export const dataService = {
       servidor_destino: m.servidor_destino_id
         ? servidores.find((s) => s.id === m.servidor_destino_id)
         : undefined,
+      destinos: m.destinos?.map((dest) => ({
+        ...dest,
+        departamento_destino: deps.find((d) => d.id === dest.departamento_destino_id),
+        setor_destino: setores.find((st) => st.id === dest.setor_destino_id),
+        servidor_destino: dest.servidor_destino_id
+          ? servidores.find((s) => s.id === dest.servidor_destino_id)
+          : undefined,
+      })),
     }));
+  },
+
+  async atualizarMovimentacaoAdministrativa(
+    movimentacaoId: string,
+    atualizacao: MovimentacaoAdminUpdate,
+    operador?: UserProfile | null
+  ): Promise<Movimentacao> {
+    if (operador?.role !== 'admin') {
+      throw new Error('Apenas administradores podem editar movimentações.');
+    }
+
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase
+        .from('movimentacoes')
+        .update(atualizacao)
+        .eq('id', movimentacaoId)
+        .select()
+        .single();
+      return requireLiveResult(data, error, 'Não foi possível atualizar a movimentação') as Movimentacao;
+    }
+
+    const movimentacoes = getStorage<Movimentacao[]>(STORAGE_KEYS.MOVIMENTACOES, INITIAL_MOVIMENTACOES);
+    const indice = movimentacoes.findIndex((item) => item.id === movimentacaoId);
+    if (indice < 0) throw new Error('Movimentação não encontrada.');
+
+    movimentacoes[indice] = { ...movimentacoes[indice], ...atualizacao };
+    setStorage(STORAGE_KEYS.MOVIMENTACOES, movimentacoes);
+    await this.registrarLogAuditoria({
+      usuario_email: operador.email,
+      acao: 'EDICAO_ADMINISTRATIVA_MOVIMENTACAO',
+      tabela: 'movimentacoes',
+      registro_id: movimentacaoId,
+      detalhes: atualizacao,
+      ip_origem: getTerminalInfo(),
+    });
+    return movimentacoes[indice];
+  },
+
+  async excluirMovimentacaoAdministrativa(
+    movimentacaoId: string,
+    operador?: UserProfile | null
+  ): Promise<void> {
+    if (operador?.role !== 'admin') {
+      throw new Error('Apenas administradores podem excluir movimentações.');
+    }
+
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase
+        .from('movimentacoes')
+        .delete()
+        .eq('id', movimentacaoId)
+        .select('id');
+      if (error) throw new Error(error.message);
+      if (!data?.length) {
+        throw new Error('A exclusão foi bloqueada pelas permissões do Supabase. Aplique a migration administrativa no banco remoto.');
+      }
+      return;
+    }
+
+    const movimentacoes = getStorage<Movimentacao[]>(STORAGE_KEYS.MOVIMENTACOES, INITIAL_MOVIMENTACOES);
+    const movimentacao = movimentacoes.find((item) => item.id === movimentacaoId);
+    if (!movimentacao) throw new Error('Movimentação não encontrada.');
+
+    setStorage(STORAGE_KEYS.MOVIMENTACOES, movimentacoes.filter((item) => item.id !== movimentacaoId));
+    await this.registrarLogAuditoria({
+      usuario_email: operador.email,
+      acao: 'EXCLUSAO_ADMINISTRATIVA_MOVIMENTACAO',
+      tabela: 'movimentacoes',
+      registro_id: movimentacaoId,
+      detalhes: { pessoa: movimentacao.servidor_id || movimentacao.visitante_id },
+      ip_origem: getTerminalInfo(),
+    });
   },
 
   // 7. Registro Atômico de Entrada
@@ -698,7 +1193,9 @@ export const dataService = {
         cracha: input.cracha_numero,
         motivo: input.motivo,
       },
+      ip_origem: getTerminalInfo(),
     });
+
 
     return novaMov;
   },
@@ -757,7 +1254,9 @@ export const dataService = {
         data_hora_saida: mov.data_hora_saida,
         cracha: mov.cracha_numero,
       },
+      ip_origem: getTerminalInfo(),
     });
+
 
     return mov;
   },
@@ -770,7 +1269,7 @@ export const dataService = {
         .select(`
           *,
           servidor_solicitado:servidores(*),
-          movimentacao:movimentacoes(*, visitante:visitantes(*), servidor:servidores(*))
+          movimentacao:movimentacoes(*, visitante:visitantes(*), servidor:servidores!movimentacoes_servidor_id_fkey(*))
         `)
         .order('created_at', { ascending: false });
       return requireLiveResult(data, error, 'Não foi possível carregar autorizações') as Autorizacao[];
@@ -823,7 +1322,9 @@ export const dataService = {
       tabela: 'autorizacoes',
       registro_id: autorizacaoId,
       detalhes: { aprovado, motivo: motivoResposta },
+      ip_origem: getTerminalInfo(),
     });
+
   },
 
   // 10. Agendamentos
@@ -836,7 +1337,7 @@ export const dataService = {
           visitante:visitantes(*),
           departamento:departamentos(*),
           setor:setores(*),
-          servidor_destino:servidores(*)
+          servidor_destino:servidores!agendamentos_servidor_destino_id_fkey(*)
         `)
         .order('data_hora_prevista', { ascending: true });
       return requireLiveResult(data, error, 'Não foi possível carregar agendamentos') as Agendamento[];
@@ -878,28 +1379,38 @@ export const dataService = {
   },
 
   // 11. Auditoria
-  async getLogsAuditoria(): Promise<AuditoriaLog[]> {
+  /** Trilha de auditoria do período (mais recentes primeiro), limitada a `limite` eventos. */
+  async getLogsAuditoria(periodo: { desde?: string; ate?: string; limite?: number } = {}): Promise<AuditoriaLog[]> {
+    const limite = periodo.limite ?? 500;
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
+      let query = supabase
         .from('auditoria_logs')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(limite);
+      if (periodo.desde) query = query.gte('created_at', periodo.desde);
+      if (periodo.ate) query = query.lte('created_at', periodo.ate);
+      const { data, error } = await query;
       return requireLiveResult(data, error, 'Não foi possível carregar logs de auditoria') as AuditoriaLog[];
     }
-    return getStorage<AuditoriaLog[]>(STORAGE_KEYS.AUDITORIA, INITIAL_AUDITORIA_LOGS);
+    return getStorage<AuditoriaLog[]>(STORAGE_KEYS.AUDITORIA, INITIAL_AUDITORIA_LOGS)
+      .filter((log) => (!periodo.desde || log.created_at >= periodo.desde) && (!periodo.ate || log.created_at <= periodo.ate))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, limite);
   },
 
   async registrarLogAuditoria(log: Partial<AuditoriaLog>): Promise<void> {
     if (isSupabaseConfigured) {
       const { error } = await supabase.from('auditoria_logs').insert({
+        usuario_id: log.usuario_id || null,
         usuario_email: log.usuario_email || null,
         acao: log.acao || 'OPERACAO',
         tabela: log.tabela || null,
         registro_id: log.registro_id || null,
         detalhes: log.detalhes || {},
+        ip_origem: log.ip_origem || null,
       });
-      if (error) throw new Error(`Não foi possível registrar auditoria: ${error.message}`);
+      if (error) console.warn(`Auditoria: ${error.message}`);
       return;
     }
 
@@ -956,5 +1467,74 @@ export const dataService = {
       fluxoPorDepartamento,
       ultimasMovimentacoes: movs.slice(0, 8),
     };
+  },
+
+  // 13. Gestão e Sincronização de Operadores / Usuários do Sistema
+  async getUsuariosSistema(): Promise<UserProfile[]> {
+    if (isSupabaseConfigured) {
+      // Com Supabase, a lista oficial é sempre a do banco (nunca a cópia local do navegador).
+      const { data, error } = await supabase.from('profiles').select('*').order('nome_completo');
+      const perfis = requireLiveResult(data, error, 'Não foi possível carregar os usuários') as UserProfile[];
+      // As matrículas de login ficam no Auth; sem a função publicada, a lista sai sem elas.
+      try {
+        const { matriculas } = await invokeAdminUsuarios<{ matriculas: Record<string, string> }>('list_matriculas', {});
+        return perfis.map((perfil) => ({ ...perfil, matricula: matriculas?.[perfil.id] ?? null }));
+      } catch {
+        return perfis;
+      }
+    }
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.USUARIOS);
+      if (raw) return JSON.parse(raw) as UserProfile[];
+    } catch {}
+    return DEMO_USERS.map((u) => ({ ...u }));
+  },
+
+  /**
+   * Cria o operador no Supabase Auth + profiles pela Edge Function admin-manage-user
+   * (a service_role fica só no servidor). Sem Supabase, grava no modo demonstração.
+   */
+  async criarUsuarioSistema(u: Omit<UserProfile, 'id'>, senha: string): Promise<UserProfile> {
+    if (isSupabaseConfigured) {
+      const { profile } = await invokeAdminUsuarios<{ profile: UserProfile }>('create_operator', {
+        email: u.email, password: senha, nome_completo: u.nome_completo, cargo: u.cargo, role: u.role, ativo: u.ativo,
+        matricula: u.matricula || '',
+        unidade_id: u.unidade_id || null, acesso_cco: Boolean(u.acesso_cco), acesso_cpd_os: Boolean(u.acesso_cpd_os), acesso_agenda_mkt: Boolean(u.acesso_agenda_mkt), cco_unidades: u.cco_unidades || [],
+      });
+      return profile;
+    }
+    const novo: UserProfile = { ...u, id: `u-custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, created_at: new Date().toISOString() };
+    salvarUsuarioLocal(novo);
+    return novo;
+  },
+
+  /** Atualiza dados, papel, situação e (opcionalmente) senha/e-mail no Auth e no perfil. */
+  async salvarUsuarioSistema(u: UserProfile, novaSenha?: string): Promise<UserProfile> {
+    if (isSupabaseConfigured) {
+      const { profile } = await invokeAdminUsuarios<{ profile: UserProfile }>('update_operator', {
+        id: u.id, email: u.email, nome_completo: u.nome_completo, cargo: u.cargo, role: u.role, ativo: u.ativo,
+        ...(u.matricula !== undefined ? { matricula: u.matricula || '' } : {}),
+        unidade_id: u.unidade_id || null, acesso_cco: Boolean(u.acesso_cco), acesso_cpd_os: Boolean(u.acesso_cpd_os), acesso_agenda_mkt: Boolean(u.acesso_agenda_mkt), cco_unidades: u.cco_unidades || [],
+        ...(novaSenha ? { password: novaSenha } : {}),
+      });
+      return profile;
+    }
+    salvarUsuarioLocal(u);
+    return u;
+  },
+
+  /** Remove o operador do Auth (o perfil é apagado em cascata). */
+  async excluirUsuarioSistema(id: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      await invokeAdminUsuarios('delete_operator', { id });
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.USUARIOS);
+      if (raw) {
+        const users = JSON.parse(raw) as UserProfile[];
+        localStorage.setItem(STORAGE_KEYS.USUARIOS, JSON.stringify(users.filter((item) => item.id !== id)));
+      }
+    } catch {}
   },
 };

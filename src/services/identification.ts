@@ -33,6 +33,8 @@ export interface BiometricProvider extends IdentificationProvider {
   readonly method: 'biometria';
   getStationId(): Promise<string | null>;
   startIdentification(): Promise<IdentificationResult>;
+  /** Cadastra a digital da pessoa no agente local; o template fica somente no agente. */
+  startEnrollment(subjectId: string): Promise<IdentificationResult>;
 }
 
 type BiometricAgentResponse = {
@@ -114,6 +116,30 @@ export class LocalAgentBiometricProvider implements BiometricProvider {
     }
   }
 
+  async startEnrollment(subjectId: string): Promise<IdentificationResult> {
+    try {
+      const result = await this.request('/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subjectId, subjectType: 'visitante' }),
+      });
+      const cadastrada = result.status === 'identificado' || result.subjectId === subjectId;
+      return {
+        method: 'biometria',
+        status: cadastrada ? 'identified' : 'unavailable',
+        subjectId: cadastrada ? subjectId : undefined,
+        message: result.message || (cadastrada ? 'Digital cadastrada com sucesso.' : 'A digital não foi cadastrada.'),
+        occurredAt: new Date().toISOString(),
+      };
+    } catch {
+      return {
+        method: 'biometria', status: 'error',
+        message: 'Não foi possível comunicar com o agente biométrico desta estação.',
+        occurredAt: new Date().toISOString(),
+      };
+    }
+  }
+
   async identify(): Promise<IdentificationResult> { return this.startIdentification(); }
 
   async cancel(): Promise<void> {
@@ -138,6 +164,15 @@ export class UnconfiguredBiometricProvider implements BiometricProvider {
       method: 'biometria',
       status: 'unavailable',
       message: 'Leitor biométrico não configurado nesta estação. Utilize identificação manual.',
+      occurredAt: new Date().toISOString(),
+    };
+  }
+
+  async startEnrollment(): Promise<IdentificationResult> {
+    return {
+      method: 'biometria',
+      status: 'unavailable',
+      message: 'Leitor biométrico não configurado nesta estação.',
       occurredAt: new Date().toISOString(),
     };
   }

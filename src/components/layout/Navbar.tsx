@@ -1,32 +1,73 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, LogOut, Database, RefreshCw, Moon, Sun, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Shield, LogOut, RefreshCw, Moon, Sun, PanelLeftClose, PanelLeftOpen, Menu, X, Download } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { UserRole } from '@/types';
 import { resetTestData } from '@/services/dataService';
+import { ThemeToggle, useTheme } from './ThemeToggle';
+import { UserAvatar } from '@/components/ui/UserAvatar';
+import { isInstallAvailable, openInstallSheet, usePwa } from '@/pwa/pwa';
+import { useLocation } from 'react-router-dom';
+import { ROTULO_PAPEL, moduloDaRota } from '@/lib/modulos';
+import { SeletorModulo } from './SeletorModulo';
+import { SinoCco } from './SinoCco';
 
 interface NavbarProps {
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
+  onOpenMobileMenu: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSidebar }) => {
-  const { user, logout, login, isSupabaseLive } = useAuth();
-  const [theme, setTheme] = useState<'dark' | 'light'>(
-    () => (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'),
-  );
+export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSidebar, onOpenMobileMenu }) => {
+  const { user, logout, login, isSupabaseLive, switchDemoRole } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const pwa = usePwa();
+  const noCco = moduloDaRota(useLocation().pathname) === 'cco';
+  const subtitulo = noCco ? 'CCO • Central Controle Operacional' : 'Sistema de Recepção e Controle de Acesso';
+
+  // Painel de conta: Esc fecha e a página não rola por trás.
+  useEffect(() => {
+    if (!isAccountOpen) return;
+    const closeOnEsc = (event: KeyboardEvent) => { if (event.key === 'Escape') setIsAccountOpen(false); };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEsc);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEsc);
+    };
+  }, [isAccountOpen]);
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [profilePassword, setProfilePassword] = useState('');
   const [profileLoginError, setProfileLoginError] = useState('');
   const [isProfileLoginLoading, setIsProfileLoginLoading] = useState(false);
 
+  const getRoleEmail = (role: UserRole, defaultEmail: string) => {
+    try {
+      const raw = localStorage.getItem('sme_admin_users');
+      if (raw) {
+        const users = JSON.parse(raw);
+        const found = users.find((u: any) => u.role === role);
+        if (found?.email) return found.email;
+      }
+    } catch {}
+    return defaultEmail;
+  };
+
   const profileOptions: Record<UserRole, { label: string; email: string }> = {
-    recepcionista: { label: 'Recepcionista', email: 'recepcionista.smedu@edu.itaguai.rj.gov.br' },
-    admin: { label: 'Admin', email: 'cpdinfra@edu.itaguai.rj.gov.br' },
-    gestor: { label: 'Gestor', email: 'cpdinfra@edu.itaguai.rj.gov.br' },
-    atendente: { label: 'Atendente', email: '' },
+    recepcionista: { label: 'Recepcionista', email: getRoleEmail('recepcionista', 'recepcao@sme.gov.br') },
+    admin: { label: 'Admin', email: getRoleEmail('admin', 'admin@sme.gov.br') },
+    gestor: { label: 'Gestor', email: getRoleEmail('gestor', 'gestor@sme.gov.br') },
+    atendente: { label: 'Atendente', email: getRoleEmail('atendente', '') },
+    unidade_escolar: { label: 'Unidade escolar', email: getRoleEmail('unidade_escolar', 'unidade@sme.gov.br') },
+    cco: { label: 'Equipe CCO', email: getRoleEmail('cco', 'cco@sme.gov.br') },
+    cco_admin: { label: 'Admin do CCO', email: getRoleEmail('cco_admin', 'paulo.sergio@edu.itaguai.rj.gov.br') },
+    cpd_os: { label: 'CPD_OS', email: getRoleEmail('cpd_os', 'cpd_os@sme.gov.br') },
+    agenda_mkt: { label: 'AgendaMKT', email: getRoleEmail('agenda_mkt', 'agendamkt@sme.gov.br') },
   };
 
   const openProfileLogin = (role: UserRole) => {
@@ -59,14 +100,6 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
     }
   };
 
-  const toggleTheme = () => {
-    const nextTheme = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = nextTheme;
-    document.documentElement.classList.toggle('dark', nextTheme === 'dark');
-    localStorage.setItem('sme-theme', nextTheme);
-    setTheme(nextTheme);
-  };
-
   const handleResetData = () => {
     if (confirm('Deseja restaurar os dados de teste para o estado inicial padrão?')) {
       resetTestData();
@@ -76,9 +109,24 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#dce4f0] px-4 lg:px-8 py-3 shadow-[0_2px_10px_rgba(18,44,82,.04)] dark:bg-[#0f1422]/95 dark:border-slate-800/80 dark:shadow-none">
-      <div className="flex items-center justify-between gap-4">
-        {/* Brand identity */}
-        <div className="flex items-center gap-3">
+      <div className="md:hidden">
+        <div className="flex items-center gap-1.5 min-[380px]:gap-3">
+          <button type="button" onClick={onOpenMobileMenu} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl min-[380px]:h-11 min-[380px]:w-11 min-[380px]:rounded-2xl border border-[#d7e6f6] bg-white text-[#087ef5] shadow-sm" aria-label="Abrir menu de navegação"><Menu className="h-6 w-6" /></button>
+          <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-[#b9d9f3] bg-white shadow-sm min-[380px]:h-11 min-[380px]:w-11 min-[380px]:rounded-2xl"><img src="/assets/brasao_itaguai.png" alt="Brasão do Município de Itaguaí" className="h-8 w-8 object-contain min-[380px]:h-9 min-[380px]:w-9" /></div>
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="flex items-start gap-1.5"><h1 className="text-[11px] font-extrabold leading-[1.05] tracking-wide text-[#082b57] min-[380px]:text-[13px]">SECRETARIA MUNICIPAL<br />DE EDUCAÇÃO</h1><span className="mt-0.5 hidden rounded border border-[#b9d9f3] bg-[#edf5ff] px-1.5 py-0.5 text-[9px] font-bold text-[#087ef5] min-[420px]:inline">SMEDU</span></div>
+            <p className="mt-1 truncate text-[10px] text-[#68809f] min-[380px]:text-[11px]">{subtitulo}</p>
+          </div>
+          <SinoCco />
+          <ThemeToggle size="xs" className="min-[380px]:hidden" />
+          <ThemeToggle size="sm" className="max-[379px]:hidden" />
+          <button type="button" onClick={() => setIsAccountOpen(true)} aria-haspopup="dialog" aria-expanded={isAccountOpen} className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087ef5]" aria-label="Abrir conta e preferências" title="Conta e preferências"><UserAvatar nome={user?.nome_completo} className="h-10 w-10 text-sm min-[380px]:h-11 min-[380px]:w-11 min-[380px]:text-base" /></button>
+        </div>
+      </div>
+
+      <div className="hidden md:flex items-center justify-between gap-4">
+        {/* Brand identity: é a parte que encolhe (texto com reticências) para os botões de módulo nunca perderem o nome. */}
+        <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             onClick={onToggleSidebar}
@@ -95,55 +143,38 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
               className="w-9 h-9 object-contain"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-extrabold tracking-wider text-[#071d41] uppercase dark:text-slate-100">
+              <h1 className="truncate text-sm font-extrabold tracking-wider text-[#071d41] uppercase dark:text-slate-100">
                 SECRETARIA MUNICIPAL DE EDUCAÇÃO
               </h1>
               <span className="text-[10px] bg-[#edf5fc] text-[#005a9c] px-2 py-0.5 rounded font-mono border border-[#b9d9f3] dark:bg-slate-800 dark:text-emerald-400 dark:border-emerald-500/20">
                 SMEDU
               </span>
             </div>
-            <p className="text-xs text-[#627289] dark:text-slate-400">
-              Sistema de Recepção e Controle de Acesso
+            <p className="truncate text-xs text-[#627289] dark:text-slate-400">
+              {subtitulo}
             </p>
           </div>
         </div>
 
         {/* Status Pills and User actions */}
-        <div className="flex items-center gap-3">
-          {/* Supabase status indicator */}
-          <div
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-              isSupabaseLive
-                ? 'bg-emerald-950/50 text-emerald-400 border-emerald-500/30'
-                : 'bg-amber-950/40 text-amber-300 border-amber-500/30'
-            }`}
-            title={
-              isSupabaseLive
-                ? 'Conectado ao Supabase PostgreSQL com RLS'
-                : 'Ambiente de Testes / Modo Homologação com Armazenamento Local'
-            }
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>{isSupabaseLive ? 'Supabase Conectado' : 'Modo Homologação Ativo'}</span>
-          </div>
-
+        <div className="flex shrink-0 items-center gap-3">
           {/* Quick role switcher for testing */}
-          {user && (
-            <div className="hidden md:flex items-center gap-1 bg-[#151c2c] border border-slate-700/80 rounded-lg p-0.5 text-xs">
+          {user && !isSupabaseLive && (
+            <div className="hidden xl:flex items-center gap-1 bg-[#151c2c] border border-slate-700/80 rounded-lg p-0.5 text-xs">
               <span className="px-2 text-slate-400 text-[11px]">Perfil teste:</span>
-              {(['recepcionista', 'admin', 'gestor'] as UserRole[]).map((r) => (
+              {(['recepcionista', 'admin', 'gestor', 'unidade_escolar', 'cco', 'cco_admin'] as UserRole[]).map((r) => (
                 <button
                   key={r}
-                  onClick={() => openProfileLogin(r)}
+                  onClick={() => switchDemoRole(r)}
                   className={`px-2 py-0.5 rounded text-[11px] capitalize font-medium transition-colors ${
                     user.role === r
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  {r}
+                  {r === 'unidade_escolar' ? 'unidade' : r === 'cco_admin' ? 'admin cco' : r}
                 </button>
               ))}
               <button
@@ -156,24 +187,22 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
-            aria-label={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
-            className="theme-toggle p-2 rounded-lg border border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
+          <SeletorModulo />
+
+          <SinoCco />
+
+          <ThemeToggle size="sm" />
 
           {/* User profile dropdown & logout */}
           {user && (
             <div className="flex items-center gap-3 pl-2 border-l border-slate-800">
-              <div className="text-right hidden sm:block">
+              <UserAvatar nome={user.nome_completo} className="h-9 w-9 text-xs" />
+              <div className="text-right hidden sm:block" title={user.email}>
                 <div className="text-xs font-semibold text-slate-200">{user.nome_completo}</div>
+                <div className="text-[10px] text-slate-400 font-mono truncate max-w-[180px]">{user.email}</div>
                 <div className="text-[11px] text-emerald-400 flex items-center justify-end gap-1">
                   <Shield className="w-3 h-3" />
-                  <span className="capitalize">{user.role}</span>
+                  <span>{ROTULO_PAPEL[user.role] || user.role}</span>
                 </div>
               </div>
 
@@ -191,6 +220,64 @@ export const Navbar: React.FC<NavbarProps> = ({ sidebarCollapsed, onToggleSideba
           )}
         </div>
       </div>
+
+      {/* Conta e preferências (smartphone) */}
+      {isAccountOpen && createPortal(
+        <div className="fixed inset-0 z-[60] md:hidden" role="dialog" aria-modal="true" aria-labelledby="conta-titulo">
+          <button type="button" aria-label="Fechar conta e preferências" className="absolute inset-0 bg-[#082b57]/40 backdrop-blur-[2px]" onClick={() => setIsAccountOpen(false)} />
+          <section className="absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-[#d7e6f6] bg-white px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-3 shadow-[0_-18px_42px_rgba(8,43,87,.25)] dark:border-slate-800 dark:bg-[#0f1422]">
+            <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-[#d7e6f6] dark:bg-slate-700" aria-hidden="true" />
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <UserAvatar nome={user?.nome_completo} className="h-14 w-14 text-lg" />
+                <div className="min-w-0">
+                  <h2 id="conta-titulo" className="truncate text-sm font-extrabold text-[#082b57] dark:text-slate-100">{user?.nome_completo || 'Operador SMEDU'}</h2>
+                  <p className="truncate text-xs text-[#68809f] dark:text-slate-400">{user?.email}</p>
+                  {user?.role && <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-[#16a34a] dark:text-emerald-400"><Shield className="h-3 w-3" />{ROTULO_PAPEL[user.role] || user.role}</p>}
+                </div>
+              </div>
+              <button type="button" onClick={() => setIsAccountOpen(false)} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#526d91] hover:bg-[#f2f7ff] dark:text-slate-400 dark:hover:bg-slate-800" aria-label="Fechar"><X className="h-5 w-5" /></button>
+            </div>
+
+            <SeletorModulo bloco className="mt-5" onTrocar={() => setIsAccountOpen(false)} />
+
+            <div className="mt-5">
+              <p id="aparencia-titulo" className="mb-2 text-xs font-bold uppercase tracking-wider text-[#68809f] dark:text-slate-400">Aparência</p>
+              <div role="radiogroup" aria-labelledby="aparencia-titulo" className="grid grid-cols-2 gap-2 rounded-2xl border border-[#d7e6f6] bg-[#f4f9ff] p-1.5 dark:border-slate-800 dark:bg-[#0b0f19]">
+                {([
+                  { value: 'light', label: 'Claro', Icon: Sun, active: 'bg-white text-[#b45309] shadow-[0_6px_16px_-8px_rgba(245,158,11,.8)] ring-1 ring-[#f59e0b]/50' },
+                  { value: 'dark', label: 'Escuro', Icon: Moon, active: 'bg-[#131b2e] text-[#bfdbfe] shadow-[0_6px_16px_-8px_rgba(59,130,246,.9)] ring-1 ring-[#3b82f6]/60' },
+                ] as const).map(({ value, label, Icon, active }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={theme === value}
+                    onClick={() => setTheme(value)}
+                    className={`flex min-h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold motion-safe:transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#087ef5] ${theme === value ? active : 'text-[#526d91] hover:bg-white/70 dark:text-slate-400 dark:hover:bg-slate-800'}`}
+                  >
+                    <Icon className="h-5 w-5" />{label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-[#68809f] dark:text-slate-500">A preferência fica salva neste aparelho.</p>
+            </div>
+
+            {isInstallAvailable(pwa) && (
+              <button type="button" onClick={() => { setIsAccountOpen(false); openInstallSheet(); }} className="mt-5 flex min-h-12 w-full items-center gap-3 rounded-xl border border-[#d7e6f6] bg-[#f4f9ff] px-3 text-left text-sm font-bold text-[#005a9c] hover:bg-[#e8f3ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#087ef5] dark:border-slate-800 dark:bg-[#101625] dark:text-sky-300 dark:hover:bg-slate-800">
+                <img src="/icons/icon-192.png?v=5" alt="" className="h-8 w-8 rounded-lg" />
+                <span className="flex-1">Instalar aplicativo<span className="block text-[11px] font-medium text-[#68809f] dark:text-slate-400">Acesso rápido pela tela inicial</span></span>
+                <Download className="h-4 w-4" />
+              </button>
+            )}
+
+            <button type="button" onClick={() => { setIsAccountOpen(false); logout(); }} className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#fecaca] bg-[#fef2f2] text-sm font-bold text-[#dc2626] hover:bg-[#fee2e2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#dc2626] dark:border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-300">
+              <LogOut className="h-4 w-4" />Sair do sistema
+            </button>
+          </section>
+        </div>,
+        document.body,
+      )}
 
       <Modal
         isOpen={Boolean(selectedRole)}

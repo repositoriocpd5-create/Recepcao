@@ -88,7 +88,7 @@ export const AutorizacoesPage: React.FC = () => {
       </div>
 
       {/* Filtros de status */}
-      <div className="flex items-center gap-2 bg-[#101625] p-1 rounded-lg border border-slate-800 max-w-md text-xs">
+      <div className="grid grid-cols-2 gap-1 bg-[#101625] p-1 rounded-lg border border-slate-800 max-w-md text-xs min-[400px]:flex min-[400px]:items-center min-[400px]:gap-2">
         {(['pendente', 'autorizado', 'recusado', 'todos'] as const).map((st) => (
           <button
             key={st}
