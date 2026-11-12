@@ -30,14 +30,19 @@ const ICONE_ENQUADRAR = svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 
 
 const tooltipUnidade = (u: UnidadeMapa) => {
   const base = `<strong>${escapar(u.nome)}</strong><br/>${escapar(u.bairro ?? 'Itaguaí')} · ${escapar(CRITICIDADES[u.criticidade].rotulo)}${u.abertas.length ? ` · ${u.abertas.length} pendência(s)` : ''}`;
-  if (!u.abertas.length) return base;
+  const contato = [
+    `<span style="opacity:.85">Diretor(a): <strong>${u.diretor ? escapar(u.diretor) : 'não informado'}</strong></span>`,
+    `<span style="opacity:.85">Ramal: <strong>${u.ramais.length ? escapar(u.ramais.join(' / ')) : 'não informado'}</strong></span>`,
+  ].join('<br/>');
+  const comContato = `${base}<div style="margin-top:4px;line-height:1.45">${contato}</div>`;
+  if (!u.abertas.length) return comContato;
   const r = resumirParadas(u.abertas);
   const dias = (n: number) => `${n} ${n === 1 ? 'dia' : 'dias'}`;
   const linhas: string[] = [];
   if (r.semAtualizacao) linhas.push(`<span style="color:#e11d48;font-weight:700">&#9888; ${r.semAtualizacao} sem atualização · mais parada há ${dias(r.maiorSemAtualizar)}</span>`);
   if (r.aguardando) linhas.push(`<span style="color:#b45309;font-weight:700">&#8987; ${r.aguardando} aguardando resolução</span>`);
   linhas.push(`<span style="opacity:.8">Mais antiga em aberto: ${dias(r.maisAntiga)}</span>`);
-  return `${base}<div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(100,116,139,.3);line-height:1.45">${linhas.join('<br/>')}</div>`;
+  return `${comContato}<div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(100,116,139,.3);line-height:1.45">${linhas.join('<br/>')}</div>`;
 };
 
 const escapar =(texto: string) => texto.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));

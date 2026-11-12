@@ -35,6 +35,10 @@ export interface UnidadeMapa {
   bairro: string | null;
   endereco: string | null;
   mapaUrl: string | null;
+  /** Diretor(a) da unidade, quando cadastrado. */
+  diretor: string | null;
+  /** Ramais da unidade (números), principal primeiro. */
+  ramais: string[];
   abertas: CcoOcorrencia[];
   urgentes: number;
   vencidas: number;
@@ -87,6 +91,8 @@ export function montarUnidades(unidades: RamalUnidade[], ocorrencias: CcoOcorren
         bairro: u.bairro ?? padrao?.bairro ?? null,
         endereco: u.endereco ?? padrao?.endereco ?? null,
         mapaUrl: u.mapa_url ?? padrao?.mapa_url ?? null,
+        diretor: u.diretor?.trim() || null,
+        ramais: [...new Set([...(u.ramais ?? []).map((r) => r.numero), u.ramal ?? ''].map((n) => n.trim()).filter(Boolean))],
         abertas,
         urgentes,
         vencidas,
