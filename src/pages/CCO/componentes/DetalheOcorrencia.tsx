@@ -55,7 +55,7 @@ import {
 import { SUGESTAO_IMAGENS, primeiroNome } from '@/lib/gravidadeCco';
 import { CcoHistorico, CcoOcorrencia, CcoSituacao, UserProfile } from '@/types';
 import { Campo, CampoHora, caixaCampo, completarHora, horaValida } from './campos';
-import { Carregando, ESTILO_SITUACAO, SituacaoBadge, botaoPrimario } from './ui';
+import { Carregando, ESTILO_SITUACAO, ParadaBadge, SituacaoBadge, botaoPrimario } from './ui';
 import { Atendimento, formatarVisita } from './Atendimento';
 import { useUnidade } from '../hooks';
 import { LOCALIZACOES_UNIDADES } from '@/services/localizacoesUnidades';
@@ -697,6 +697,7 @@ export const DetalheOcorrencia: React.FC<Props> = ({ ocorrenciaId, user, onFecha
           <div className="flex flex-col gap-3 border-b border-[#d9e5f3] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-slate-800 dark:bg-[#121826]">
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
               <SituacaoBadge situacao={oc.situacao} className="px-3 py-1.5 text-[13px]" />
+              <ParadaBadge oc={oc} className="px-3 py-1.5 text-[13px]" />
               <span className="text-[13px] text-[#5f7391] dark:text-slate-400">{SITUACOES[oc.situacao].descricao}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">

@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CalendarClock, CheckCircle2, ChevronRight, ClipboardList, EyeOff, LayoutDashboard, ShieldCheck, Sparkles, Timer } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, ChevronRight, ClipboardList, EyeOff, Hourglass, LayoutDashboard, ShieldCheck, Sparkles, Timer } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 import { primeiroNome } from '@/lib/gravidadeCco';
 import { gravidadeDe, hojeBrasilia, importanciaDe } from '@/services/ccoService';
 import { CcoOcorrencia, UserProfile } from '@/types';
-import { botaoPrimario, botaoSecundario } from './ui';
+import { LIMITE_AGUARDANDO, LIMITE_SEM_ATUALIZACAO, paradaDe } from '@/lib/paradaCco';
+import { ParadaBadge, botaoPrimario, botaoSecundario } from './ui';
 
 const FUSO = 'America/Sao_Paulo';
 const chaveVisto = (userId: string) => `sme-cco-boas-vindas-${userId}`;
@@ -54,17 +55,25 @@ export const BoasVindasAdmin: React.FC<Props> = ({ user, ocorrencias, carregando
     const emAtendimento = abertas.filter((oc) => oc.situacao === 'em_analise' || oc.situacao === 'em_atendimento');
     const visitasHoje = abertas.filter((oc) => oc.visita_data === hoje);
     const registradasHoje = ocorrencias.filter((oc) => oc.created_at && new Intl.DateTimeFormat('en-CA', { timeZone: FUSO }).format(new Date(oc.created_at)) === hoje);
-    const prioridades = [...abertas]
-      .map((oc) => ({ oc, imp: importanciaDe(oc), grave: gravidadeDe(oc) }))
-      .filter(({ imp, grave }) => grave.grave || imp.nivel !== 'baixa')
+    const comParada = abertas.map((oc) => ({ oc, parada: paradaDe(oc) }));
+    const semAtualizacao = comParada.filter(({ parada }) => parada?.tipo === 'sem_atualizacao');
+    const aguardando = comParada.filter(({ parada }) => parada?.tipo === 'aguardando');
+    const maisAntiga = comParada.reduce((max, { parada }) => Math.max(max, parada?.diasAberta ?? 0), 0);
+    const maiorSemAtualizar = comParada.reduce((max, { parada }) => Math.max(max, parada?.diasSemAtualizar ?? 0), 0);
+    const peso = { critico: 0, atencao: 1, ok: 2 } as const;
+    const prioridades = comParada
+      .map(({ oc, parada }) => ({ oc, parada, imp: importanciaDe(oc), grave: gravidadeDe(oc) }))
+      .filter(({ imp, grave, parada }) => grave.grave || imp.nivel !== 'baixa' || (parada && parada.tom !== 'ok'))
       .sort((a, b) => Number(b.grave.grave) - Number(a.grave.grave)
+        || peso[a.parada?.tom ?? 'ok'] - peso[b.parada?.tom ?? 'ok']
         || ({ alta: 0, media: 1, baixa: 2 }[a.imp.nivel] - { alta: 0, media: 1, baixa: 2 }[b.imp.nivel])
-        || b.oc.created_at.localeCompare(a.oc.created_at))
-      .slice(0, 3);
-    return { abertas, naoVisualizadas, graves, emAtendimento, visitasHoje, registradasHoje, prioridades };
+        || (b.parada?.dias ?? 0) - (a.parada?.dias ?? 0))
+      .slice(0, 4);
+    return { abertas, naoVisualizadas, graves, emAtendimento, visitasHoje, registradasHoje, prioridades, semAtualizacao, aguardando, maisAntiga, maiorSemAtualizar };
   }, [ocorrencias, hoje]);
 
-  const pendencias = resumo.graves.length + resumo.naoVisualizadas.length + resumo.visitasHoje.length;
+  const pendencias = resumo.graves.length + resumo.naoVisualizadas.length + resumo.visitasHoje.length + resumo.semAtualizacao.length;
+  const temParados = resumo.semAtualizacao.length + resumo.aguardando.length > 0;
   const nome = primeiroNome(user.nome_completo);
 
   const mensagem = resumo.graves.length
@@ -108,6 +117,29 @@ export const BoasVindasAdmin: React.FC<Props> = ({ user, ocorrencias, carregando
           ))}
         </dl>
 
+        {temParados && (
+          <div role="alert" className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-3.5 dark:border-rose-500/30 dark:bg-rose-500/10">
+            <Hourglass className="mt-0.5 h-5 w-5 shrink-0 text-rose-700 dark:text-rose-300" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm font-extrabold text-rose-900 dark:text-rose-100">Ocorrências paradas</p>
+              <ul className="mt-1 space-y-0.5 text-sm leading-relaxed text-rose-900/90 dark:text-rose-200">
+                {resumo.semAtualizacao.length > 0 && (
+                  <li>
+                    <strong>{plural(resumo.semAtualizacao.length, 'ocorrência', 'ocorrências')}</strong> sem atualização há {LIMITE_SEM_ATUALIZACAO} dias ou mais
+                    {' '}(a mais parada: <strong>{resumo.maiorSemAtualizar} dias</strong>).
+                  </li>
+                )}
+                {resumo.aguardando.length > 0 && (
+                  <li>
+                    <strong>{plural(resumo.aguardando.length, 'ocorrência', 'ocorrências')}</strong> aguardando resolução há {LIMITE_AGUARDANDO} dias ou mais.
+                  </li>
+                )}
+                <li className="text-xs font-semibold opacity-80">A mais antiga em aberto tem {resumo.maisAntiga} dias.</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-start gap-3 rounded-2xl border border-[#cfe0f7] bg-[#f3f8ff] p-3.5 dark:border-sky-500/30 dark:bg-sky-500/10">
           <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-[#0b63ce] dark:text-sky-300" aria-hidden="true" />
           <div>
@@ -120,7 +152,7 @@ export const BoasVindasAdmin: React.FC<Props> = ({ user, ocorrencias, carregando
           <section aria-labelledby="cco-prioridades">
             <h3 id="cco-prioridades" className="mb-2 text-xs font-extrabold uppercase tracking-wider text-[#4c6283] dark:text-slate-400">Prioridades</h3>
             <ul className="divide-y divide-[#e6edf6] overflow-hidden rounded-2xl border border-[#e2eaf4] dark:divide-slate-800 dark:border-slate-800">
-              {resumo.prioridades.map(({ oc, imp, grave }) => (
+              {resumo.prioridades.map(({ oc, imp, grave, parada }) => (
                 <li key={oc.id}>
                   <button
                     type="button"
@@ -135,6 +167,7 @@ export const BoasVindasAdmin: React.FC<Props> = ({ user, ocorrencias, carregando
                       <span className="block truncate text-xs text-[#5f7391] dark:text-slate-400">
                         {grave.grave ? `Caso grave${grave.categoria ? `: ${grave.categoria}` : ''}` : imp.motivo}
                       </span>
+                      <ParadaBadge oc={oc} className="mt-1.5" />
                     </span>
                     <ChevronRight className="h-4 w-4 shrink-0 text-[#8a9bb3]" aria-hidden="true" />
                   </button>

@@ -1,9 +1,10 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, CircleDot, Clock3, Loader2, Search } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDot, Clock3, Hourglass, Loader2, Search, Timer } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
+import { TomParada, paradaDe } from '@/lib/paradaCco';
 import { SITUACOES } from '@/services/ccoService';
-import { CcoSituacao } from '@/types';
+import { CcoOcorrencia, CcoSituacao } from '@/types';
 
 /** Cor + ícone + texto: a situação nunca depende só da cor. */
 export const ESTILO_SITUACAO: Record<CcoSituacao, { classe: string; ponto: string; icone: typeof CircleDot }> = {
@@ -36,6 +37,28 @@ export const SituacaoBadge: React.FC<{ situacao: CcoSituacao; className?: string
     <span className={cn('inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ring-1', estilo.classe, className)}>
       <Icone className="h-3.5 w-3.5" aria-hidden="true" />
       {SITUACOES[situacao].rotulo}
+    </span>
+  );
+};
+
+const ESTILO_PARADA: Record<TomParada, { classe: string; icone: typeof Clock3 }> = {
+  critico: { classe: 'bg-rose-50 text-rose-800 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/30', icone: AlertTriangle },
+  atencao: { classe: 'bg-amber-50 text-amber-800 ring-amber-300 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30', icone: Hourglass },
+  ok: { classe: 'bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/30', icone: Timer },
+};
+
+/** Há quantos dias a ocorrência está sem andamento: texto + ícone + cor (nunca só a cor). */
+export const ParadaBadge: React.FC<{ oc: CcoOcorrencia; className?: string; /** esconde o selo quando está tudo em dia */ somenteAlerta?: boolean }> = ({ oc, className, somenteAlerta }) => {
+  const parada = paradaDe(oc);
+  if (!parada || (somenteAlerta && parada.tom === 'ok')) return null;
+  const { classe, icone: Icone } = ESTILO_PARADA[parada.tom];
+  return (
+    <span
+      className={cn('inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ring-1', classe, className)}
+      title={`Aberta há ${parada.diasAberta} ${parada.diasAberta === 1 ? 'dia' : 'dias'} · última atualização há ${parada.diasSemAtualizar} ${parada.diasSemAtualizar === 1 ? 'dia' : 'dias'}`}
+    >
+      <Icone className="h-3.5 w-3.5" aria-hidden="true" />
+      {parada.texto}
     </span>
   );
 };

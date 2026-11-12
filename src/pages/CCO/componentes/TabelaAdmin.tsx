@@ -3,7 +3,7 @@ import { AlertTriangle, Camera, CheckCircle2, ClipboardList, Eye, Image as Image
 import { cn } from '@/lib/utils';
 import { IMPORTANCIAS, Importancia, PessoasDasUnidades, descreverHorario, formatarData, formatarDataHora, importanciaDe } from '@/services/ccoService';
 import { CcoOcorrencia } from '@/types';
-import { SituacaoBadge } from './ui';
+import { ParadaBadge, SituacaoBadge } from './ui';
 import type { Densidade } from './DensidadeTabela';
 
 export const ESTILO_IMPORTANCIA: Record<Importancia, string> = {
@@ -197,6 +197,7 @@ export const TabelaAdmin: React.FC<Props> = ({ ocorrencias, pessoas, onAbrir, on
                   ) : (
                     <>
                       <SituacaoBadge situacao={oc.situacao} />
+                      <ParadaBadge oc={oc} somenteAlerta className="mt-1 !text-[11px] !px-2 !py-0.5" />
                       <span className="mt-1 block truncate text-[#5f7391] dark:text-slate-400" title={oc.responsavel_nome || undefined}>
                         {oc.responsavel_nome ? `Resp.: ${oc.responsavel_nome}` : 'Sem responsável'}
                       </span>

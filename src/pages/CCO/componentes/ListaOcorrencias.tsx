@@ -3,7 +3,7 @@ import { Camera, ChevronRight, Eye, EyeOff, FileText, MoonStar } from 'lucide-re
 import { cn } from '@/lib/utils';
 import { SITUACOES, descreverHorario, formatarData, formatarDataHora } from '@/services/ccoService';
 import { CcoOcorrencia } from '@/types';
-import { SituacaoBadge } from './ui';
+import { ParadaBadge, SituacaoBadge } from './ui';
 import { ImportanciaBadge } from './TabelaAdmin';
 
 interface Props {
@@ -95,6 +95,7 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
               <span className="flex flex-wrap justify-end gap-1.5 lg:hidden">
                 <SituacaoBadge situacao={oc.situacao} />
                 {mostrarVisualizacao && <VisualizacaoBadge oc={oc} />}
+                {mostrarUnidade && <ParadaBadge oc={oc} somenteAlerta />}
               </span>
 
               <span className="col-span-2 flex flex-wrap items-center gap-x-1.5 text-[13px] text-[#3b4d68] lg:col-span-1 lg:block dark:text-slate-300">
@@ -119,7 +120,10 @@ export const ListaOcorrencias: React.FC<Props> = ({ ocorrencias, onAbrir, mostra
                 {oc.foto_path && <Camera className="mt-0.5 h-4 w-4 shrink-0 text-[#6b7f9b]" aria-label="com foto" />}
               </span>
 
-              <span className="hidden lg:block"><SituacaoBadge situacao={oc.situacao} /></span>
+              <span className="hidden lg:flex lg:flex-col lg:items-start lg:gap-1">
+                <SituacaoBadge situacao={oc.situacao} />
+                {mostrarUnidade && <ParadaBadge oc={oc} somenteAlerta />}
+              </span>
               {mostrarVisualizacao && <span className="hidden lg:block"><VisualizacaoBadge oc={oc} /></span>}
               <ChevronRight className="hidden h-5 w-5 text-[#9aaac0] transition-transform group-hover:translate-x-0.5 group-hover:text-[#0b63ce] lg:block" aria-hidden="true" />
             </button>
