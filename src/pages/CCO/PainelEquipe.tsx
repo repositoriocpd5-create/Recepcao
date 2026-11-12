@@ -35,13 +35,9 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [toast, setToast] = useState<string | null>(null);
   const [novaAberta, setNovaAberta] = useState(false);
   const [unidadeNova, setUnidadeNova] = useState('');
-  const [kpisAbertos, setKpisAbertos] = useState(() => {
-    try { return localStorage.getItem('sme-cco-kpis-recolhidos') !== '1'; } catch { return true; }
-  });
-  const alternarKpis = () => setKpisAbertos((v) => {
-    try { localStorage.setItem('sme-cco-kpis-recolhidos', v ? '1' : '0'); } catch { /* sem armazenamento */ }
-    return !v;
-  });
+  // Sempre começa recolhido; a escolha vale só enquanto a tela está aberta.
+  const [kpisAbertos, setKpisAbertos] = useState(false);
+  const alternarKpis = () => setKpisAbertos((v) => !v);
 
   useEffect(() => {
     if (!toast) return;
