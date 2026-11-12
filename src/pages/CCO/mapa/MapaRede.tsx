@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { resumirParadas } from '@/lib/paradaCco';
 import { CRITICIDADES, SEDE, UnidadeMapa } from './dados';
 
 interface Props {
@@ -26,6 +27,18 @@ const svg = (corpo: string) =>
 const ICONE_TELA_CHEIA = svg('<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>');
 const ICONE_SAIR_TELA_CHEIA = svg('<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>');
 const ICONE_ENQUADRAR = svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/>');
+
+const tooltipUnidade = (u: UnidadeMapa) => {
+  const base = `<strong>${escapar(u.nome)}</strong><br/>${escapar(u.bairro ?? 'Itaguaí')} · ${escapar(CRITICIDADES[u.criticidade].rotulo)}${u.abertas.length ? ` · ${u.abertas.length} pendência(s)` : ''}`;
+  if (!u.abertas.length) return base;
+  const r = resumirParadas(u.abertas);
+  const dias = (n: number) => `${n} ${n === 1 ? 'dia' : 'dias'}`;
+  const linhas: string[] = [];
+  if (r.semAtualizacao) linhas.push(`<span style="color:#e11d48;font-weight:700">&#9888; ${r.semAtualizacao} sem atualização · mais parada há ${dias(r.maiorSemAtualizar)}</span>`);
+  if (r.aguardando) linhas.push(`<span style="color:#b45309;font-weight:700">&#8987; ${r.aguardando} aguardando resolução</span>`);
+  linhas.push(`<span style="opacity:.8">Mais antiga em aberto: ${dias(r.maisAntiga)}</span>`);
+  return `${base}<div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(100,116,139,.3);line-height:1.45">${linhas.join('<br/>')}</div>`;
+};
 
 const escapar =(texto: string) => texto.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
@@ -163,10 +176,7 @@ export const MapaRede: React.FC<Props> = ({ unidades, selecionada, rota, trajeto
         riseOnHover: true,
         zIndexOffset: u.id === selecionada ? 900 : u.criticidade === 'ok' ? 0 : 500 + u.prioridade / 100,
       });
-      marcador.bindTooltip(
-        `<strong>${escapar(u.nome)}</strong><br/>${escapar(u.bairro ?? 'Itaguaí')} · ${escapar(CRITICIDADES[u.criticidade].rotulo)}${u.abertas.length ? ` · ${u.abertas.length} pendência(s)` : ''}`,
-        { direction: 'top', offset: [0, -14] },
-      );
+      marcador.bindTooltip(tooltipUnidade(u), { direction: 'top', offset: [0, -14], className: 'tooltip-unidade' });
       marcador.on('click', () => onSelecionar(u.id));
       marcador.on('keypress', (e: L.LeafletKeyboardEvent) => { if (e.originalEvent.key === 'Enter') onSelecionar(u.id); });
       camada.addLayer(marcador);

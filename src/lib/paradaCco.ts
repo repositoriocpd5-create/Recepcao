@@ -50,3 +50,26 @@ export const paradaDe = (oc: CcoOcorrencia, agora: Date = new Date()): Parada | 
     texto: diasSemAtualizar === 0 ? 'Atualizada hoje' : `Última atualização há ${diasTxt(diasSemAtualizar)}`,
   };
 };
+
+export interface ResumoParadas {
+  semAtualizacao: number;
+  aguardando: number;
+  /** Maior tempo sem atualização entre as abertas, em dias. */
+  maiorSemAtualizar: number;
+  /** Idade da ocorrência aberta mais antiga, em dias. */
+  maisAntiga: number;
+}
+
+/** Resumo de um conjunto de ocorrências (ignora as concluídas). */
+export const resumirParadas = (ocorrencias: CcoOcorrencia[], agora: Date = new Date()): ResumoParadas => {
+  const r: ResumoParadas = { semAtualizacao: 0, aguardando: 0, maiorSemAtualizar: 0, maisAntiga: 0 };
+  for (const oc of ocorrencias) {
+    const p = paradaDe(oc, agora);
+    if (!p) continue;
+    if (p.tipo === 'sem_atualizacao') r.semAtualizacao += 1;
+    if (p.tipo === 'aguardando') r.aguardando += 1;
+    r.maiorSemAtualizar = Math.max(r.maiorSemAtualizar, p.diasSemAtualizar);
+    r.maisAntiga = Math.max(r.maisAntiga, p.diasAberta);
+  }
+  return r;
+};
