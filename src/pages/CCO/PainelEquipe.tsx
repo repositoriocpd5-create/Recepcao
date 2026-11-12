@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, FileDown, LayoutDashboard, Loader2, MessageSquarePlus, Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, FileDown, LayoutDashboard, Loader2, MessageSquarePlus, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { dataService } from '@/services/dataService';
 import { IMPORTANCIAS, Importancia, ORDEM_SITUACOES, SITUACOES, ccoService, formatarData, formatarDataHora, importanciaDe } from '@/services/ccoService';
@@ -35,6 +35,13 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [toast, setToast] = useState<string | null>(null);
   const [novaAberta, setNovaAberta] = useState(false);
   const [unidadeNova, setUnidadeNova] = useState('');
+  const [kpisAbertos, setKpisAbertos] = useState(() => {
+    try { return localStorage.getItem('sme-cco-kpis-recolhidos') !== '1'; } catch { return true; }
+  });
+  const alternarKpis = () => setKpisAbertos((v) => {
+    try { localStorage.setItem('sme-cco-kpis-recolhidos', v ? '1' : '0'); } catch { /* sem armazenamento */ }
+    return !v;
+  });
 
   useEffect(() => {
     if (!toast) return;
@@ -113,7 +120,43 @@ export const PainelEquipe: React.FC<{ user: UserProfile }> = ({ user }) => {
         icone={<LayoutDashboard className="h-7 w-7 sm:h-9 sm:w-9" aria-hidden="true" />}
       />
 
-      <section aria-label="Indicadores" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="-mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xs font-extrabold uppercase tracking-wider text-[#4c6283] dark:text-slate-400">Indicadores</h2>
+        <button
+          type="button"
+          onClick={alternarKpis}
+          aria-expanded={kpisAbertos}
+          aria-controls="cco-indicadores"
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-bold text-[#0b4fa3] hover:bg-[#eef5fe] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce] dark:text-sky-300 dark:hover:bg-slate-800"
+        >
+          {kpisAbertos ? 'Recolher' : 'Exibir'}
+          <ChevronDown className={cn('h-4 w-4 transition-transform', kpisAbertos && 'rotate-180')} aria-hidden="true" />
+        </button>
+      </div>
+
+      {!kpisAbertos && (
+        <ul className="flex flex-wrap gap-2" aria-label="Resumo dos indicadores">
+          {ORDEM_SITUACOES.map((s) => {
+            const ativo = filtros.situacao === s;
+            const Icone = ESTILO_SITUACAO[s].icone;
+            return (
+              <li key={s}>
+                <button
+                  type="button"
+                  aria-pressed={ativo}
+                  onClick={() => mudar({ situacao: ativo ? '' : s })}
+                  className={cn('inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold ring-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b63ce]', ESTILO_SITUACAO[s].classe, ativo && 'ring-2 ring-[#0b63ce]')}
+                >
+                  <Icone className="h-3.5 w-3.5" aria-hidden="true" />
+                  {INDICADOR[s]} <span className="tabular-nums">{contagem[s]}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <section id="cco-indicadores" aria-label="Indicadores" className={cn('grid-cols-2 gap-3 lg:grid-cols-4', kpisAbertos ? 'grid' : 'hidden')}>
         {ORDEM_SITUACOES.map((s) => {
           const ativo = filtros.situacao === s;
           const Icone = ESTILO_SITUACAO[s].icone;
