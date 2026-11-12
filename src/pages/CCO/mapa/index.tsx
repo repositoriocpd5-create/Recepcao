@@ -53,10 +53,10 @@ import {
   comoChegar,
 } from './dados';
 
-type FiltroCriticidade = '' | 'critica' | 'atencao' | 'estavel';
+type GrupoCriticidade = 'critica' | 'atencao' | 'estavel';
 type FiltroStatus = '' | 'pendencias' | 'vencidas' | 'atendimento' | 'ok';
 
-const GRUPO_CRITICIDADE: Record<Exclude<FiltroCriticidade, ''>, Criticidade[]> = {
+const GRUPO_CRITICIDADE: Record<GrupoCriticidade, Criticidade[]> = {
   critica: ['critica'],
   atencao: ['vencida', 'atencao'],
   estavel: ['atendimento', 'ok'],
@@ -277,7 +277,8 @@ export const MapaRedePage: React.FC = () => {
 
   const [busca, setBusca] = useState('');
   const [bairro, setBairro] = useState('');
-  const [filtroCriticidade, setFiltroCriticidade] = useState<FiltroCriticidade>('');
+  const [filtroCriticidade, setFiltroCriticidade] = useState<GrupoCriticidade[]>([]);
+  const alternarCriticidade = (g: GrupoCriticidade) => setFiltroCriticidade((v) => (v.includes(g) ? v.filter((x) => x !== g) : [...v, g]));
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>('');
   const [selecionada, setSelecionada] = useState<string | null>(null);
   const [historicoEscola, setHistoricoEscola] = useState<string | null>(null);
@@ -382,7 +383,7 @@ export const MapaRedePage: React.FC = () => {
     return comLocal.filter((u) => {
       if (termo && !normalizar(`${u.nome} ${u.bairro ?? ''}`).includes(termo)) return false;
       if (bairro === '__sem' ? u.bairro : bairro && u.bairro !== bairro) return false;
-      if (filtroCriticidade && !GRUPO_CRITICIDADE[filtroCriticidade].includes(u.criticidade)) return false;
+      if (filtroCriticidade.length && !filtroCriticidade.some((g) => GRUPO_CRITICIDADE[g].includes(u.criticidade))) return false;
       if (filtroStatus === 'pendencias' && !u.abertas.length) return false;
       if (filtroStatus === 'vencidas' && !u.vencidas) return false;
       if (filtroStatus === 'atendimento' && !u.emAtendimento) return false;
@@ -414,7 +415,7 @@ export const MapaRedePage: React.FC = () => {
   const rotaPorRuas = porRuas.data && porRuas.data.ordem.length === unidadesDaRota.length ? porRuas.data : null;
   const rota = { ordem: rotaPorRuas?.ordem ?? retaAprox.ordem, km: rotaPorRuas?.km ?? retaAprox.km };
   const unidadeSelecionada = comLocal.find((u) => u.id === selecionada) || null;
-  const filtrosAtivos = Boolean(busca || bairro || filtroCriticidade || filtroStatus);
+  const filtrosAtivos = Boolean(busca || bairro || filtroCriticidade.length || filtroStatus);
 
   // Tempo real: cada nova ocorrência aparece na hora no mapa, com aviso e destaque no marcador.
   const [novas, setNovas] = useState<CcoOcorrencia[]>([]);
@@ -555,11 +556,20 @@ export const MapaRedePage: React.FC = () => {
           onChange={setBairro}
           ocorrenciasPorBairro={ocorrenciasPorBairro}
         />
-        <select aria-label="Criticidade" value={filtroCriticidade} onChange={(e) => setFiltroCriticidade(e.target.value as FiltroCriticidade)} className={cn(campo, 'w-[170px]')}>
+        <select
+          aria-label="Criticidade"
+          value={filtroCriticidade.length > 1 ? [...filtroCriticidade].sort().join('+') : filtroCriticidade[0] ?? ''}
+          onChange={(e) => setFiltroCriticidade(e.target.value ? (e.target.value.split('+') as GrupoCriticidade[]) : [])}
+          className={cn(campo, 'w-[170px]')}
+        >
           <option value="">Criticidade (todas)</option>
           <option value="critica">Crítica</option>
           <option value="atencao">Atenção</option>
           <option value="estavel">Estável</option>
+          <option value="atencao+critica">Crítica e Atenção</option>
+          {filtroCriticidade.length > 1 && !(filtroCriticidade.length === 2 && filtroCriticidade.includes('critica') && filtroCriticidade.includes('atencao')) && (
+            <option value={[...filtroCriticidade].sort().join('+')}>Várias criticidades</option>
+          )}
         </select>
         <select aria-label="Status" value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value as FiltroStatus)} className={cn(campo, 'w-[170px]')}>
           <option value="">Status (todos)</option>
@@ -629,7 +639,7 @@ export const MapaRedePage: React.FC = () => {
           </button>
         )}
         {filtrosAtivos && (
-          <button type="button" onClick={() => { setBusca(''); setBairro(''); setFiltroCriticidade(''); setFiltroStatus(''); }} className={cn(botaoBarra, 'text-[#5f7391] hover:bg-[#eef5fe] dark:text-slate-400 dark:hover:bg-slate-800')}>
+          <button type="button" onClick={() => { setBusca(''); setBairro(''); setFiltroCriticidade([]); setFiltroStatus(''); }} className={cn(botaoBarra, 'text-[#5f7391] hover:bg-[#eef5fe] dark:text-slate-400 dark:hover:bg-slate-800')}>
             <X className="h-4 w-4" aria-hidden="true" /> Limpar filtros
           </button>
         )}
@@ -639,10 +649,10 @@ export const MapaRedePage: React.FC = () => {
 
       {/* Indicadores */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        <Indicador icone={School} valor={indicadores.total} rotulo="Unidades escolares" ativo={!filtrosAtivos} onClick={() => { setFiltroCriticidade(''); setFiltroStatus(''); }} />
-        <Indicador icone={AlertTriangle} valor={indicadores.criticas} rotulo="Crítica" destaque="text-rose-600" ativo={filtroCriticidade === 'critica'} onClick={() => setFiltroCriticidade((v) => (v === 'critica' ? '' : 'critica'))} />
-        <Indicador icone={Info} valor={indicadores.atencao} rotulo="Atenção" destaque="text-amber-600" ativo={filtroCriticidade === 'atencao'} onClick={() => setFiltroCriticidade((v) => (v === 'atencao' ? '' : 'atencao'))} />
-        <Indicador icone={CheckCircle2} valor={indicadores.estaveis} rotulo="Estável" destaque="text-green-600" ativo={filtroCriticidade === 'estavel'} onClick={() => setFiltroCriticidade((v) => (v === 'estavel' ? '' : 'estavel'))} />
+        <Indicador icone={School} valor={indicadores.total} rotulo="Unidades escolares" ativo={!filtrosAtivos} onClick={() => { setFiltroCriticidade([]); setFiltroStatus(''); }} />
+        <Indicador icone={AlertTriangle} valor={indicadores.criticas} rotulo="Crítica" destaque="text-rose-600" ativo={filtroCriticidade.includes('critica')} onClick={() => alternarCriticidade('critica')} />
+        <Indicador icone={Info} valor={indicadores.atencao} rotulo="Atenção" destaque="text-amber-600" ativo={filtroCriticidade.includes('atencao')} onClick={() => alternarCriticidade('atencao')} />
+        <Indicador icone={CheckCircle2} valor={indicadores.estaveis} rotulo="Estável" destaque="text-green-600" ativo={filtroCriticidade.includes('estavel')} onClick={() => alternarCriticidade('estavel')} />
         <Indicador icone={UserRound} valor={indicadores.atendimento} rotulo="Em atendimento" destaque="text-blue-600" ativo={filtroStatus === 'atendimento'} onClick={() => setFiltroStatus((v) => (v === 'atendimento' ? '' : 'atendimento'))} />
         <Indicador icone={Clock} valor={indicadores.vencidas} rotulo="Prazos vencidos" destaque="text-orange-600" ativo={filtroStatus === 'vencidas'} onClick={() => setFiltroStatus((v) => (v === 'vencidas' ? '' : 'vencidas'))} />
       </div>
